@@ -39,6 +39,9 @@ enum class VariantType : int { Int = 0,
                                MatrixInt,
                                MatrixFloat,
                                MatrixDouble,
+                               LabeledArrayInt,
+                               LabeledArrayFloat,
+                               LabeledArrayDouble,
                                Empty,
                                Unknown };
 
@@ -80,6 +83,10 @@ DECLARE_VARIANT_TRAIT(std::vector<std::string>, ArrayString);
 DECLARE_VARIANT_TRAIT(Array2D<int>, MatrixInt);
 DECLARE_VARIANT_TRAIT(Array2D<float>, MatrixFloat);
 DECLARE_VARIANT_TRAIT(Array2D<double>, MatrixDouble);
+
+DECLARE_VARIANT_TRAIT(LabeledArray<int>, LabeledArrayInt);
+DECLARE_VARIANT_TRAIT(LabeledArray<float>, LabeledArrayFloat);
+DECLARE_VARIANT_TRAIT(LabeledArray<double>, LabeledArrayDouble);
 
 template <typename T>
 struct variant_array_symbol {
@@ -141,19 +148,55 @@ DECLARE_VARIANT_TYPE(Array2D<int>, MatrixInt);
 DECLARE_VARIANT_TYPE(Array2D<float>, MatrixFloat);
 DECLARE_VARIANT_TYPE(Array2D<double>, MatrixDouble);
 
+DECLARE_VARIANT_TYPE(LabeledArray<int>, LabeledArrayInt);
+DECLARE_VARIANT_TYPE(LabeledArray<float>, LabeledArrayFloat);
+DECLARE_VARIANT_TYPE(LabeledArray<double>, LabeledArrayDouble);
+
 template <typename S, typename T>
 struct variant_helper {
-  static void set(S* store, T value) { *(reinterpret_cast<T*>(store)) = value; }
+  static void set(S* store, T value)
+  {
+    *reinterpret_cast<T*>(store) = value;
+  }
   static void set(S* store, T values, size_t size)
   {
     *reinterpret_cast<T*>(store) = reinterpret_cast<T>(std::memcpy(std::malloc(size * sizeof(std::remove_pointer_t<T>)), reinterpret_cast<void*>(values), size * sizeof(std::remove_pointer_t<T>)));
   }
-  static void reset(S* store, T values, size_t)
-  {
-    *reinterpret_cast<T*>(store) = values;
-  }
 
   static T get(const S* store) { return *(reinterpret_cast<const T*>(store)); }
+};
+
+template <typename S>
+struct variant_helper<S, LabeledArray<int>> {
+  static void set(S* store, LabeledArray<int> value)
+  {
+    auto* ptr = reinterpret_cast<LabeledArray<int>*>(store);
+    new (ptr) LabeledArray<int>{};
+    *ptr = value;
+  }
+  static LabeledArray<int> get(const S* store) { return *(reinterpret_cast<const LabeledArray<int>*>(store)); }
+};
+
+template <typename S>
+struct variant_helper<S, LabeledArray<float>> {
+  static void set(S* store, LabeledArray<float> value)
+  {
+    auto* ptr = reinterpret_cast<LabeledArray<float>*>(store);
+    new (ptr) LabeledArray<int>{};
+    *ptr = value;
+  }
+  static LabeledArray<float> get(const S* store) { return *(reinterpret_cast<const LabeledArray<float>*>(store)); }
+};
+
+template <typename S>
+struct variant_helper<S, LabeledArray<double>> {
+  static void set(S* store, LabeledArray<double> value)
+  {
+    auto* ptr = reinterpret_cast<LabeledArray<double>*>(store);
+    new (ptr) LabeledArray<int>{};
+    *ptr = value;
+  }
+  static LabeledArray<double> get(const S* store) { return *(reinterpret_cast<const LabeledArray<double>*>(store)); }
 };
 
 template <typename S>
@@ -180,7 +223,10 @@ struct variant_helper<S, std::string> {
 /// Variant for configuration parameter storage. Owns stored data.
 class Variant
 {
-  using storage_t = std::aligned_union<8, int, int64_t, const char*, float, double, bool, int*, float*, double*, bool*, Array2D<int>, Array2D<float>, Array2D<double>>::type;
+  using storage_t = std::aligned_union<8, int, int64_t, const char*, float, double, bool,
+                                       int*, float*, double*, bool*,
+                                       Array2D<int>, Array2D<float>, Array2D<double>,
+                                       LabeledArray<int>, LabeledArray<float>, LabeledArray<double>>::type;
 
  public:
   Variant(VariantType type = VariantType::Unknown) : mType{type}, mSize{1} {}
@@ -295,34 +341,28 @@ class Variant
 
   void operator=(const Variant& other)
   {
+    mSize = other.mSize;
     switch (mType) {
       case variant_trait_v<const char*>:
-        mSize = other.mSize;
         variant_helper<storage_t, const char*>::set(&mStore, other.get<const char*>());
         return;
       case variant_trait_v<int*>:
-        mSize = other.mSize;
         variant_helper<storage_t, int*>::set(&mStore, other.get<int*>(), mSize);
         return;
       case variant_trait_v<float*>:
-        mSize = other.mSize;
         variant_helper<storage_t, float*>::set(&mStore, other.get<float*>(), mSize);
         return;
       case variant_trait_v<double*>:
-        mSize = other.mSize;
         variant_helper<storage_t, double*>::set(&mStore, other.get<double*>(), mSize);
         return;
       case variant_trait_v<bool*>:
-        mSize = other.mSize;
         variant_helper<storage_t, bool*>::set(&mStore, other.get<bool*>(), mSize);
         return;
       case variant_trait_v<std::string*>:
-        mSize = other.mSize;
         variant_helper<storage_t, std::string*>::set(&mStore, other.get<std::string*>(), mSize);
         return;
       default:
         mStore = other.mStore;
-        mSize = other.mSize;
     }
   }
 

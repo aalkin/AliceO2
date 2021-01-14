@@ -24,30 +24,6 @@ bool unknown_type(RuntimeErrorRef const& ref)
   return strcmp(err.what, "Mismatch between types") == 0;
 }
 
-BOOST_AUTO_TEST_CASE(MatrixTest)
-{
-  float m[3][4] = {{0.1, 0.2, 0.3, 0.4}, {0.5, 0.6, 0.7, 0.8}, {0.9, 1.0, 1.1, 1.2}};
-  Array2D mm(&m[0][0], 3, 4);
-  for (auto i = 0U; i < 3; ++i) {
-    for (auto j = 0U; j < 4; ++j) {
-      BOOST_CHECK(mm(i, j) == m[i][j]);
-    }
-  }
-  std::vector<float> v = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2};
-  Array2D mv(v, 3, 4);
-  for (auto i = 0U; i < 3; ++i) {
-    for (auto j = 0U; j < 4; ++j) {
-      BOOST_CHECK(mm(i, j) == v[i * 4 + j]);
-    }
-  }
-  for (auto i = 0U; i < 3; ++i) {
-    auto const& vv = mm[i];
-    for (auto j = 0u; j < 4; ++j) {
-      BOOST_CHECK(vv[j] == mm(i, j));
-    }
-  }
-}
-
 BOOST_AUTO_TEST_CASE(VariantTest)
 {
   std::ostringstream ss{};
@@ -182,4 +158,71 @@ BOOST_AUTO_TEST_CASE(VariantTest)
   std::stringstream ssm;
   ssm << vmma;
   BOOST_CHECK(ssm.str() == "f[[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8], [0.9, 1, 1.1, 1.2]]");
+
+  LabeledArray<float> laf{&m[0][0], 3, 4, {"r1", "r2", "r3"}, {"c1", "c2", "c3", "c4"}};
+  Variant vlaf(laf);
+  auto const& lafc = vlaf.get<LabeledArray<float>>();
+  for (auto i = 0u; i < 3; ++i) {
+    for (auto j = 0u; j < 4; ++j) {
+      BOOST_CHECK(laf.get(i, j) == lafc.get(i, j));
+    }
+  }
+
+  Variant vlafc(vlaf);            // Copy constructor
+  Variant vlafm(std::move(vlaf)); // Move constructor
+  Variant vlafa = vlafm;          // Copy assignment
+  auto const& lafc2 = vlafc.get<LabeledArray<float>>();
+  for (auto i = 0U; i < 3; ++i) {
+    for (auto j = 0U; j < 4; ++j) {
+      BOOST_CHECK(lafc2.get(i, j) == mm(i, j));
+    }
+  }
+  auto const& lafc3 = vlafa.get<LabeledArray<float>>();
+  for (auto i = 0U; i < 3; ++i) {
+    for (auto j = 0U; j < 4; ++j) {
+      BOOST_CHECK(lafc3.get(i, j) == mm(i, j));
+    }
+  }
+
+  std::vector<Variant> collection;
+  collection.push_back(vlafc);
+  collection.push_back(vlafm);
+  collection.push_back(vlafa);
+}
+
+BOOST_AUTO_TEST_CASE(Array2DTest)
+{
+  float m[3][4] = {{0.1, 0.2, 0.3, 0.4}, {0.5, 0.6, 0.7, 0.8}, {0.9, 1.0, 1.1, 1.2}};
+  Array2D mm(&m[0][0], 3, 4);
+  for (auto i = 0U; i < 3; ++i) {
+    for (auto j = 0U; j < 4; ++j) {
+      BOOST_CHECK(mm(i, j) == m[i][j]);
+    }
+  }
+  std::vector<float> v = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2};
+  Array2D mv(v, 3, 4);
+  for (auto i = 0U; i < 3; ++i) {
+    for (auto j = 0U; j < 4; ++j) {
+      BOOST_CHECK(mm(i, j) == v[i * 4 + j]);
+    }
+  }
+  for (auto i = 0U; i < 3; ++i) {
+    auto const& vv = mm[i];
+    for (auto j = 0u; j < 4; ++j) {
+      BOOST_CHECK(vv[j] == mm(i, j));
+    }
+  }
+}
+
+BOOST_AUTO_TEST_CASE(LabeledArrayTest)
+{
+  float m[3][4] = {{0.1, 0.2, 0.3, 0.4}, {0.5, 0.6, 0.7, 0.8}, {0.9, 1.0, 1.1, 1.2}};
+  std::string xl[] = {"c1", "c2", "c3", "c4"};
+  std::string yl[] = {"r1", "r2", "r3"};
+  LabeledArray<float> laf{&m[0][0], 3, 4, {"r1", "r2", "r3"}, {"c1", "c2", "c3", "c4"}};
+  for (auto i = 0u; i < 3; ++i) {
+    for (auto j = 0u; j < 4; ++j) {
+      BOOST_CHECK(laf.get(yl[i], xl[j]) == laf.get(i, j));
+    }
+  }
 }

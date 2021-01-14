@@ -51,6 +51,38 @@ void PropertyTreeHelpers::populateDefaults(std::vector<ConfigParamSpec> const& s
     pt.put_child(key, subtree);
   };
 
+  auto addLabeledArraySubTree = [&](std::string const& key, auto la) {
+    boost::property_tree::ptree subtree;
+    auto createArray = [&](auto vector) {
+      boost::property_tree::ptree branch;
+      for (auto i = 0u; i < vector.size(); ++i) {
+        boost::property_tree::ptree leaf;
+        leaf.put("", vector[i]);
+        branch.push_back(std::make_pair("", leaf));
+      }
+      return branch;
+    };
+    auto createArray2D = [&](auto array2d) {
+      boost::property_tree::ptree subtree;
+      for (auto i = 0u; i < array2d.rows; ++i) {
+        boost::property_tree::ptree branch;
+        for (auto j = 0u; j < array2d.cols; ++j) {
+          boost::property_tree::ptree leaf;
+          leaf.put("", array2d(i, j));
+          branch.push_back(std::make_pair("", leaf));
+        }
+        subtree.push_back(std::make_pair("", branch));
+      }
+      return subtree;
+    };
+
+    subtree.put_child("labels_rows", createArray(la.getLabelsRows()));
+    subtree.put_child("labels_cols", createArray(la.getLabelsCols()));
+    subtree.put_child("values", createArray2D(la.getData()));
+
+    pt.put_child(key, subtree);
+  };
+
   for (auto const& spec : schema) {
     std::string key = spec.name.substr(0, spec.name.find(','));
     try {
@@ -99,6 +131,15 @@ void PropertyTreeHelpers::populateDefaults(std::vector<ConfigParamSpec> const& s
           break;
         case VariantType::MatrixDouble:
           addSubTree(key, spec.defaultValue.get<Array2D<double>>());
+          break;
+        case VariantType::LabeledArrayInt:
+          addLabeledArraySubTree(key, spec.defaultValue.get<LabeledArray<int>>());
+          break;
+        case VariantType::LabeledArrayFloat:
+          addLabeledArraySubTree(key, spec.defaultValue.get<LabeledArray<float>>());
+          break;
+        case VariantType::LabeledArrayDouble:
+          addLabeledArraySubTree(key, spec.defaultValue.get<LabeledArray<double>>());
           break;
         case VariantType::Unknown:
         case VariantType::Empty:
@@ -335,6 +376,9 @@ void PropertyTreeHelpers::populate(std::vector<ConfigParamSpec> const& schema,
         case VariantType::MatrixInt:
         case VariantType::MatrixFloat:
         case VariantType::MatrixDouble:
+        case VariantType::LabeledArrayInt:
+        case VariantType::LabeledArrayFloat:
+        case VariantType::LabeledArrayDouble:
           pt.put_child(key, *it);
           break;
         case VariantType::Unknown:

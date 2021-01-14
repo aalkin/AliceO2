@@ -89,6 +89,7 @@ o2_add_library(Framework
                        src/DataOutputDirector.cxx
                        src/Task.cxx
                        src/Variant.cxx
+                       src/VariantSerializationHelpers.cxx
                        src/WorkflowCustomizationHelpers.cxx
                        src/WorkflowHelpers.cxx
                        src/WorkflowSerializationHelpers.cxx

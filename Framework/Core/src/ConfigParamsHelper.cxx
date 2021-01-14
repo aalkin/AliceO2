@@ -79,6 +79,9 @@ void ConfigParamsHelper::populateBoostProgramOptions(
       case VariantType::MatrixDouble:
         addConfigSpecOption<VariantType::MatrixDouble>(spec, options);
         break;
+      case VariantType::LabeledArrayInt:
+      case VariantType::LabeledArrayFloat:
+      case VariantType::LabeledArrayDouble:
       case VariantType::Unknown:
       case VariantType::Empty:
         break;

@@ -30,7 +30,11 @@ std::vector<T> extractVector(boost::property_tree::ptree const& tree)
   std::vector<T> result(tree.size());
   auto count = 0u;
   for (auto& entry : tree) {
-    result[count++] = entry.second.get_value<T>();
+    if constexpr (std::is_same_v<T, const char*>) {
+      result[count++] = entry.second.get_value<std::string>().c_str();
+    } else {
+      result[count++] = entry.second.get_value<T>();
+    }
   }
   return result;
 }
@@ -56,6 +60,16 @@ o2::framework::Array2D<T> extractMatrix(boost::property_tree::ptree const& tree)
     ++irow;
   }
   return o2::framework::Array2D<T>{cache, nrows, ncols};
+}
+
+template <typename T>
+o2::framework::LabeledArray<T> extractLabeledArray(boost::property_tree::ptree const& tree)
+{
+  auto labels_rows = extractVector<std::string>(tree.get_child("labels_rows"));
+  auto labels_cols = extractVector<std::string>(tree.get_child("labels_cols"));
+  auto values = extractMatrix<T>(tree.get_child("values"));
+
+  return LabeledArray<T>{values, labels_rows, labels_cols};
 }
 } // namespace
 
@@ -105,6 +119,8 @@ class ConfigParamRegistry
         return extractVector<typename T::value_type>(mStore->store().get_child(key));
       } else if constexpr (is_base_of_template<o2::framework::Array2D, T>::value) {
         return extractMatrix<typename T::element_t>(mStore->store().get_child(key));
+      } else if constexpr (is_base_of_template<o2::framework::LabeledArray, T>::value) {
+        return extractLabeledArray<typename T::element_t>(mStore->store().get_child(key));
       } else if constexpr (std::is_same_v<T, boost::property_tree::ptree>) {
         return mStore->store().get_child(key);
       } else if constexpr (std::is_constructible_v<T, boost::property_tree::ptree>) {

@@ -18,6 +18,10 @@ namespace o2
 {
 namespace framework
 {
+enum struct ConfigParamKind {
+  kGeneric = 0,
+  kAxisSpec = 1
+};
 
 /// @class ConfigParamSpec Definition of options for a processor
 /// An option definition consists of a name, a type, a help message, and
@@ -38,27 +42,28 @@ struct ConfigParamSpec {
   };
   template <typename T>
   ConfigParamSpec(std::string, ParamType, Variant, T)
-    : type(VariantType::Unknown)
+    : type(VariantType::Unknown), kind{ConfigParamKind::kGeneric}
   {
     static_assert(std::is_same<T, HelpString>::value,
                   R"(help string must be brace-enclosed, e.g. '{"help"}')");
   }
 
   ConfigParamSpec(std::string _name, ParamType _type,
-                  Variant _defaultValue, HelpString _help)
-    : name(_name), type(_type), defaultValue(_defaultValue), help(_help)
+                  Variant _defaultValue, HelpString _help, ConfigParamKind kind_ = ConfigParamKind::kGeneric)
+    : name(_name), type(_type), defaultValue(_defaultValue), help(_help), kind{kind_}
   {
   }
 
   /// config spec without default value, explicitely marked as 'empty'
   /// and will be ignored at other places
   ConfigParamSpec(std::string _name, ParamType _type, HelpString _help)
-    : name(_name), type(_type), defaultValue(VariantType::Empty), help(_help) {}
+    : name(_name), type(_type), defaultValue(VariantType::Empty), help(_help), kind{ConfigParamKind::kGeneric} {}
 
   std::string name;
   ParamType type;
   Variant defaultValue;
   HelpString help;
+  ConfigParamKind kind;
 };
 
 } // namespace framework

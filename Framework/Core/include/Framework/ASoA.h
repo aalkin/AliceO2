@@ -149,6 +149,12 @@ inline constexpr bool is_self_index_column_v = false;
 template <typename T>
 inline constexpr bool is_self_index_column_v<T, std::void_t<decltype(sizeof(typename T::self_index_t))>> = true;
 
+template <typename, typename = void>
+inline constexpr bool is_with_base_table_v = false;
+
+template <typename T>
+inline constexpr bool is_with_base_table_v<T, std::void_t<decltype(sizeof(typename T::base_table_t))>> = true;
+
 template <typename B, typename E>
 struct EquivalentIndex {
   constexpr static bool value = false;
@@ -2204,7 +2210,7 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
                                                                                                                                 \
   struct _Name_##ExtensionMetadata : o2::soa::TableMetadata<_Name_##ExtensionMetadata> {                                        \
     using table_t = _Name_##Extension;                                                                                          \
-    using base_table_t = typename _Table_::table_t;                                                                             \
+    using base_table_t = _Table_;                                                                                               \
     using expression_pack_t = typename _Name_##Extension::expression_pack_t;                                                    \
     using originals = soa::originals_pack_t<_Table_>;                                                                           \
     using sources = originals;                                                                                                  \
@@ -2665,6 +2671,7 @@ class Filtered : public FilteredBase<T>
  public:
   using self_t = Filtered<T>;
   using table_t = typename FilteredBase<T>::table_t;
+  using originals = originals_pack_t<T>;
 
   Filtered(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
     : FilteredBase<T>(std::move(tables), selection, offset) {}
@@ -2780,6 +2787,7 @@ class Filtered<Filtered<T>> : public FilteredBase<typename T::table_t>
  public:
   using self_t = Filtered<Filtered<T>>;
   using table_t = typename FilteredBase<typename T::table_t>::table_t;
+  using originals = originals_pack_t<T>;
 
   Filtered(std::vector<Filtered<T>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
     : FilteredBase<typename T::table_t>(std::move(extractTablesFromFiltered(tables)), selection, offset)

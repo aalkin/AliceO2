@@ -12,6 +12,7 @@
 o2_add_library(Framework
                SOURCES src/AODReaderHelpers.cxx
                        src/ArrowSupport.cxx
+                       src/ArrowTableSlicingCache.cxx
                        src/AnalysisDataModel.cxx
                        src/ASoA.cxx
                        src/AsyncQueue.cxx

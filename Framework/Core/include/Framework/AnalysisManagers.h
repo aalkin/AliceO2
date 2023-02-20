@@ -326,7 +326,7 @@ struct OutputManager<Spawns<T>> {
   {
     auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals(what.sources_pack(), pc));
     if (originalTable->schema()->fields().empty() == true) {
-      using base_table_t = typename Spawns<T>::base_table_t;
+      using base_table_t = typename Spawns<T>::base_table_t::table_t;
       originalTable = makeEmptyTable<base_table_t>(aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel());
     }
 

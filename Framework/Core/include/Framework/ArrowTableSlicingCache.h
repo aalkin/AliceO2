@@ -20,7 +20,6 @@
 namespace  o2::framework
 {
   struct SliceInfoPtr {
-    std::pair<std::string, std::string> bindingKey;
     gsl::span<int const> values;
     gsl::span<int64_t const> counts;
 
@@ -46,13 +45,11 @@ namespace  o2::framework
     // set caching information externally
     void setCaches(std::vector<std::pair<std::string, std::string>>&& bsks);
 
-    // add slicing info cache entry (does not check if the entry is present)
-    void addCacheEntry(std::pair<const char*, const char*> bindingKey);
     // update slicing info cache entry (assumes it is already present)
-    arrow::Status updateCacheEntry(std::pair<const char*, const char*> bindingKey, std::shared_ptr<arrow::Table> const& table);
+    arrow::Status updateCacheEntry(int pos, std::shared_ptr<arrow::Table>&& table);
 
     // get slice from cache for a given value
-    SliceInfoPtr getCacheFor(std::pair<const char*, const char*> bindingKey) const;
+    SliceInfoPtr getCacheFor(std::pair<std::string, std::string> const& bindingKey) const;
   };
 }
 

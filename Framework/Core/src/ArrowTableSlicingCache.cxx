@@ -22,6 +22,9 @@ namespace o2::framework
 std::pair<int64_t, int64_t> SliceInfoPtr::getSliceFor(int value) const
 {
   int64_t offset = 0;
+  if (values.empty()) {
+    return {offset, 0};
+  }
   for (auto i = 0; i < values.size(); ++i) {
     if (values[i] == value) {
       return {offset, counts[i]};
@@ -52,38 +55,33 @@ void ArrowTableSlicingCache::setCaches(std::vector<std::pair<std::string, std::s
   counts.resize(bindingsKeys.size());
 }
 
-void ArrowTableSlicingCache::addCacheEntry(std::pair<const char*, const char*> bindingKey)
+arrow::Status ArrowTableSlicingCache::updateCacheEntry(int pos, std::shared_ptr<arrow::Table>&& table)
 {
-  bindingsKeys.emplace_back(bindingKey.first, bindingKey.second);
-  values.emplace_back();
-  counts.emplace_back();
-}
-
-arrow::Status ArrowTableSlicingCache::updateCacheEntry(std::pair<const char*, const char*> bindingKey, std::shared_ptr<arrow::Table> const& table)
-{
-  auto locate = std::find_if(bindingsKeys.begin(), bindingsKeys.end(), [&](auto const& entry) { return (entry.first == bindingKey.first) && (entry.second == bindingKey.second); });
-  auto i = std::distance(bindingsKeys.begin(), locate);
+  if (table->num_rows() == 0) {
+    values[pos] = std::make_shared<arrow::NumericArray<arrow::Int32Type>>();
+    counts[pos] = std::make_shared<arrow::NumericArray<arrow::Int64Type>>();
+    return arrow::Status::OK();
+  }
   arrow::Datum value_counts;
   auto options = arrow::compute::ScalarAggregateOptions::Defaults();
   ARROW_ASSIGN_OR_RAISE(value_counts,
-                        arrow::compute::CallFunction("value_counts", {table->GetColumnByName(bindingKey.second)},
+                        arrow::compute::CallFunction("value_counts", {table->GetColumnByName(bindingsKeys[pos].second)},
                                                      &options));
   auto pair = static_cast<arrow::StructArray>(value_counts.array());
-  values[i] = std::make_shared<arrow::NumericArray<arrow::Int32Type>>(pair.field(0)->data());
-  counts[i] = std::make_shared<arrow::NumericArray<arrow::Int64Type>>(pair.field(1)->data());
+  values[pos] = std::make_shared<arrow::NumericArray<arrow::Int32Type>>(pair.field(0)->data());
+  counts[pos] = std::make_shared<arrow::NumericArray<arrow::Int64Type>>(pair.field(1)->data());
   return arrow::Status::OK();
 }
 
-SliceInfoPtr ArrowTableSlicingCache::getCacheFor(std::pair<const char*, const char*> bindingKey) const
+SliceInfoPtr ArrowTableSlicingCache::getCacheFor(std::pair<std::string, std::string> const& bindingKey) const
 {
   auto locate = std::find_if(bindingsKeys.begin(), bindingsKeys.end(), [&](std::pair<std::string, std::string> const& bk) { return (bindingKey.first == bk.first) && (bindingKey.second == bk.second); });
   if (locate == bindingsKeys.end()) {
-    throw runtime_error_f("Slicing cache miss for %s/%s", bindingKey.first, bindingKey.second);
+    throw runtime_error_f("Slicing cache miss for %s/%s", bindingKey.first.c_str(), bindingKey.second.c_str());
   }
   auto i = std::distance(bindingsKeys.begin(), locate);
 
   return {
-    bindingsKeys[i],
     {reinterpret_cast<int const*>(values[i]->values()->data()), static_cast<size_t>(values[i]->length())},
     {reinterpret_cast<int64_t const*>(counts[i]->values()->data()), static_cast<size_t>(counts[i]->length())} //
   };

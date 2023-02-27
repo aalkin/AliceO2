@@ -70,71 +70,6 @@ static constexpr bool is_enumeration_v<Enumeration<BEGIN, END, STEP>> = true;
 // the contents of an AnalysisTask...
 struct AnalysisDataProcessorBuilder {
   template <typename T>
-  static std::string getLabelFromType()
-  {
-    auto cutString = [](std::string&& str) -> std::string {
-      auto pos = str.find('_');
-      if (pos != std::string::npos) {
-        str.erase(pos);
-      }
-      return str;
-    };
-
-    if constexpr (soa::is_soa_index_table_v<std::decay_t<T>>) {
-      using TT = typename std::decay_t<T>::first_t;
-      if constexpr (soa::is_type_with_originals_v<std::decay_t<TT>>) {
-        using O = typename framework::pack_head_t<typename std::decay_t<TT>::originals>;
-        using groupingMetadata = typename aod::MetadataTrait<O>::metadata;
-        return cutString(std::string{groupingMetadata::tableLabel()});
-      } else {
-        using groupingMetadata = typename aod::MetadataTrait<TT>::metadata;
-        return cutString(std::string{groupingMetadata::tableLabel()});
-      }
-    } else if constexpr (soa::is_type_with_originals_v<std::decay_t<T>>) {
-      using TT = typename framework::pack_head_t<typename std::decay_t<T>::originals>;
-      if constexpr (soa::is_with_base_table_v<typename aod::MetadataTrait<TT>::metadata>) {
-        using TTT = typename aod::MetadataTrait<TT>::metadata::base_table_t;
-        return getLabelFromType<TTT>();
-      } else {
-        using groupingMetadata = typename aod::MetadataTrait<TT>::metadata;
-        return cutString(std::string{groupingMetadata::tableLabel()});
-      }
-    } else {
-      if constexpr (soa::is_with_base_table_v<typename aod::MetadataTrait<T>::metadata>) {
-        using TT = typename aod::MetadataTrait<T>::metadata::base_table_t;
-        return getLabelFromType<TT>();
-      } else {
-        using groupingMetadata = typename aod::MetadataTrait<std::decay_t<T>>::metadata;
-        return cutString(std::string{groupingMetadata::tableLabel()});
-      }
-    }
-  }
-
-  template <typename B, typename... C>
-  constexpr static bool hasIndexTo(framework::pack<C...>&&)
-  {
-    return (o2::soa::is_binding_compatible_v<B, typename C::binding_t>() || ...);
-  }
-
-  template <typename B, typename... C>
-  constexpr static bool hasSortedIndexTo(framework::pack<C...>&&)
-  {
-    return ((C::sorted && o2::soa::is_binding_compatible_v<B, typename C::binding_t>()) || ...);
-  }
-
-  template <typename B, typename Z>
-  constexpr static bool relatedByIndex()
-  {
-    return hasIndexTo<B>(typename Z::table_t::external_index_columns_t{});
-  }
-
-  template <typename B, typename Z>
-  constexpr static bool relatedBySortedIndex()
-  {
-    return hasSortedIndexTo<B>(typename Z::table_t::external_index_columns_t{});
-  }
-
-  template <typename T>
   static ConfigParamSpec getSpec()
   {
     if constexpr (soa::is_type_with_metadata_v<aod::MetadataTrait<T>>) {
@@ -229,8 +164,8 @@ struct AnalysisDataProcessorBuilder {
   template <typename G, typename Arg>
   static void appendGroupingCandidate(std::vector<std::pair<std::string, std::string>>& bk, std::string& key)
   {
-    if constexpr (relatedByIndex<std::decay_t<G>, std::decay_t<Arg>>()) {
-      auto binding = getLabelFromType<std::decay_t<Arg>>();
+    if constexpr (soa::relatedByIndex<std::decay_t<G>, std::decay_t<Arg>>()) {
+      auto binding = soa::getLabelFromType<std::decay_t<Arg>>();
       bk.emplace_back(binding, key);
     }
   }
@@ -238,7 +173,7 @@ struct AnalysisDataProcessorBuilder {
   template <typename G, typename... Args>
   static void appendGroupingCandidates(std::vector<std::pair<std::string, std::string>>& bk, framework::pack<G, Args...>)
   {
-    auto key = std::string{"fIndex"} + getLabelFromType<std::decay_t<G>>();
+    auto key = std::string{"fIndex"} + soa::getLabelFromType<std::decay_t<G>>();
     (appendGroupingCandidate<G, Args>(bk, key), ...);
   }
 
@@ -388,7 +323,7 @@ struct AnalysisDataProcessorBuilder {
                              task);
     };
     // pre-slice grouping table if required
-    presliceTable(groupingTable);
+//    presliceTable(groupingTable);
 
     // set filtered tables for partitions with grouping
     homogeneous_apply_refs([&groupingTable](auto& x) {
@@ -420,7 +355,7 @@ struct AnalysisDataProcessorBuilder {
       static_assert(((soa::is_soa_iterator_v<std::decay_t<Associated>> == false) && ...),
                     "Associated arguments of process() should not be iterators");
       auto associatedTables = AnalysisDataProcessorBuilder::bindAssociatedTables(inputs, processingFunction, infos);
-      //pre-bind self indices
+      // pre-bind self indices
       std::apply(
         [&](auto&... t) {
           (homogeneous_apply_refs(
@@ -461,10 +396,10 @@ struct AnalysisDataProcessorBuilder {
       if constexpr (soa::is_soa_iterator_v<std::decay_t<G>>) {
         // grouping case
         // pre-slice associated tables
-        std::apply([&presliceTable](auto&... x) {
-          (presliceTable(x), ...);
-        },
-                   associatedTables);
+//        std::apply([&presliceTable](auto&... x) {
+//          (presliceTable(x), ...);
+//        },
+//                   associatedTables);
 
         auto slicer = GroupSlicer(groupingTable, associatedTables);
         for (auto& slice : slicer) {
@@ -488,10 +423,10 @@ struct AnalysisDataProcessorBuilder {
       } else {
         // non-grouping case
         // pre-slice associated tables
-        std::apply([&presliceTable](auto&... x) {
-          (presliceTable(x), ...);
-        },
-                   associatedTables);
+//        std::apply([&presliceTable](auto&... x) {
+//          (presliceTable(x), ...);
+//        },
+//                   associatedTables);
 
         overwriteInternalIndices(associatedTables, associatedTables);
         // bind partitions and grouping table
@@ -697,6 +632,9 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
     },
     *task.get());
 
+  // add preslice declarations to slicing cache definition
+  homogeneous_apply_refs([&bindingsKeys](auto& x) { return PresliceManager<std::decay_t<decltype(x)>>::registerCache(x, bindingsKeys); }, *task.get());
+
   // request base tables for spawnable extended tables
   // this checks for duplications
   homogeneous_apply_refs([&inputs](auto& x) {
@@ -704,7 +642,7 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
   },
                          *task.get());
 
-  //request base tables for indices to be built
+  // request base tables for indices to be built
   homogeneous_apply_refs([&inputs](auto& x) {
     return IndexManager<std::decay_t<decltype(x)>>::requestInputs(inputs, x);
   },
@@ -768,7 +706,14 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
         info.resetSelection = true;
       }
       // reset pre-slice for the next dataframe
-      homogeneous_apply_refs([](auto& x) { return PresliceManager<std::decay_t<decltype(x)>>::setNewDF(x); }, *(task.get()));
+      auto slices = pc.services().get<ArrowTableSlicingCache>();
+      homogeneous_apply_refs([&pc, &slices](auto& x) {
+        if constexpr(framework::is_base_of_template_v<Preslice, std::decay_t<decltype(x)>>) {
+          return PresliceManager<std::decay_t<decltype(x)>>::updateSliceInfo(x, slices.getCacheFor(x.getBindingKey()));
+        }
+        return false;
+      }, //
+      *(task.get()));
       // prepare outputs
       homogeneous_apply_refs([&pc](auto&& x) { return OutputManager<std::decay_t<decltype(x)>>::prepare(pc, x); }, *task.get());
       // execute run()

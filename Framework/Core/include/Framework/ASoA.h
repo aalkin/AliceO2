@@ -35,13 +35,14 @@
 #include <typeinfo>
 #include <gsl/span>
 
-#define DECLARE_SOA_METADATA()                                                                    \
-template <typename T>                                                                             \
-struct MetadataTrait {                                                                            \
-  using metadata = std::void_t<T>;                                                                \
-};
+#define DECLARE_SOA_METADATA()       \
+  template <typename T>              \
+  struct MetadataTrait {             \
+    using metadata = std::void_t<T>; \
+  };
 
-namespace o2::aod {
+namespace o2::aod
+{
 DECLARE_SOA_METADATA();
 }
 
@@ -1061,7 +1062,7 @@ constexpr static bool relatedBySortedIndex()
 {
   return hasSortedIndexTo<B>(typename Z::table_t::external_index_columns_t{});
 }
-}
+} // namespace o2::soa
 
 namespace o2::framework
 {
@@ -1077,12 +1078,12 @@ struct Preslice {
     sliceInfo = si;
   }
 
-  arrow::Status getSliceFor(int value, std::shared_ptr<arrow::Table> const& input , std::shared_ptr<arrow::Table>& output, uint64_t& offset) const
+  arrow::Status getSliceFor(int value, std::shared_ptr<arrow::Table> const& input, std::shared_ptr<arrow::Table>& output, uint64_t& offset) const
   {
-      auto [offset_, count] = sliceInfo.getSliceFor(value);
-      output = input->Slice(offset_, count);
-      offset = static_cast<int64_t>(offset_);
-      return arrow::Status::OK();
+    auto [offset_, count] = sliceInfo.getSliceFor(value);
+    output = input->Slice(offset_, count);
+    offset = static_cast<int64_t>(offset_);
+    return arrow::Status::OK();
   }
 
   std::pair<std::string, std::string> const& getBindingKey() const
@@ -1608,7 +1609,7 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
 
 } // namespace o2::soa
 
-#define DECLARE_SOA_VERSIONING()                                                                         \
+#define DECLARE_SOA_VERSIONING()                                                                    \
   template <typename T>                                                                             \
   constexpr int getVersion()                                                                        \
   {                                                                                                 \

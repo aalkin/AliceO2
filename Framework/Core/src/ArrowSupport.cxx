@@ -537,8 +537,7 @@ o2::framework::ServiceSpec ArrowSupport::arrowTableSlicingCacheSpec()
         if (!status.ok()) {
           throw runtime_error_f("Failed to update slice cache for %s/%s", caches[i].first.c_str(), caches[i].second.c_str());
         }
-      } //
-    },
+      } // },
     .configure = CommonServices::noConfiguration(),
     .kind = ServiceKind::Stream};
 }

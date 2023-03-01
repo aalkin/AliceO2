@@ -525,7 +525,8 @@ o2::framework::ServiceSpec ArrowSupport::arrowTableSlicingCacheDefSpec()
 
 o2::framework::ServiceSpec ArrowSupport::arrowTableSlicingCacheSpec()
 {
-  return ServiceSpec{
+  return ServiceSpec
+  {
     .name = "arrow-slicing-cache",
     .uniqueId = CommonServices::simpleServiceId<ArrowTableSlicingCache>(),
     .init = [](ServiceRegistryRef services, DeviceState&, fair::mq::ProgOptions&) { return ServiceHandle{TypeIdHelpers::uniqueId<ArrowTableSlicingCache>(), new ArrowTableSlicingCache(std::vector<std::pair<std::string, std::string>>{services.get<ArrowTableSlicingCacheDef>().bindingsKeys}), ServiceKind::Stream, typeid(ArrowTableSlicingCache).name()}; },
@@ -539,8 +540,8 @@ o2::framework::ServiceSpec ArrowSupport::arrowTableSlicingCacheSpec()
         }
       } // },
     .configure = CommonServices::noConfiguration(),
-    .kind = ServiceKind::Stream};
-}
+    .kind = ServiceKind::Stream };
+  }
 
 } // namespace o2::framework
 #pragma GGC diagnostic pop

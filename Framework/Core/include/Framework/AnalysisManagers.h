@@ -624,7 +624,7 @@ template <typename T>
 struct PresliceManager<Preslice<T>> {
   static bool registerCache(Preslice<T>& container, std::vector<std::pair<std::string, std::string>>& bsks)
   {
-    auto locate = std::find_if(bsks.begin(), bsks.end(), [&](auto const& entry){ return (entry.first == container.bindingKey.first) && (entry.second == container.bindingKey.second); });
+    auto locate = std::find_if(bsks.begin(), bsks.end(), [&](auto const& entry) { return (entry.first == container.bindingKey.first) && (entry.second == container.bindingKey.second); });
     if (locate == bsks.end()) {
       bsks.emplace_back(container.getBindingKey());
     }

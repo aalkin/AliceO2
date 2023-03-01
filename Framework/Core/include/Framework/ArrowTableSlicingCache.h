@@ -17,40 +17,40 @@
 #include <string_view>
 #include <gsl/span>
 
-namespace  o2::framework
+namespace o2::framework
 {
-  struct SliceInfoPtr {
-    gsl::span<int const> values;
-    gsl::span<int64_t const> counts;
+struct SliceInfoPtr {
+  gsl::span<int const> values;
+  gsl::span<int64_t const> counts;
 
-    std::pair<int64_t, int64_t> getSliceFor(int value) const;
-  };
+  std::pair<int64_t, int64_t> getSliceFor(int value) const;
+};
 
-  struct ArrowTableSlicingCacheDef {
-    constexpr static ServiceKind service_kind = ServiceKind::Global;
-    std::vector<std::pair<std::string, std::string>> bindingsKeys;
+struct ArrowTableSlicingCacheDef {
+  constexpr static ServiceKind service_kind = ServiceKind::Global;
+  std::vector<std::pair<std::string, std::string>> bindingsKeys;
 
-    void setCaches(std::vector<std::pair<std::string, std::string>>&& bsks);
-  };
+  void setCaches(std::vector<std::pair<std::string, std::string>>&& bsks);
+};
 
-  struct ArrowTableSlicingCache {
-    constexpr static ServiceKind service_kind = ServiceKind::Stream;
+struct ArrowTableSlicingCache {
+  constexpr static ServiceKind service_kind = ServiceKind::Stream;
 
-    std::vector<std::pair<std::string, std::string>> bindingsKeys;
-    std::vector<std::shared_ptr<arrow::NumericArray<arrow::Int32Type>>> values;
-    std::vector<std::shared_ptr<arrow::NumericArray<arrow::Int64Type>>> counts;
+  std::vector<std::pair<std::string, std::string>> bindingsKeys;
+  std::vector<std::shared_ptr<arrow::NumericArray<arrow::Int32Type>>> values;
+  std::vector<std::shared_ptr<arrow::NumericArray<arrow::Int64Type>>> counts;
 
-    ArrowTableSlicingCache(std::vector<std::pair<std::string, std::string>>&& bsks);
+  ArrowTableSlicingCache(std::vector<std::pair<std::string, std::string>>&& bsks);
 
-    // set caching information externally
-    void setCaches(std::vector<std::pair<std::string, std::string>>&& bsks);
+  // set caching information externally
+  void setCaches(std::vector<std::pair<std::string, std::string>>&& bsks);
 
-    // update slicing info cache entry (assumes it is already present)
-    arrow::Status updateCacheEntry(int pos, std::shared_ptr<arrow::Table>&& table);
+  // update slicing info cache entry (assumes it is already present)
+  arrow::Status updateCacheEntry(int pos, std::shared_ptr<arrow::Table>&& table);
 
-    // get slice from cache for a given value
-    SliceInfoPtr getCacheFor(std::pair<std::string, std::string> const& bindingKey) const;
-  };
-}
+  // get slice from cache for a given value
+  SliceInfoPtr getCacheFor(std::pair<std::string, std::string> const& bindingKey) const;
+};
+} // namespace o2::framework
 
 #endif // ARROWTABLESLICINGCACHE_H

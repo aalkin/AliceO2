@@ -323,7 +323,7 @@ struct AnalysisDataProcessorBuilder {
                              task);
     };
     // pre-slice grouping table if required
-//    presliceTable(groupingTable);
+    //    presliceTable(groupingTable);
 
     // set filtered tables for partitions with grouping
     homogeneous_apply_refs([&groupingTable](auto& x) {
@@ -396,10 +396,10 @@ struct AnalysisDataProcessorBuilder {
       if constexpr (soa::is_soa_iterator_v<std::decay_t<G>>) {
         // grouping case
         // pre-slice associated tables
-//        std::apply([&presliceTable](auto&... x) {
-//          (presliceTable(x), ...);
-//        },
-//                   associatedTables);
+        //        std::apply([&presliceTable](auto&... x) {
+        //          (presliceTable(x), ...);
+        //        },
+        //                   associatedTables);
 
         auto slicer = GroupSlicer(groupingTable, associatedTables);
         for (auto& slice : slicer) {
@@ -423,10 +423,10 @@ struct AnalysisDataProcessorBuilder {
       } else {
         // non-grouping case
         // pre-slice associated tables
-//        std::apply([&presliceTable](auto&... x) {
-//          (presliceTable(x), ...);
-//        },
-//                   associatedTables);
+        //        std::apply([&presliceTable](auto&... x) {
+        //          (presliceTable(x), ...);
+        //        },
+        //                   associatedTables);
 
         overwriteInternalIndices(associatedTables, associatedTables);
         // bind partitions and grouping table
@@ -708,12 +708,12 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
       // reset pre-slice for the next dataframe
       auto slices = pc.services().get<ArrowTableSlicingCache>();
       homogeneous_apply_refs([&pc, &slices](auto& x) {
-        if constexpr(framework::is_base_of_template_v<Preslice, std::decay_t<decltype(x)>>) {
+        if constexpr (framework::is_base_of_template_v<Preslice, std::decay_t<decltype(x)>>) {
           return PresliceManager<std::decay_t<decltype(x)>>::updateSliceInfo(x, slices.getCacheFor(x.getBindingKey()));
         }
         return false;
       }, //
-      *(task.get()));
+                             *(task.get()));
       // prepare outputs
       homogeneous_apply_refs([&pc](auto&& x) { return OutputManager<std::decay_t<decltype(x)>>::prepare(pc, x); }, *task.get());
       // execute run()

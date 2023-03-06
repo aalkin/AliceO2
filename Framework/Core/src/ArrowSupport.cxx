@@ -507,9 +507,9 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
         // file sink for any AOD output
         if (!outputsInputsAOD.empty()) {
           // add TFNumber and TFFilename as input to the writer
-          outputsInputsAOD.emplace_back("tfn", "TFN", "TFNumber");
-          outputsInputsAOD.emplace_back("tff", "TFF", "TFFilename");
-          workflow.push_back(CommonDataProcessors::getGlobalAODSink(dod, outputsInputsAOD));
+        outputsInputsAOD.emplace_back("tfn", "TFN", "TFNumber");
+        outputsInputsAOD.emplace_back("tff", "TFF", "TFFilename");
+        workflow.push_back(CommonDataProcessors::getGlobalAODSink(dod, outputsInputsAOD));
         } },
     .kind = ServiceKind::Global};
 }

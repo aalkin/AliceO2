@@ -246,7 +246,7 @@ set_property(TARGET o2-test-framework-core PROPERTY RUNTIME_OUTPUT_DIRECTORY ${o
 
 add_test(NAME framework:core COMMAND o2-test-framework-core)
 
-o2_add_test(AlgorithmWrapper NAME test_Framework_test_AlgorithmWrapper  
+o2_add_test(AlgorithmWrapper NAME test_Framework_test_AlgorithmWrapper
             SOURCES test/test_AlgorithmWrapper.cxx
             COMPONENT_NAME Framework
             LABELS framework

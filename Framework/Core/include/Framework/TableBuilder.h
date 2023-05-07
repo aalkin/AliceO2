@@ -99,6 +99,9 @@ O2_ARROW_STL_CONVERSION(double, DoubleType)
 O2_ARROW_STL_CONVERSION(std::string, StringType)
 } // namespace detail
 
+template <typename T>
+using VectorOrSpan = std::variant<std::reference_wrapper<std::vector<T>>, std::reference_wrapper<gsl::span<T>>>; // std::vector<T>
+
 void addLabelToSchema(std::shared_ptr<arrow::Schema>& schema, const char* label);
 
 struct BuilderUtils {
@@ -156,14 +159,26 @@ struct BuilderUtils {
 
   /// Appender for the vector case.
   template <typename HolderType, typename T>
-  static arrow::Status append(HolderType& holder, std::vector<T> const& data)
+  static arrow::Status append(HolderType& holder, VectorOrSpan<T> const& vos)
   {
+    auto isSpan = (vos.index() == 1);
+    std::vector<T>* vdata;
+    gsl::span<T>* sdata;
+    if (!isSpan) {
+      vdata = &(std::get<0>(vos).get());
+    } else {
+      sdata = &(std::get<1>(vos).get());
+    }
     using ArrowType = typename detail::ConversionTraits<T>::ArrowType;
     using ValueBuilderType = typename arrow::TypeTraits<ArrowType>::BuilderType;
-    auto status = holder.builder->Reserve(data.size());
+    auto status = holder.builder->Reserve(isSpan ? sdata->size() : vdata->size());
     status &= holder.builder->Append();
     auto vbuilder = static_cast<ValueBuilderType*>(holder.builder->value_builder());
-    status &= vbuilder->AppendValues(data.begin(), data.end());
+    if (isSpan) {
+      status &= vbuilder->AppendValues(sdata->data(), sdata->size(), nullptr);
+    } else {
+      status &= vbuilder->AppendValues(vdata->begin(), vdata->end());
+    }
 
     return status;
   }
@@ -367,7 +382,7 @@ struct BuilderMaker<T[N]> {
 
 template <typename T>
 struct BuilderMaker<std::vector<T>> {
-  using FillType = std::vector<T>;
+  using FillType = VectorOrSpan<T>;
   using BuilderType = arrow::ListBuilder;
   using ArrowType = arrow::ListType;
   using ElementType = typename detail::ConversionTraits<T>::ArrowType;
@@ -777,7 +792,7 @@ class TableBuilder
       using objType_t = pack_element_t<0, framework::pack<ARGS...>>;
       auto persister = persistTuple(framework::pack<objType_t>{}, columnNames);
       // Callback used to fill the builders
-      return [persister = persister](unsigned int slot, typename BuilderMaker<objType_t>::FillType const& arg) -> void {
+      return [persister = persister](unsigned int slot, typename BuilderMaker<objType_t>::FillType arg) -> void {
         persister(slot, std::forward_as_tuple(arg));
       };
     } else if constexpr (sizeof...(ARGS) >= 1) {

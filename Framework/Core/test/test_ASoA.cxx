@@ -943,7 +943,8 @@ TEST_CASE("TestAdvancedIndices")
   }
 }
 
-namespace o2::aod {
+namespace o2::aod
+{
 DECLARE_SOA_TABLE(PointsSelfRef, "TEST", "PTSSR", test::OtherPointId, test::PointSeqIdSlice, test::PointSetIds);
 }
 

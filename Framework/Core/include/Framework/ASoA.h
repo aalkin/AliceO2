@@ -1548,6 +1548,11 @@ class Table
     }
   }
 
+  auto& cached_begin()
+  {
+    return mBegin;
+  }
+
   auto const& cached_begin() const
   {
     return mBegin;
@@ -1633,7 +1638,7 @@ class Table
     doBindInternalIndicesExplicit(internal_index_columns_t{}, binding);
   }
 
-  template<typename... Cs>
+  template <typename... Cs>
   void doBindInternalIndicesExplicit(framework::pack<Cs...>, o2::soa::Binding binding)
   {
     (static_cast<Cs>(mBegin).setCurrentRaw(binding), ...);
@@ -2722,10 +2727,15 @@ struct Join : JoinBase<Ts...> {
     return doSliceBy(this, container, value);
   }
 
-  unfiltered_iterator rawIteratorAt(uint64_t i) const
+  iterator rawIteratorAt(uint64_t i) const
   {
-    auto it = this->begin() + i;
+    auto it = iterator{this->cached_begin()} + i;
     return it;
+  }
+
+  iterator iteratorAt(uint64_t i) const
+  {
+    return rawIteratorAt(i);
   }
 
   auto rawSlice(uint64_t start, uint64_t end) const

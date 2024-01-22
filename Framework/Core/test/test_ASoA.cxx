@@ -1054,6 +1054,17 @@ TEST_CASE("TestSelfIndexRecursion")
       }
     }
   }
+
+  auto const& fpa = fp;
+
+  for (auto& it1 : fpa) {
+    [[maybe_unused]] auto it2 = fpa.rawIteratorAt(0);
+    [[maybe_unused]] auto it3 = fpa.iteratorAt(0);
+    auto bit1 = std::is_same_v<std::decay_t<decltype(it1)>, std::decay_t<decltype(it2)>>;
+    CHECK(bit1);
+    auto bit2 = std::is_same_v<std::decay_t<decltype(it1)>, std::decay_t<decltype(it3)>>;
+    CHECK(bit2);
+  }
 }
 
 TEST_CASE("TestListColumns")

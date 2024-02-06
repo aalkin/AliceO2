@@ -56,7 +56,6 @@ struct ExpressionInfo {
       hashes(hs),
       schema(sc)
   {
-
   }
   int argumentIndex;
   size_t processHash;

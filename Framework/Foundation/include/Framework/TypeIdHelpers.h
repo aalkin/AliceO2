@@ -14,6 +14,7 @@
 
 #include <string_view>
 #include <sstream>
+#include <source_location>
 #include "Framework/StringHelpers.h"
 
 namespace o2::framework
@@ -41,8 +42,8 @@ struct TypeIdHelpers {
   template <typename T>
   constexpr static uint32_t uniqueId()
   {
-    constexpr uint32_t r = crc32(unique_type_id_v<T>.data(), unique_type_id_v<T>.size());
-    return r;
+    constexpr std::source_location l{std::source_location::current()};
+    return compile_time_hash(l.function_name());
   }
 };
 

@@ -13,7 +13,6 @@
 #define O2_FRAMEWORK_STRINGHELPERS_H_
 
 #include <cstdint>
-#include <source_location>
 #include <utility>
 #include <type_traits>
 #include <string_view>
@@ -163,14 +162,5 @@ constexpr auto get_size(const std::string_view& str)
     };                                                      \
     return const_str_details::as_chars<literal_to_chars>(); \
   }()
-
-
-template <typename T>
-consteval inline uint32_t hashid()
-{
-  constexpr std::source_location l{std::source_location::current()};
-  return compile_time_hash(l.function_name());
-}
-
 
 #endif // O2_FRAMEWORK_STRINGHELPERS_H

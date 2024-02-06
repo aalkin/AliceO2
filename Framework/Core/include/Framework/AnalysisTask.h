@@ -189,7 +189,7 @@ struct AnalysisDataProcessorBuilder {
   static void inputsFromArgs(R (C::*)(Args...), const char* name, bool value, std::vector<InputSpec>& inputs, std::vector<ExpressionInfo>& eInfos, std::vector<StringPair>& bk, std::vector<StringPair>& bku)
   {
     int ai = 0;
-    auto hash = hashid<R (C::*)(Args...)>();
+    auto hash = o2::framework::TypeIdHelpers::uniqueId<R (C::*)(Args...)>();
     if constexpr (soa::is_soa_iterator_v<std::decay_t<framework::pack_element_t<0, framework::pack<Args...>>>>) {
       appendGroupingCandidates(bk, bku, framework::pack<Args...>{});
     }
@@ -205,7 +205,7 @@ struct AnalysisDataProcessorBuilder {
   template <typename R, typename C, typename Grouping, typename... Args>
   static auto bindGroupingTable(InputRecord& record, R (C::*)(Grouping, Args...), std::vector<ExpressionInfo>& infos)
   {
-    auto hash = hashid<R (C::*)(Grouping, Args...)>();
+    auto hash = o2::framework::TypeIdHelpers::uniqueId<R (C::*)(Grouping, Args...)>();
     return extractSomethingFromRecord<Grouping, 0>(record, infos, hash);
   }
 
@@ -291,7 +291,7 @@ struct AnalysisDataProcessorBuilder {
   static auto bindAssociatedTables(InputRecord& record, R (C::*)(Grouping, Args...), std::vector<ExpressionInfo>& infos)
   {
     constexpr auto p = pack<Args...>{};
-    auto hash = hashid<R (C::*)(Grouping, Args...)>();
+    auto hash = o2::framework::TypeIdHelpers::uniqueId<R (C::*)(Grouping, Args...)>();
     return std::make_tuple(extractSomethingFromRecord<Args, has_type_at_v<Args>(p) + 1>(record, infos, hash)...);
   }
 

@@ -27,7 +27,6 @@
 #include <gandiva/selection_vector.h>
 #include <cassert>
 #include <fmt/format.h>
-#include <typeinfo>
 #include <gsl/span>
 #include <limits>
 
@@ -53,13 +52,13 @@ struct Binding {
   void bind(T const* table)
   {
     ptr = table;
-    hash = hashid<T>();
+    hash = o2::framework::TypeIdHelpers::uniqueId<T>();
   }
 
   template <typename T>
   T const* get() const
   {
-    if (hash == hashid<T>()) {
+    if (hash == o2::framework::TypeIdHelpers::uniqueId<T>()) {
       return static_cast<T const*>(ptr);
     }
     return nullptr;
@@ -1386,7 +1385,7 @@ class Table
 
   static constexpr auto hashes()
   {
-    return std::set{{hashid<C>()...}};
+    return std::set{{o2::framework::TypeIdHelpers::uniqueId<C>()...}};
   }
 
   template <typename IP, typename Parent, typename... T>
@@ -1886,7 +1885,7 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
       return _Getter_();                                                                                                                                                          \
     }                                                                                                                                                                             \
   };                                                                                                                                                                              \
-  static constexpr o2::framework::expressions::BindingNode _Getter_ { _Label_, hashid<_Name_>(),                                                                         \
+  static constexpr o2::framework::expressions::BindingNode _Getter_ { _Label_, o2::framework::TypeIdHelpers::uniqueId<_Name_>(),                                                                         \
                                                                   o2::framework::expressions::selectArrowType<_Type_>() }
 
 #define DECLARE_SOA_COLUMN(_Name_, _Getter_, _Type_) \
@@ -1921,7 +1920,7 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
       return (*mColumnIterator & (static_cast<type>(1) << bit)) >> bit;                                                                                                           \
     }                                                                                                                                                                             \
   };                                                                                                                                                                              \
-  static constexpr o2::framework::expressions::BindingNode _Getter_ { _Label_, hashid<_Name_>(),                                                                         \
+  static constexpr o2::framework::expressions::BindingNode _Getter_ { _Label_, o2::framework::TypeIdHelpers::uniqueId<_Name_>(),                                                                         \
                                                                   o2::framework::expressions::selectArrowType<MAKEINT(_Size_)>() }
 
 #define DECLARE_SOA_BITMAP_COLUMN(_Name_, _Getter_, _Size_) \
@@ -1954,7 +1953,7 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
       return _Expression_;                                                                                \
     }                                                                                                     \
   };                                                                                                      \
-  static constexpr o2::framework::expressions::BindingNode _Getter_ { _Label_, hashid<_Name_>(), \
+  static constexpr o2::framework::expressions::BindingNode _Getter_ { _Label_, o2::framework::TypeIdHelpers::uniqueId<_Name_>(), \
                                                                   o2::framework::expressions::selectArrowType<_Type_>() }
 
 #define DECLARE_SOA_EXPRESSION_COLUMN(_Name_, _Getter_, _Type_, _Expression_) \
@@ -2288,7 +2287,7 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
     o2::soa::Binding getCurrentRaw() const { return mBinding; }                                                                      \
     o2::soa::Binding mBinding;                                                                                                       \
   };                                                                                                                                 \
-  static constexpr o2::framework::expressions::BindingNode _Getter_##Id { "fIndex" #_Table_ _Suffix_, hashid<_Name_##Id>(), \
+  static constexpr o2::framework::expressions::BindingNode _Getter_##Id { "fIndex" #_Table_ _Suffix_, o2::framework::TypeIdHelpers::uniqueId<_Name_##Id>(), \
                                                                       o2::framework::expressions::selectArrowType<_Type_>() }
 
 #define DECLARE_SOA_INDEX_COLUMN(_Name_, _Getter_) DECLARE_SOA_INDEX_COLUMN_FULL(_Name_, _Getter_, int32_t, _Name_##s, "")
@@ -2346,7 +2345,7 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
     o2::soa::Binding getCurrentRaw() const { return mBinding; }                                                            \
     o2::soa::Binding mBinding;                                                                                             \
   };                                                                                                                       \
-  static constexpr o2::framework::expressions::BindingNode _Getter_##Id { "fIndex" _Label_, hashid<_Name_##Id>(), \
+  static constexpr o2::framework::expressions::BindingNode _Getter_##Id { "fIndex" _Label_, o2::framework::TypeIdHelpers::uniqueId<_Name_##Id>(), \
                                                                       o2::framework::expressions::selectArrowType<_Type_>() }
 
 #define DECLARE_SOA_SELF_INDEX_COLUMN(_Name_, _Getter_) DECLARE_SOA_SELF_INDEX_COLUMN_FULL(_Name_, _Getter_, int32_t, #_Name_)

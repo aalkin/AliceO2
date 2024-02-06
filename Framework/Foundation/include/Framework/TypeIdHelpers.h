@@ -35,10 +35,6 @@ template <typename T>
 inline constexpr auto unique_type_id_v = unique_type_id<T>::value;
 
 struct TypeIdHelpers {
-  /// Return a unique id for a given type
-  /// This works just fine with GCC and CLANG,
-  /// C++20 will allow us to use:
-  ///    std::source_location::current().function_name();
   template <typename T>
   constexpr static uint32_t uniqueId()
   {

@@ -1432,14 +1432,14 @@ class Table
 
     template <typename P>
     RowViewBase(RowViewBase<IP, P, T...> const& other)
-      // : RowViewCore<IP, C...>(static_cast<RowViewCore<IP, C...> const&>(other))
+    // : RowViewCore<IP, C...>(static_cast<RowViewCore<IP, C...> const&>(other))
     {
       *this = other;
     }
 
     template <typename P>
     RowViewBase(RowViewBase<IP, P, T...>&& other) noexcept
-      // : RowViewCore<IP, C...>(std::forward<RowViewCore<IP, C...>>(other))
+    // : RowViewCore<IP, C...>(std::forward<RowViewCore<IP, C...>>(other))
     {
       *this = other;
     }

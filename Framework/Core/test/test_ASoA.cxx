@@ -130,7 +130,7 @@ TEST_CASE("TestTableIteration")
   ++tests;
   REQUIRE(tests.x() == 0);
   REQUIRE(tests.y() == 1);
-  using Test = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Y>;
+  using Test = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Y>;
   Test tests2{table};
   size_t value = 0;
   auto b = tests2.begin();
@@ -180,14 +180,14 @@ TEST_CASE("TestDynamicColumns")
   rowWriter(0, 1, 7);
   auto table = builder.finalize();
 
-  using Test = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::X, o2::aod::test::Y>>;
+  using Test = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::X, o2::aod::test::Y>>;
 
   Test tests{table};
   for (auto& test : tests) {
     REQUIRE(test.sum() == test.x() + test.y());
   }
 
-  using Test2 = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::Y, o2::aod::test::Y>>;
+  using Test2 = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::Y, o2::aod::test::Y>>;
 
   Test2 tests2{table};
   for (auto& test : tests2) {
@@ -267,9 +267,9 @@ TEST_CASE("TestJoinedTables")
   rowWriterZ(0, 8);
   auto tableZ = builderZ.finalize();
 
-  using TestX = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::aod::test::X>;
-  using TestY = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::aod::test::Y>;
-  using TestZ = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::aod::test::Z>;
+  using TestX = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::X>;
+  using TestY = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::Y>;
+  using TestZ = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::Z>;
   using Test = Join<TestX, TestY>;
 
   REQUIRE(Test::contains<TestX>());
@@ -286,14 +286,14 @@ TEST_CASE("TestJoinedTables")
     REQUIRE(7 == test.x() + test.y());
   }
 
-  auto tests2 = join<o2::framework::OriginEnc{"JOIN"}>(TestX{tableX}, TestY{tableY});
+  auto tests2 = join<OriginEnc{"JOIN"}>(TestX{tableX}, TestY{tableY});
   static_assert(std::is_same_v<Test::table_t, decltype(tests2)>,
                 "Joined tables should have the same type, regardless how we construct them");
   for (auto& test : tests2) {
     REQUIRE(7 == test.x() + test.y());
   }
 
-  auto tests3 = join<o2::framework::OriginEnc{"JOIN"}>(TestX{tableX}, TestY{tableY}, TestZ{tableZ});
+  auto tests3 = join<OriginEnc{"JOIN"}>(TestX{tableX}, TestY{tableY}, TestZ{tableZ});
 
   for (auto& test : tests3) {
     REQUIRE(15 == test.x() + test.y() + test.z());
@@ -356,25 +356,25 @@ TEST_CASE("TestConcatTables")
   rowWriterD(0, 23, 15);
   auto tableD = builderD.finalize();
 
-  using TestA = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
-  using TestB = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X>;
-  using TestC = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::aod::test::Z>;
-  using TestD = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Z>;
+  using TestA = o2::soa::Table<OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
+  using TestB = o2::soa::Table<OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X>;
+  using TestC = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::Z>;
+  using TestD = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Z>;
   using ConcatTest = Concat<TestA, TestB>;
   using JoinedTest = Join<TestA, TestC>;
   using NestedJoinTest = Join<JoinedTest, TestD>;
   using NestedConcatTest = Concat<Join<TestA, TestB>, TestD>;
 
-  static_assert(std::is_same_v<NestedJoinTest::table_t, o2::soa::Table<o2::framework::OriginEnc{"JOIN"}, o2::soa::Index<>, o2::aod::test::Y, o2::aod::test::X, o2::aod::test::Z>>, "Bad nested join");
+  static_assert(std::is_same_v<NestedJoinTest::table_t, o2::soa::Table<OriginEnc{"JOIN"}, o2::soa::Index<>, o2::aod::test::Y, o2::aod::test::X, o2::aod::test::Z>>, "Bad nested join");
 
-  static_assert(std::is_same_v<ConcatTest::table_t, o2::soa::Table<o2::framework::OriginEnc{"CONC"}, o2::soa::Index<>, o2::aod::test::X>>, "Bad intersection of columns");
+  static_assert(std::is_same_v<ConcatTest::table_t, o2::soa::Table<OriginEnc{"CONC"}, o2::soa::Index<>, o2::aod::test::X>>, "Bad intersection of columns");
   ConcatTest tests{tableA, tableB};
   REQUIRE(16 == tests.size());
   for (auto& test : tests) {
     REQUIRE(test.index() == test.x());
   }
 
-  static_assert(std::is_same_v<NestedConcatTest::table_t, o2::soa::Table<o2::framework::OriginEnc{"CONC"}, o2::aod::test::X>>, "Bad nested concat");
+  static_assert(std::is_same_v<NestedConcatTest::table_t, o2::soa::Table<OriginEnc{"CONC"}, o2::aod::test::X>>, "Bad nested concat");
 
   // Hardcode a selection for the first 5 odd numbers
   using FilteredTest = Filtered<TestA>;
@@ -539,7 +539,7 @@ TEST_CASE("TestDereference")
   REQUIRE(j.pointB().x() == 3);
   REQUIRE(j.pointB().y() == 4);
 
-  auto joined = join<o2::framework::OriginEnc{"JOIN"}>(segments, segmentsExtras);
+  auto joined = join<OriginEnc{"JOIN"}>(segments, segmentsExtras);
   joined.bindExternalIndices(&points, &infos);
   auto se = joined.begin();
   REQUIRE(se.n() == 10);
@@ -574,7 +574,7 @@ TEST_CASE("TestFilteredOperators")
   auto tableA = builderA.finalize();
   REQUIRE(tableA->num_rows() == 8);
 
-  using TestA = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
+  using TestA = o2::soa::Table<OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
   using FilteredTest = Filtered<TestA>;
   using NestedFilteredTest = Filtered<Filtered<TestA>>;
   using namespace o2::framework;
@@ -650,7 +650,7 @@ TEST_CASE("TestNestedFiltering")
   auto tableA = builderA.finalize();
   REQUIRE(tableA->num_rows() == 8);
 
-  using TestA = o2::soa::Table<o2::framework::OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
+  using TestA = o2::soa::Table<OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
   using FilteredTest = Filtered<TestA>;
   using NestedFilteredTest = Filtered<Filtered<TestA>>;
   using TripleNestedFilteredTest = Filtered<Filtered<Filtered<TestA>>>;
@@ -1336,6 +1336,61 @@ TEST_CASE("TestCombinedGetter")
   o2::aod::MixTest mt{t};
   auto count = 0;
   for (auto const& row : mt) {
+    auto features1 = row.getValues<float, o2::aod::table::One, o2::aod::table::Three>();
+    auto features2 = row.getValues<double, o2::aod::table::One, o2::aod::table::Two, o2::aod::table::Three>();
+    auto features3 = row.getValues<float, o2::aod::table::Two, o2::aod::table::Five<o2::aod::table::Four>>();
+    auto b1 = std::is_same_v<std::array<float, 2>, decltype(features1)>;
+    REQUIRE(b1);
+    auto b2 = std::is_same_v<std::array<double, 3>, decltype(features2)>;
+    REQUIRE(b2);
+    auto b3 = std::is_same_v<std::array<float, 2>, decltype(features3)>;
+    REQUIRE(b3);
+    REQUIRE(features1[0] == (float)count);
+    REQUIRE(features1[1] == (float)(o2::constants::math::Almost0 * count));
+
+    REQUIRE(features2[0] == (double)count);
+    REQUIRE(features2[1] == (double)(o2::constants::math::PI * count));
+    REQUIRE(features2[2] == (double)(o2::constants::math::Almost0 * count));
+
+    REQUIRE(features3[0] == (float)(o2::constants::math::PI * count));
+    REQUIRE(features3[1] == (float)((float)count / (float)(count + 1)));
+    ++count;
+  }
+}
+
+#define DECLARE(_Name_, _Origin_, _Desc_, _Version_, ...)                                             \
+  using _Name_##Metadata = TableMetadataNG<TableSignature{_Desc_, _Version_}, __VA_ARGS__>;           \
+  template <o2::soa::OriginEnc ORIGIN>                                                                \
+  using _Name_##IteratorFrom = TableIterator<TableSignature{_Desc_, _Version_}, ORIGIN, __VA_ARGS__>; \
+  template <o2::soa::OriginEnc ORIGIN>                                                                \
+  using _Name_##From = TableNG<TableSignature{_Desc_, _Version_}, ORIGIN>;                            \
+  using _Name_ = _Name_##From<OriginEnc{_Origin_}>;                                                   \
+  template <>                                                                                         \
+  struct MetadataTraitNG<TableSignature{_Desc_, _Version_}> {                                         \
+    using metadata = _Name_##Metadata;                                                                \
+  };
+
+namespace o2::aod
+{
+DECLARE(Test1, "AOD", "TEST1", 0,
+        table::One, table::Two, table::Three, table::Four,
+        table::Five<table::Four>)
+}
+
+TEST_CASE("NewTables")
+{
+  TableBuilder b;
+  auto writer = b.cursor<o2::aod::MixTest>();
+  int f[2];
+  for (auto i = 0; i < 20; ++i) {
+    f[0] = i;
+    f[1] = i + 1;
+    writer(0, i, o2::constants::math::PI * i, o2::constants::math::Almost0 * i, f);
+  }
+  auto t = b.finalize();
+  o2::aod::Test1 t1{t};
+  auto count = 0;
+  for (auto const& row : t1) {
     auto features1 = row.getValues<float, o2::aod::table::One, o2::aod::table::Three>();
     auto features2 = row.getValues<double, o2::aod::table::One, o2::aod::table::Two, o2::aod::table::Three>();
     auto features3 = row.getValues<float, o2::aod::table::Two, o2::aod::table::Five<o2::aod::table::Four>>();

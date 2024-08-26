@@ -43,39 +43,97 @@
     using metadata = typename MetadataTrait<typename IT::parent_t>::metadata; \
   };
 
-namespace o2::framework
+namespace o2::soa
 {
 struct OriginEnc {
-  static constexpr size_t size = 4;
-  uint32_t value;
+  static constexpr auto size = 4U;
+  uint64_t value;
   consteval OriginEnc(uint32_t v) : value{v}
   {
   }
-  consteval OriginEnc(std::string_view in) : value{0}
+#if defined(__clang__)
+  consteval OriginEnc(std::string_view in) noexcept : value{0}
+#elif defined(__GNUC__) || defined(__GNUG__)
+  constexpr OriginEnc(std::string_view in) noexcept : value{0}
+#endif
   {
-    for (auto i = 0U; i < (size < in.size() ? size : in.size()); ++i) {
-      value |= ((uint8_t)in[i]) << (8 * i);
+    for (auto i = 0U; i < (size < (uint32_t)in.size() ? size : (uint32_t)in.size()); ++i) {
+      value |= ((uint32_t)in[i]) << (8 * i);
     }
   }
-  operator const char*() const
+  constexpr operator std::string_view() const noexcept
   {
-    return (const char*)(&value);
+    return static_cast<const char*>(static_cast<const void*>(&value));
   }
 
   consteval operator o2::header::DataOrigin()
   {
-    return o2::header::DataOrigin{value};
+    return o2::header::DataOrigin{static_cast<uint32_t>(value)};
   }
 
-  consteval OriginEnc(OriginEnc const& other) = default;
-  consteval OriginEnc(OriginEnc&& other) noexcept = default;
-  consteval OriginEnc& operator=(OriginEnc const& other) = default;
-  consteval OriginEnc& operator=(OriginEnc&& other) noexcept = default;
+  constexpr OriginEnc(OriginEnc const& other) noexcept = default;
+  constexpr OriginEnc(OriginEnc&& other) noexcept = default;
+  constexpr OriginEnc& operator=(OriginEnc const& other) noexcept = default;
+  constexpr OriginEnc& operator=(OriginEnc&& other) noexcept = default;
+
+  constexpr bool operator==(OriginEnc const& other) const
+  {
+    return this->value == other.value;
+  }
 };
-} // namespace o2::framework
+
+struct TableSignature {
+  static constexpr auto desc_size = 16U;
+  std::array<uint64_t, 3> values{0UL};
+  int mVersion;
+
+  inline consteval TableSignature(std::array<uint64_t, 3> val, int v) noexcept : values{val}, mVersion{v}
+  {}
+#if defined(__clang__)
+  inline consteval TableSignature(std::string_view in, int v) noexcept : values{0}, mVersion{v}
+#elif defined(__GNUC__) || defined(__GNUG__)
+  inline constexpr TableSignature(std::string_view in, int v) noexcept : values{0}, mVersion{v}
+#endif
+  {
+    for (auto i = 0U; i < (desc_size < (uint32_t)in.size() ? desc_size : (uint32_t)in.size()); ++i) {
+      values[i/8] |= ((uint64_t)in[i]) << (8 * (i % 8));
+    }
+  }
+
+  inline constexpr std::string_view description() const noexcept
+  {
+    return static_cast<const char*>(static_cast<const void*>(values.data()));
+  }
+
+  inline constexpr auto version() const noexcept {
+    return mVersion;
+  }
+
+  constexpr TableSignature(TableSignature const& other) noexcept = default;
+  constexpr TableSignature(TableSignature&& other) noexcept = default;
+  constexpr TableSignature& operator=(TableSignature const& other) noexcept = default;
+  constexpr TableSignature& operator=(TableSignature&& other) noexcept = default;
+
+  constexpr bool operator==(TableSignature const& other) const
+  {
+    return (this->values[0] == other.values[0]) && (this->values[1] == other.values[1]) && (this->values[2] == other.values[2]);
+  }
+};
+
+// template <TableSignature SIG, OriginEnc ORIGIN>
+struct TableRef {
+  consteval TableRef(TableSignature _signature, OriginEnc _origin)
+    : origin{_origin},
+      signature{_signature}
+  {
+  }
+  const OriginEnc origin;
+  const TableSignature signature;
+};
+} // namespace o2::soa
 
 template <>
-struct fmt::formatter<o2::framework::OriginEnc> {
+struct fmt::formatter<o2::soa::OriginEnc> {
   char presentation = 's';
   constexpr auto parse(format_parse_context& ctx)
   {
@@ -94,7 +152,7 @@ struct fmt::formatter<o2::framework::OriginEnc> {
   }
 
   template <typename FormatContext>
-  auto format(o2::framework::OriginEnc const& origin, FormatContext& ctx)
+  auto format(o2::soa::OriginEnc const& origin, FormatContext& ctx)
   {
     return fmt::format_to(ctx.out(), "{}", (std::string_view)origin);
   }
@@ -103,6 +161,16 @@ struct fmt::formatter<o2::framework::OriginEnc> {
 namespace o2::aod
 {
 DECLARE_SOA_METADATA();
+
+template <soa::TableSignature SIG, typename... Cs>
+struct TableMetadataNG {
+  using columns = framework::pack<Cs...>;
+};
+
+template <soa::TableSignature SIG>
+struct MetadataTraitNG {
+  using metadata = void;
+};
 }
 
 namespace o2::soa
@@ -839,7 +907,7 @@ struct DefaultIndexPolicy : IndexPolicyBase {
   int64_t mMaxRow = 0;
 };
 
-template <o2::framework::OriginEnc ORIGIN, typename... C>
+template <OriginEnc ORIGIN, typename... C>
 class Table;
 
 /// Similar to a pair but not a pair, to avoid
@@ -855,7 +923,216 @@ concept CanBind = requires(T&& t) {
   { t.B::mColumnIterator };
 };
 
-template <o2::framework::OriginEnc ORIGIN, typename IP, typename... C>
+template <TableSignature SIG, OriginEnc ORIGIN, typename IP, typename... C>
+struct TableIterator : IP, C... {
+ public:
+  using self_t = TableIterator<SIG, ORIGIN, IP, C...>;
+  static constexpr auto parent_ref = TableRef{SIG, ORIGIN};
+  using policy_t = IP;
+  using all_columns = framework::pack<C...>;
+  using persistent_columns_t = framework::selected_pack<is_persistent_t, C...>;
+  using index_columns_t = framework::selected_pack<is_index_t, C...>;
+  constexpr inline static bool has_index_v = framework::pack_size(index_columns_t{}) > 0;
+  using external_index_columns_t = framework::selected_pack<is_external_index_t, C...>;
+  using internal_index_columns_t = framework::selected_pack<is_self_index_t, C...>;
+  using bindings_pack_t = decltype([]<typename... Cs>(framework::pack<Cs...>) { return framework::pack<typename Cs::binding_t...>{}; }(external_index_columns_t{})); // decltype(extractBindings(external_index_columns_t{}));
+
+  TableIterator(arrow::ChunkedArray* columnData[sizeof...(C)], IP&& policy)
+    : IP{policy},
+      C(columnData[framework::has_type_at_v<C>(all_columns{})])...
+  {
+    bind();
+    // In case we have an index column might need to constrain the actual
+    // number of rows in the view to the range provided by the index.
+    // FIXME: we should really understand what happens to an index when we
+    // have a RowViewFiltered.
+    if constexpr (has_index_v) {
+      this->limitRange(this->rangeStart(), this->rangeEnd());
+    }
+  }
+
+  TableIterator() = default;
+  TableIterator(TableIterator<SIG, ORIGIN, IP, C...> const& other)
+    : IP{static_cast<IP const&>(other)},
+      C(static_cast<C const&>(other))...
+  {
+    bind();
+  }
+
+  TableIterator& operator=(TableIterator other)
+  {
+    IP::operator=(static_cast<IP const&>(other));
+    (void(static_cast<C&>(*this) = static_cast<C>(other)), ...);
+    bind();
+    return *this;
+  }
+
+  TableIterator(TableIterator<SIG, ORIGIN, FilteredIndexPolicy, C...> const& other) requires std::is_same_v<IP, DefaultIndexPolicy>
+    : IP{static_cast<IP const&>(other)},
+      C(static_cast<C const&>(other))...
+  {
+    bind();
+  }
+
+  TableIterator& operator++()
+  {
+    this->moveByIndex(1);
+    return *this;
+  }
+
+  TableIterator operator++(int)
+  {
+    TableIterator<SIG, ORIGIN, IP, C...> copy = *this;
+    this->operator++();
+    return copy;
+  }
+
+  TableIterator& operator--()
+  {
+    this->moveByIndex(-1);
+    return *this;
+  }
+
+  TableIterator operator--(int)
+  {
+    TableIterator<SIG, ORIGIN, IP, C...> copy = *this;
+    this->operator--();
+    return copy;
+  }
+
+         /// Allow incrementing by more than one the iterator
+  TableIterator operator+(int64_t inc) const
+  {
+    TableIterator copy = *this;
+    copy.moveByIndex(inc);
+    return copy;
+  }
+
+  TableIterator operator-(int64_t dec) const
+  {
+    return operator+(-dec);
+  }
+
+  TableIterator const& operator*() const
+  {
+    return *this;
+  }
+
+  template <typename... CL, typename TA>
+  void doSetCurrentIndex(framework::pack<CL...>, TA* current)
+  {
+    (CL::setCurrent(current), ...);
+  }
+
+  template <typename CL>
+  auto getCurrent() const
+  {
+    return CL::getCurrentRaw();
+  }
+
+  template <typename... Cs>
+  auto getIndexBindingsImpl(framework::pack<Cs...>) const
+  {
+    return std::vector<o2::soa::Binding>{static_cast<Cs const&>(*this).getCurrentRaw()...};
+  }
+
+  auto getIndexBindings() const
+  {
+    return getIndexBindingsImpl(external_index_columns_t{});
+  }
+
+  template <typename... TA>
+  void bindExternalIndices(TA*... current)
+  {
+    (doSetCurrentIndex(external_index_columns_t{}, current), ...);
+  }
+
+  template <typename... Cs>
+  void doSetCurrentIndexRaw(framework::pack<Cs...> p, std::vector<o2::soa::Binding>&& ptrs)
+  {
+    (Cs::setCurrentRaw(ptrs[framework::has_type_at_v<Cs>(p)]), ...);
+  }
+
+  template <typename... Cs, typename I>
+  void doSetCurrentInternal(framework::pack<Cs...>, I const* ptr)
+  {
+    o2::soa::Binding b;
+    b.bind(ptr);
+    (Cs::setCurrentRaw(b), ...);
+  }
+
+  void bindExternalIndicesRaw(std::vector<o2::soa::Binding>&& ptrs)
+  {
+    doSetCurrentIndexRaw(external_index_columns_t{}, std::forward<std::vector<o2::soa::Binding>>(ptrs));
+  }
+
+  template <typename I>
+  void bindInternalIndices(I const* table)
+  {
+    doSetCurrentInternal(internal_index_columns_t{}, table);
+  }
+
+ private:
+  /// Helper to move to the correct chunk, if needed.
+  /// FIXME: not needed?
+  template <typename... PC>
+  void checkNextChunk(framework::pack<PC...>)
+  {
+    (PC::mColumnIterator.checkNextChunk(), ...);
+  }
+
+  /// Helper to move at the end of columns which actually have an iterator.
+  template <typename... PC>
+  void doMoveToEnd(framework::pack<PC...>)
+  {
+    (PC::mColumnIterator.moveToEnd(), ...);
+  }
+
+  /// Helper which binds all the ColumnIterators to the
+  /// index of a the associated RowView
+  void bind()
+  {
+    using namespace o2::soa;
+    auto f = framework::overloaded  {
+                                   [this]<typename T>(T*) -> void requires is_persistent_v<T> { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
+                                              [this]<typename T>(T*) -> void requires is_dynamic_v<T> { bindDynamicColumn<T>(typename T::bindings_t{});},
+                                   [this]<typename T>(T*) -> void {},
+                                   };
+    (f(static_cast<C*>(nullptr)), ...);
+    if constexpr (has_index_v) {
+      this->setIndices(this->getIndices());
+      this->setOffsets(this->getOffsets());
+    }
+  }
+
+  template <typename DC, typename... B>
+  auto bindDynamicColumn(framework::pack<B...>)
+  {
+    DC::boundIterators = std::make_tuple(getDynamicBinding<B>()...);
+  }
+
+  // Sometimes dynamic columns are defined for tables in
+  // the hope that it will be joined / extended with another one which provides
+  // the full set of bindings. This is to avoid a compilation
+  // error if constructor for the table or any other thing involving a missing
+  // binding is preinstanciated.
+  template <typename B>
+    requires(CanBind<self_t, B>)
+  decltype(auto) getDynamicBinding()
+  {
+    static_assert(std::is_same_v<decltype(&(static_cast<B*>(this)->mColumnIterator)), std::decay_t<decltype(B::mColumnIterator)>*>, "foo");
+    return &(static_cast<B*>(this)->mColumnIterator);
+    //return static_cast<std::decay_t<decltype(B::mColumnIterator)>*>(nullptr);
+  }
+
+  template <typename B>
+  decltype(auto) getDynamicBinding()
+  {
+    return static_cast<std::decay_t<decltype(B::mColumnIterator)>*>(nullptr);
+  }
+};
+
+template <OriginEnc ORIGIN, typename IP, typename... C>
 struct RowViewCore : public IP, C... {
  public:
   using policy_t = IP;
@@ -1277,29 +1554,29 @@ using PresliceOptional = PresliceBase<T, true, true>;
 namespace o2::soa
 {
 /// special case for the template with origin
-template <typename T, template <o2::framework::OriginEnc, typename...> class Ref>
+template <typename T, template <OriginEnc, typename...> class Ref>
 struct is_specialization_origin : std::false_type {
 };
 
-template <template <o2::framework::OriginEnc, typename...> class Ref, o2::framework::OriginEnc ORIGIN, typename... Args>
+template <template <OriginEnc, typename...> class Ref, OriginEnc ORIGIN, typename... Args>
 struct is_specialization_origin<Ref<ORIGIN, Args...>, Ref> : std::true_type {
 };
 
-template <typename T, template <o2::framework::OriginEnc, typename...> class Ref>
+template <typename T, template <OriginEnc, typename...> class Ref>
 inline constexpr bool is_specialization_origin_v = is_specialization_origin<T, Ref>::value;
 
-template <template <o2::framework::OriginEnc, typename...> class base, typename derived>
+template <template <OriginEnc, typename...> class base, typename derived>
 struct is_base_of_template_origin_impl {
-  template <o2::framework::OriginEnc ORIGIN, typename... Ts>
+  template <OriginEnc ORIGIN, typename... Ts>
   static constexpr std::true_type test(const base<ORIGIN, Ts...>*);
   static constexpr std::false_type test(...);
   using type = decltype(test(std::declval<derived*>()));
 };
 
-template <template <o2::framework::OriginEnc, typename...> class base, typename derived>
+template <template <OriginEnc, typename...> class base, typename derived>
 using is_base_of_template_origin = typename is_base_of_template_origin_impl<base, derived>::type;
 
-template <template <o2::framework::OriginEnc, typename...> class base, typename derived>
+template <template <OriginEnc, typename...> class base, typename derived>
 inline constexpr bool is_base_of_template_origin_v = is_base_of_template_origin<base, derived>::value;
 
 //! Helper to check if a type T is an iterator
@@ -1478,13 +1755,398 @@ auto select(T const& t, framework::expressions::Filter const& f)
 
 arrow::ChunkedArray* getIndexFromLabel(arrow::Table* table, const char* label);
 
+template <TableSignature SIG, OriginEnc ORIGIN, typename IP, typename... C>
+auto base_iter(framework::pack<C...>&&) -> TableIterator<SIG, ORIGIN, IP, C...>
+{
+}
+
+template <TableSignature SIG, OriginEnc ORIGIN>
+class TableNG {
+ public:
+  static constexpr auto ref = TableRef{SIG, ORIGIN};
+  using self_t = TableNG<SIG, ORIGIN>;
+  using table_t = self_t;
+
+  using columns_t = aod::MetadataTraitNG<SIG>::metadata::columns;
+
+  using column_types = decltype([]<typename... C>(framework::pack<C...>&&) { return framework::pack<typename C::type...>{}; }(columns_t{}));
+  using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) { return framework::selected_pack<is_persistent_t, C...>{}; }(columns_t{}));
+  using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) { return framework::selected_pack<is_external_index_t, C...>{}; }(columns_t{}));
+  using internal_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) { return framework::selected_pack<is_self_index_t, C...>{}; }(columns_t{}));
+  template <typename IP>
+  using base_iterator = decltype(base_iter<SIG, ORIGIN, IP>(columns_t{}));
+
+  template <typename IP, typename Parent, typename... T>
+  struct TableIteratorBase : base_iterator<IP> {
+    using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>) { return framework::selected_pack<is_external_index_t, C...>{}; }(columns_t{}));
+    using bindings_pack_t = decltype([]<typename... C>(framework::pack<C...>) { return framework::pack<typename C::binding_t...>{}; }(external_index_columns_t{}));
+    static constexpr const std::array<TableRef, sizeof...(T)> originals{T::ref...};
+    using policy_t = IP;
+    using parent_t = Parent;
+
+    TableIteratorBase() = default;
+
+    TableIteratorBase(arrow::ChunkedArray* columnData[framework::pack_size(columns_t{})], IP&& policy)
+      : base_iterator<IP>(columnData, std::forward<decltype(policy)>(policy))
+    {
+    }
+
+    template <typename P, typename... Os>
+    TableIteratorBase& operator=(TableIteratorBase<IP, P, Os...> other)
+      requires(P::ref::signature == Parent::ref::signature)
+    {
+      static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
+      return *this;
+    }
+
+    template <typename P>
+    TableIteratorBase& operator=(TableIteratorBase<IP, P, T...> other)
+    {
+      static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
+      return *this;
+    }
+
+    template <typename P>
+    TableIteratorBase& operator=(TableIteratorBase<FilteredIndexPolicy, P, T...> other)
+      requires std::is_same_v<IP, DefaultIndexPolicy>
+    {
+      static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<FilteredIndexPolicy>>(other);
+      return *this;
+    }
+
+    template <typename P, typename... Os>
+    TableIteratorBase(TableIteratorBase<IP, P, Os...> const& other)
+      requires(P::ref::signature == Parent::ref::signature)
+    {
+      *this = other;
+    }
+
+    template <typename P, typename... Os>
+    TableIteratorBase(TableIteratorBase<IP, P, Os...>&& other) noexcept
+      requires(P::ref::signature == Parent::ref::signature)
+    {
+      *this = other;
+    }
+
+    template <typename P>
+    TableIteratorBase(TableIteratorBase<IP, P, T...> const& other)
+    {
+      *this = other;
+    }
+
+    template <typename P>
+    TableIteratorBase(TableIteratorBase<IP, P, T...>&& other) noexcept
+    {
+      *this = other;
+    }
+
+    template <typename P>
+    TableIteratorBase(TableIteratorBase<FilteredIndexPolicy, P, T...> other)
+      requires std::is_same_v<IP, DefaultIndexPolicy>
+    {
+      *this = other;
+    }
+
+    TableIteratorBase& operator=(RowViewSentinel const& other)
+    {
+      this->mRowIndex = other.index;
+      return *this;
+    }
+    template <typename P>
+    void matchTo(TableIteratorBase<IP, P, T...> const& other)
+    {
+      this->mRowIndex = other.mRowIndex;
+    }
+
+    template <typename P, typename... O>
+    void matchTo(TableIteratorBase<IP, P, O...> const& other)
+      requires std::is_same_v<typename P::table_t, typename Parent::table_t>
+    {
+      this->mRowIndex = other.mRowIndex;
+    }
+
+    template <typename TI>
+    auto getId() const
+    {
+      using decayed = std::decay_t<TI>;
+      if constexpr (framework::has_type<decayed>(bindings_pack_t{})) { // index to another table
+        constexpr auto idx = framework::has_type_at_v<decayed>(bindings_pack_t{});
+        return framework::pack_element_t<idx, external_index_columns_t>::getId();
+      } else if constexpr (std::is_same_v<decayed, Parent>) { // self index
+        return this->globalIndex();
+      } else if constexpr (is_index_t<decayed>::value && decayed::mLabel == "Index") { // soa::Index<>
+        return this->globalIndex();
+      } else {
+        return static_cast<int32_t>(-1);
+      }
+    }
+
+    template <typename CD, typename... CDArgs>
+    auto getDynamicColumn() const
+    {
+      using decayed = std::decay_t<CD>;
+      static_assert(is_dynamic_t<decayed>(), "Requested column is not a dynamic column");
+      return static_cast<decayed>(*this).template getDynamicValue<CDArgs...>();
+    }
+
+    template <typename B, typename CC>
+    auto getValue() const
+    {
+      using COL = std::decay_t<CC>;
+      static_assert(is_dynamic_t<COL>() || is_persistent_v<COL>, "Should be persistent or dynamic column with no argument that has a return type convertable to float");
+      return static_cast<B>(static_cast<COL>(*this).get());
+    }
+
+    template <typename B, typename... CCs>
+    std::array<B, sizeof...(CCs)> getValues() const
+    {
+      static_assert(std::is_same_v<B, float> || std::is_same_v<B, double>, "The common return type should be float or double");
+      return {getValue<B, CCs>()...};
+    }
+
+    using IP::size;
+
+    using base_iterator<IP>::operator++;
+
+    /// Allow incrementing by more than one the iterator
+    TableIteratorBase operator+(int64_t inc) const
+    {
+      TableIteratorBase copy = *this;
+      copy.moveByIndex(inc);
+      return copy;
+    }
+
+    TableIteratorBase operator-(int64_t dec) const
+    {
+      return operator+(-dec);
+    }
+
+    TableIteratorBase const& operator*() const
+    {
+      return *this;
+    }
+  };
+
+  template <typename IP, typename Parent, typename... T>
+  using iterator_template = TableIteratorBase<DefaultIndexPolicy, table_t, table_t>;
+  using iterator = iterator_template<DefaultIndexPolicy, table_t, table_t>;
+  using filtered_iterator = iterator_template<FilteredIndexPolicy, table_t, table_t>;
+
+  using unfiltered_iterator = iterator;
+  using const_iterator = iterator;
+  using unfiltered_const_iterator = unfiltered_iterator;
+
+  static consteval auto hashes()
+  {
+    return []<typename... C>(framework::pack<C...>) { return std::set{{o2::framework::TypeIdHelpers::uniqueId<C>()...}}; }(columns_t{});
+  }
+
+  TableNG(std::shared_ptr<arrow::Table> table, uint64_t offset = 0)
+    : mTable(table),
+      mEnd{table->num_rows()},
+      mOffset(offset)
+  {
+    if (mTable->num_rows() == 0) {
+      for (size_t ci = 0; ci < framework::pack_size(columns_t{}); ++ci) {
+        mColumnChunks[ci] = nullptr;
+      }
+      mBegin = mEnd;
+    } else {
+      auto lookups = [this]<typename... C>(framework::pack<C...>) -> std::array<arrow::ChunkedArray*, framework::pack_size(columns_t{})> { return {lookupColumn<C>()...}; }(columns_t{});
+      for (size_t ci = 0; ci < framework::pack_size(columns_t{}); ++ci) {
+        mColumnChunks[ci] = lookups[ci];
+      }
+      mBegin = unfiltered_iterator{mColumnChunks, {table->num_rows(), offset}};
+      mBegin.bindInternalIndices(this);
+    }
+  }
+
+  /// FIXME: this is to be able to construct a Filtered without explicit Join
+  ///        so that Filtered<Table1,Table2, ...> always means a Join which
+  ///        may or may not be a problem later
+  TableNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
+    : TableNG(ArrowHelpers::joinTables(std::move(tables)), offset)
+  {
+  }
+
+  template <typename Key>
+  inline arrow::ChunkedArray* getIndexToKey()
+  {
+    if constexpr (framework::has_type_conditional<is_binding_compatible, Key>(external_index_columns_t{})) {
+      using IC = framework::pack_element_t<framework::has_type_at_conditional<is_binding_compatible, Key>(external_index_columns_t{}), external_index_columns_t>;
+      return mColumnChunks[framework::has_type_at<IC>(persistent_columns_t{})];
+    } else if constexpr (std::is_same_v<table_t, Key>) {
+      return nullptr;
+    } else {
+      static_assert(framework::always_static_assert_v<Key>, "This table does not have an index to this type");
+    }
+  }
+
+  auto& cached_begin()
+  {
+    return mBegin;
+  }
+
+  auto const& cached_begin() const
+  {
+    return mBegin;
+  }
+
+  unfiltered_iterator begin()
+  {
+    return unfiltered_iterator(mBegin);
+  }
+
+  RowViewSentinel end()
+  {
+    return RowViewSentinel{mEnd};
+  }
+
+  filtered_iterator filtered_begin(gsl::span<int64_t const> selection)
+  {
+    // Note that the FilteredIndexPolicy will never outlive the selection which
+    // is held by the table, so we are safe passing the bare pointer. If it does it
+    // means that the iterator on a table is outliving the table itself, which is
+    // a bad idea.
+    return filtered_iterator(mColumnChunks, {selection, mTable->num_rows(), mOffset});
+  }
+
+  iterator iteratorAt(uint64_t i) const
+  {
+    return rawIteratorAt(i);
+  }
+
+  unfiltered_iterator rawIteratorAt(uint64_t i) const
+  {
+    auto it = mBegin;
+    it.setCursor(i);
+    return it;
+  }
+
+  unfiltered_const_iterator begin() const
+  {
+    return unfiltered_const_iterator(mBegin);
+  }
+
+  [[nodiscard]] RowViewSentinel end() const
+  {
+    return RowViewSentinel{mEnd};
+  }
+
+  /// Return a type erased arrow table backing store for / the type safe table.
+  [[nodiscard]] std::shared_ptr<arrow::Table> asArrowTable() const
+  {
+    return mTable;
+  }
+  /// Return offset
+  auto offset() const
+  {
+    return mOffset;
+  }
+  /// Size of the table, in rows.
+  [[nodiscard]] int64_t size() const
+  {
+    return mTable->num_rows();
+  }
+
+  [[nodiscard]] int64_t tableSize() const
+  {
+    return size();
+  }
+
+  /// Bind the columns which refer to other tables
+  /// to the associated tables.
+  template <typename... TA>
+  void bindExternalIndices(TA*... current)
+  {
+    mBegin.bindExternalIndices(current...);
+  }
+
+  template <typename I>
+  void bindInternalIndicesTo(I const* ptr)
+  {
+    mBegin.bindInternalIndices(ptr);
+  }
+
+  void bindInternalIndicesExplicit(o2::soa::Binding binding)
+  {
+    doBindInternalIndicesExplicit(internal_index_columns_t{}, binding);
+  }
+
+  template <typename... Cs>
+  void doBindInternalIndicesExplicit(framework::pack<Cs...>, o2::soa::Binding binding)
+  {
+    (static_cast<Cs>(mBegin).setCurrentRaw(binding), ...);
+  }
+
+  void bindExternalIndicesRaw(std::vector<o2::soa::Binding>&& ptrs)
+  {
+    mBegin.bindExternalIndicesRaw(std::forward<std::vector<o2::soa::Binding>>(ptrs));
+  }
+
+  template <typename T, typename... Cs>
+  void doCopyIndexBindings(framework::pack<Cs...>, T& dest) const
+  {
+    dest.bindExternalIndicesRaw(mBegin.getIndexBindings());
+  }
+
+  template <typename T>
+  void copyIndexBindings(T& dest) const
+  {
+    doCopyIndexBindings(external_index_columns_t{}, dest);
+  }
+
+  auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doSliceByCached(this, node, value, cache);
+  }
+
+  auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doSliceByCachedUnsorted(this, node, value, cache);
+  }
+
+  template <typename T1, bool OPT, bool SORTED>
+  auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
+  {
+    return doSliceBy(this, container, value);
+  }
+
+  auto rawSlice(uint64_t start, uint64_t end) const
+  {
+    return self_t{mTable->Slice(start, end - start + 1), start};
+  }
+
+  auto emptySlice() const
+  {
+    return self_t{mTable->Slice(0, 0), 0};
+  }
+ private:
+  template <typename T>
+  arrow::ChunkedArray* lookupColumn()
+  {
+    if constexpr (T::persistent::value) {
+      auto label = T::columnLabel();
+      return getIndexFromLabel(mTable.get(), label);
+    } else {
+      return nullptr;
+    }
+  }
+  std::shared_ptr<arrow::Table> mTable = nullptr;
+  uint64_t mOffset = 0;
+  // Cached pointers to the ChunkedArray associated to a column
+  arrow::ChunkedArray* mColumnChunks[framework::pack_size(columns_t{})];
+  RowViewSentinel mEnd;
+  iterator mBegin;
+};
+
 /// A Table class which observes an arrow::Table and provides
 /// It is templated on a set of Column / DynamicColumn types.
-template <o2::framework::OriginEnc ORIGIN, typename... C>
+template <OriginEnc ORIGIN, typename... C>
 class Table
 {
  public:
-  static constexpr o2::framework::OriginEnc mOrigin{ORIGIN};
+  static constexpr OriginEnc mOrigin{ORIGIN};
   using self_t = Table<ORIGIN, C...>;
   using table_t = Table<ORIGIN, C...>;
   using columns = framework::pack<C...>;
@@ -1869,23 +2531,23 @@ class Table
   RowViewSentinel mEnd;
 };
 
-template <o2::framework::OriginEnc, typename T>
+template <OriginEnc, typename T>
 struct PackToTable {
   static_assert(framework::always_static_assert_v<T>, "Not a pack");
 };
 
-template <o2::framework::OriginEnc ORIGIN, typename... C>
+template <OriginEnc ORIGIN, typename... C>
 struct PackToTable<ORIGIN, framework::pack<C...>> {
   using table = o2::soa::Table<ORIGIN, C...>;
 };
 
-template <o2::framework::OriginEnc ORIGIN, typename... T>
+template <OriginEnc ORIGIN, typename... T>
 struct TableWrap {
   using all_columns = framework::concatenated_pack_unique_t<typename T::columns...>;
   using table_t = typename PackToTable<ORIGIN, all_columns>::table;
 };
 
-template <o2::framework::OriginEnc ORIGIN, typename... T>
+template <OriginEnc ORIGIN, typename... T>
 struct TableIntersect {
   using all_columns = framework::full_intersected_pack_t<typename T::columns...>;
   using table_t = typename PackToTable<ORIGIN, all_columns>::table;
@@ -1906,20 +2568,20 @@ class TableMetadata
 };
 
 /// Helper templates to define universal join and concat
-template <o2::framework::OriginEnc ORIGIN, typename... T>
+template <OriginEnc ORIGIN, typename... T>
 constexpr auto join(T const&... t)
 {
   return typename o2::soa::TableWrap<ORIGIN, T...>::table_t(ArrowHelpers::joinTables({t.asArrowTable()...}));
 }
 
-template <o2::framework::OriginEnc ORIGIN, typename... T>
+template <OriginEnc ORIGIN, typename... T>
 constexpr auto concat(T const&... t)
 {
   return typename o2::soa::TableIntersect<ORIGIN, T...>::table_t(ArrowHelpers::concatTables({t.asArrowTable()...}));
 }
 
 template <typename T1, typename T2>
-using ConcatBase = decltype(concat<o2::framework::OriginEnc{"CONC"}>(std::declval<T1>(), std::declval<T2>()));
+using ConcatBase = decltype(concat<OriginEnc{"CONC"}>(std::declval<T1>(), std::declval<T2>()));
 
 void notBoundTable(const char* tableName);
 
@@ -2734,11 +3396,11 @@ DECLARE_SOA_ITERATOR_METADATA();
   }
 
 #define DECLARE_SOA_TABLE_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Description_, _Version_, ...) \
-  template <o2::framework::OriginEnc ORIGIN = o2::framework::OriginEnc{_Origin_}>                  \
+  template <o2::soa::OriginEnc ORIGIN = o2::soa::OriginEnc{_Origin_}>                              \
   using _Name_##From = o2::soa::Table<ORIGIN, __VA_ARGS__>;                                        \
-  using _Name_ = _Name_##From<o2::framework::OriginEnc{_Origin_}>;                                 \
+  using _Name_ = _Name_##From<o2::soa::OriginEnc{_Origin_}>;                                       \
                                                                                                    \
-  template <o2::framework::OriginEnc ORIGIN = o2::framework::OriginEnc{_Origin_}>                  \
+  template <o2::soa::OriginEnc ORIGIN = o2::soa::OriginEnc{_Origin_}>                              \
   struct _Name_##Metadata : o2::soa::TableMetadata<_Name_##Metadata<ORIGIN>> {                     \
     using table_t = _Name_##From<ORIGIN>;                                                          \
     static constexpr o2::header::DataHeader::SubSpecificationType mVersion = _Version_;            \
@@ -2746,14 +3408,14 @@ DECLARE_SOA_ITERATOR_METADATA();
     static constexpr char const mDescription[16] = _Description_;                                  \
   };                                                                                               \
                                                                                                    \
-  template <o2::framework::OriginEnc ORIGIN>                                                       \
+  template <o2::soa::OriginEnc ORIGIN>                                                             \
   struct MetadataTrait<_Name_##From<ORIGIN>> {                                                     \
     using metadata = _Name_##Metadata<ORIGIN>;                                                     \
   };                                                                                               \
                                                                                                    \
   template <>                                                                                      \
   struct MetadataTrait<_Name_> {                                                                   \
-    using metadata = _Name_##Metadata<o2::framework::OriginEnc{_Origin_}>;                         \
+    using metadata = _Name_##Metadata<o2::soa::OriginEnc{_Origin_}>;                               \
   };
 
 #define DECLARE_SOA_TABLE_FULL(_Name_, _Label_, _Origin_, _Description_, ...) \
@@ -2771,7 +3433,7 @@ DECLARE_SOA_ITERATOR_METADATA();
   DECLARE_SOA_TABLE_STAGED_VERSIONED(_BaseName_, _Description_, 0, __VA_ARGS__);
 
 #define DECLARE_SOA_EXTENDED_TABLE_FULL(_Name_, _Table_, _Origin_, _Description_, ...)                                                      \
-  template <o2::framework::OriginEnc ORIGIN = o2::framework::OriginEnc{_Origin_}>                                                           \
+  template <o2::soa::OriginEnc ORIGIN = o2::soa::OriginEnc{_Origin_}>                                                                       \
   struct _Name_##ExtensionFrom : o2::soa::Table<ORIGIN, __VA_ARGS__> {                                                                      \
     using base_t = o2::soa::Table<ORIGIN, __VA_ARGS__>;                                                                                     \
     _Name_##ExtensionFrom(std::shared_ptr<arrow::Table> table, uint64_t offset = 0) : o2::soa::Table<ORIGIN, __VA_ARGS__>(table, offset){}; \
@@ -2781,12 +3443,12 @@ DECLARE_SOA_ITERATOR_METADATA();
     using iterator = typename base_t::template RowView<_Name_##ExtensionFrom<ORIGIN>, _Name_##ExtensionFrom<ORIGIN>>;                       \
     using const_iterator = iterator;                                                                                                        \
   };                                                                                                                                        \
-  using _Name_##Extension = _Name_##ExtensionFrom<o2::framework::OriginEnc{_Origin_}>;                                                      \
-  template <o2::framework::OriginEnc ORIGIN>                                                                                                \
+  using _Name_##Extension = _Name_##ExtensionFrom<o2::soa::OriginEnc{_Origin_}>;                                                            \
+  template <o2::soa::OriginEnc ORIGIN>                                                                                                      \
   using _Name_##From = o2::soa::Join<_Name_##ExtensionFrom<ORIGIN>, _Table_>;                                                               \
-  using _Name_ = _Name_##From<o2::framework::OriginEnc{_Origin_}>;                                                                          \
+  using _Name_ = _Name_##From<o2::soa::OriginEnc{_Origin_}>;                                                                                \
                                                                                                                                             \
-  template <o2::framework::OriginEnc ORIGIN = o2::framework::OriginEnc{_Origin_}>                                                           \
+  template <o2::soa::OriginEnc ORIGIN = o2::soa::OriginEnc{_Origin_}>                                                                       \
   struct _Name_##ExtensionMetadata : o2::soa::TableMetadata<_Name_##ExtensionMetadata<ORIGIN>> {                                            \
     using table_t = _Name_##ExtensionFrom<ORIGIN>;                                                                                          \
     using base_table_t = _Table_;                                                                                                           \
@@ -2800,7 +3462,7 @@ DECLARE_SOA_ITERATOR_METADATA();
                                                                                                                                             \
   template <>                                                                                                                               \
   struct MetadataTrait<_Name_##Extension> {                                                                                                 \
-    using metadata = _Name_##ExtensionMetadata<o2::framework::OriginEnc{"DYN"}>;                                                            \
+    using metadata = _Name_##ExtensionMetadata<o2::soa::OriginEnc{"DYN"}>;                                                                  \
   };
 
 #define DECLARE_SOA_EXTENDED_TABLE(_Name_, _Table_, _Description_, ...) \
@@ -2810,7 +3472,7 @@ DECLARE_SOA_ITERATOR_METADATA();
   DECLARE_SOA_EXTENDED_TABLE_FULL(_Name_, _Table_, "AOD", _Description_, __VA_ARGS__)
 
 #define DECLARE_SOA_INDEX_TABLE_FULL(_Name_, _Key_, _Origin_, _Description_, _Exclusive_, ...)                                                 \
-  template <o2::framework::OriginEnc ORIGIN = o2::framework::OriginEnc{_Origin_}>                                                              \
+  template <o2::soa::OriginEnc ORIGIN = o2::soa::OriginEnc{_Origin_}>                                                                          \
   struct _Name_##From : o2::soa::IndexTable<ORIGIN, _Key_, __VA_ARGS__> {                                                                      \
     using base_t = o2::soa::IndexTable<ORIGIN, _Key_, __VA_ARGS__>;                                                                            \
     _Name_##From(std::shared_ptr<arrow::Table> table, uint64_t offset = 0) : o2::soa::IndexTable<ORIGIN, _Key_, __VA_ARGS__>(table, offset){}; \
@@ -2819,9 +3481,9 @@ DECLARE_SOA_ITERATOR_METADATA();
     using iterator = typename base_t::template RowView<_Name_##From<ORIGIN>, _Name_##From<ORIGIN>>;                                            \
     using const_iterator = iterator;                                                                                                           \
   };                                                                                                                                           \
-  using _Name_ = _Name_##From<o2::framework::OriginEnc{_Origin_}>;                                                                             \
+  using _Name_ = _Name_##From<o2::soa::OriginEnc{_Origin_}>;                                                                                   \
                                                                                                                                                \
-  template <o2::framework::OriginEnc ORIGIN = o2::framework::OriginEnc{_Origin_}>                                                              \
+  template <o2::soa::OriginEnc ORIGIN = o2::soa::OriginEnc{_Origin_}>                                                                          \
   struct _Name_##Metadata : o2::soa::TableMetadata<_Name_##Metadata<ORIGIN>> {                                                                 \
     using table_t = _Name_##From<ORIGIN>;                                                                                                      \
     using Key = _Key_;                                                                                                                         \
@@ -2834,7 +3496,7 @@ DECLARE_SOA_ITERATOR_METADATA();
     static constexpr bool exclusive = _Exclusive_;                                                                                             \
   };                                                                                                                                           \
                                                                                                                                                \
-  template <o2::framework::OriginEnc ORIGIN>                                                                                                   \
+  template <o2::soa::OriginEnc ORIGIN>                                                                                                         \
   struct MetadataTrait<_Name_##From<ORIGIN>> {                                                                                                 \
     using metadata = _Name_##Metadata<ORIGIN>;                                                                                                 \
   };
@@ -2857,8 +3519,8 @@ template <typename T>
 class FilteredBase;
 
 template <typename... Ts>
-struct Join : TableWrap<o2::framework::OriginEnc{"JOIN"}, Ts...>::table_t {
-  using base = typename TableWrap<o2::framework::OriginEnc{"JOIN"}, Ts...>::table_t;
+struct Join : TableWrap<OriginEnc{"JOIN"}, Ts...>::table_t {
+  using base = typename TableWrap<OriginEnc{"JOIN"}, Ts...>::table_t;
   using originals = originals_pack_t<Ts...>;
 
   Join(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
@@ -3584,7 +4246,7 @@ class Filtered<Filtered<T>> : public FilteredBase<typename T::table_t>
 /// First argument is the key table (BCs for the Collisions+ZDCs case), the rest
 /// are index columns defined for the required tables.
 /// First index will be used by process() as the grouping
-template <o2::framework::OriginEnc ORIGIN, typename Key, typename H, typename... Ts>
+template <OriginEnc ORIGIN, typename Key, typename H, typename... Ts>
 struct IndexTable : Table<ORIGIN, soa::Index<>, H, Ts...> {
   using base_t = Table<ORIGIN, soa::Index<>, H, Ts...>;
   using table_t = base_t;

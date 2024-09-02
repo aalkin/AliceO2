@@ -9,6 +9,7 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
+#include <cstdio>
 #include "Framework/ASoA.h"
 #include "Framework/Expressions.h"
 #include "Framework/AnalysisHelpers.h"
@@ -22,6 +23,18 @@
 using namespace o2::framework;
 using namespace arrow;
 using namespace o2::soa;
+
+#define DECLARE(_Name_, _Origin_, _Desc_, _Version_, ...)                                             \
+  O2HASH(#_Name_);                                                                                    \
+  O2HASH(_Desc_ "/" #_Version_);                                                                      \
+  using _Name_##Metadata = TableMetadataNG<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
+  template <typename O>                                                                               \
+  using _Name_##From = TableNG<Hash<#_Name_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;              \
+  using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;                                                   \
+  template <>                                                                                         \
+  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                          \
+    using metadata = _Name_##Metadata;                                                                \
+  };
 
 namespace o2::aod
 {
@@ -40,6 +53,14 @@ DECLARE_SOA_TABLE(Points3Ds, "TEST", "PTS3D", o2::soa::Index<>, test::X, test::Y
 DECLARE_SOA_TABLE(Points3DsMk1, "TEST", "PTS3D_1", o2::soa::Index<>, o2::soa::Marker<1>, test::X, test::Y, test::Z);
 DECLARE_SOA_TABLE(Points3DsMk2, "TEST", "PTS3D_2", o2::soa::Index<>, o2::soa::Marker<2>, test::X, test::Y, test::Z);
 DECLARE_SOA_TABLE(Points3DsMk3, "TEST", "PTS3D_3", o2::soa::Index<>, o2::soa::Marker<3>, test::X, test::Y, test::Z);
+
+O2HASH("TEST");
+DECLARE(PointsNG, "TEST", "POINTS", 0, test::X, test::Y);
+DECLARE(Points3DNGs, "TEST", "PTS3D", 0, o2::soa::Index<>, test::X, test::Y, test::Z);
+
+DECLARE(Points3DMk1NGs, "TEST", "PTS3D", 1, o2::soa::Index<>, o2::soa::Marker<1>, test::X, test::Y, test::Z);
+DECLARE(Points3DMk2NGs, "TEST", "PTS3D", 2, o2::soa::Index<>, o2::soa::Marker<2>, test::X, test::Y, test::Z);
+DECLARE(Points3DMk3NGs, "TEST", "PTS3D", 3, o2::soa::Index<>, o2::soa::Marker<3>, test::X, test::Y, test::Z);
 
 namespace test
 {
@@ -86,6 +107,27 @@ TEST_CASE("TestMarkers")
   REQUIRE(pt1.begin().mark() == (size_t)1);
   REQUIRE(pt2.begin().mark() == (size_t)2);
   REQUIRE(pt3.begin().mark() == (size_t)3);
+}
+
+TEST_CASE("TestMarkersNG")
+{
+  TableBuilder b1;
+  auto pwriter = b1.cursor<o2::aod::Points3DNGs>();
+  for (auto i = 0; i < 20; ++i) {
+    pwriter(0, -1 * i, (int)(i / 2), 2 * i);
+  }
+  auto t1 = b1.finalize();
+
+  auto pt = o2::aod::Points3DNGs{t1};
+  auto pt1 = o2::aod::Points3DMk1NGs{t1};
+  auto pt2 = o2::aod::Points3DMk2NGs{t1};
+  auto pt3 = o2::aod::Points3DMk3NGs{t1};
+  REQUIRE(pt1.begin().mark() == (size_t)1);
+  REQUIRE(pt2.begin().mark() == (size_t)2);
+  REQUIRE(pt3.begin().mark() == (size_t)3);
+
+  using JoinTest = JoinNG<o2::aod::Points3DMk1NGs, o2::aod::Points3DMk2NGs>;
+  o2::framework::print_pack<JoinTest>();
 }
 
 TEST_CASE("TestTableIteration")
@@ -166,6 +208,90 @@ TEST_CASE("TestTableIteration")
   }
 }
 
+namespace o2::aod
+{
+DECLARE(Test, "AOD", "TESTT", 0, o2::aod::test::X, o2::aod::test::Y);
+}
+
+TEST_CASE("TestTableIterationNG")
+{
+  TableBuilder builder;
+  auto rowWriter = builder.persist<int32_t, int32_t>({"fX", "fY"});
+  rowWriter(0, 0, 0);
+  rowWriter(0, 0, 1);
+  rowWriter(0, 0, 2);
+  rowWriter(0, 0, 3);
+  rowWriter(0, 1, 4);
+  rowWriter(0, 1, 5);
+  rowWriter(0, 1, 6);
+  rowWriter(0, 1, 7);
+  auto table = builder.finalize();
+
+  auto i = ColumnIterator<int32_t>(table->column(0).get());
+  int64_t pos = 0;
+  i.mCurrentPos = &pos;
+  REQUIRE(*i == 0);
+  pos++;
+  REQUIRE(*i == 0);
+  pos++;
+  REQUIRE(*i == 0);
+  pos++;
+  REQUIRE(*i == 0);
+  pos++;
+  REQUIRE(*i == 1);
+  pos++;
+  REQUIRE(*i == 1);
+  pos++;
+  REQUIRE(*i == 1);
+  pos++;
+  REQUIRE(*i == 1);
+
+  arrow::ChunkedArray* chunks[2] = {
+                                    table->column(0).get(),
+                                    table->column(1).get()};
+  o2::aod::Points::iterator tests(chunks, {table->num_rows(), 0});
+  REQUIRE(tests.x() == 0);
+  REQUIRE(tests.y() == 0);
+  ++tests;
+  REQUIRE(tests.x() == 0);
+  REQUIRE(tests.y() == 1);
+  using Test = o2::aod::Test;
+  Test tests2{table};
+  size_t value = 0;
+  auto b = tests2.begin();
+  auto e = tests2.end();
+  REQUIRE(b != e);
+  ++b;
+  ++b;
+  ++b;
+  ++b;
+  ++b;
+  ++b;
+  ++b;
+  ++b;
+  REQUIRE(b == e);
+
+  b = tests2.begin();
+  REQUIRE(b != e);
+  REQUIRE(((b + 1) == (b + 1)));
+  REQUIRE(((b + 7) != b));
+  REQUIRE(((b + 7) != e));
+  REQUIRE(((b + 8) == e));
+
+  for (auto& t : tests2) {
+    REQUIRE(t.x() == value / 4);
+    REQUIRE((size_t)t.y() == value);
+    REQUIRE(value < 8);
+    value++;
+  }
+
+  for (auto t1 = tests2.begin(); t1 != tests2.end(); ++t1) {
+    for (auto t2 = t1 + 1; t2 != tests2.end(); ++t2) {
+    }
+  }
+}
+
+
 TEST_CASE("TestDynamicColumns")
 {
   TableBuilder builder;
@@ -188,6 +314,41 @@ TEST_CASE("TestDynamicColumns")
   }
 
   using Test2 = o2::soa::Table<OriginEnc{"AOD"}, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::Y, o2::aod::test::Y>>;
+
+  Test2 tests2{table};
+  for (auto& test : tests2) {
+    REQUIRE(test.sum() == test.y() + test.y());
+  }
+}
+
+namespace o2::aod
+{
+DECLARE(Test1, "AOD", "TESTT", 1, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::X, o2::aod::test::Y>);
+DECLARE(Test2, "AOD", "TESTT", 2, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::Y, o2::aod::test::Y>);
+}
+
+TEST_CASE("TestDynamicColumnsNG")
+{
+  TableBuilder builder;
+  auto rowWriter = builder.persist<int32_t, int32_t>({"fX", "fY"});
+  rowWriter(0, 0, 0);
+  rowWriter(0, 0, 1);
+  rowWriter(0, 0, 2);
+  rowWriter(0, 0, 3);
+  rowWriter(0, 1, 4);
+  rowWriter(0, 1, 5);
+  rowWriter(0, 1, 6);
+  rowWriter(0, 1, 7);
+  auto table = builder.finalize();
+
+  using Test = o2::aod::Test1;
+
+  Test tests{table};
+  for (auto& test : tests) {
+    REQUIRE(test.sum() == test.x() + test.y());
+  }
+
+  using Test2 = o2::aod::Test2;
 
   Test2 tests2{table};
   for (auto& test : tests2) {
@@ -1358,21 +1519,9 @@ TEST_CASE("TestCombinedGetter")
   }
 }
 
-#define DECLARE(_Name_, _Origin_, _Desc_, _Version_, ...)                                             \
-  using _Name_##Metadata = TableMetadataNG<TableSignature{_Desc_, _Version_}, __VA_ARGS__>;           \
-  template <o2::soa::OriginEnc ORIGIN>                                                                \
-  using _Name_##IteratorFrom = TableIterator<TableSignature{_Desc_, _Version_}, ORIGIN, __VA_ARGS__>; \
-  template <o2::soa::OriginEnc ORIGIN>                                                                \
-  using _Name_##From = TableNG<TableSignature{_Desc_, _Version_}, ORIGIN>;                            \
-  using _Name_ = _Name_##From<OriginEnc{_Origin_}>;                                                   \
-  template <>                                                                                         \
-  struct MetadataTraitNG<TableSignature{_Desc_, _Version_}> {                                         \
-    using metadata = _Name_##Metadata;                                                                \
-  };
-
 namespace o2::aod
 {
-DECLARE(Test1, "AOD", "TEST1", 0,
+DECLARE(TestR, "AOD", "TESTDESCRIPTION", 0,
         table::One, table::Two, table::Three, table::Four,
         table::Five<table::Four>)
 }
@@ -1388,7 +1537,7 @@ TEST_CASE("NewTables")
     writer(0, i, o2::constants::math::PI * i, o2::constants::math::Almost0 * i, f);
   }
   auto t = b.finalize();
-  o2::aod::Test1 t1{t};
+  o2::aod::TestR t1{t};
   auto count = 0;
   for (auto const& row : t1) {
     auto features1 = row.getValues<float, o2::aod::table::One, o2::aod::table::Three>();

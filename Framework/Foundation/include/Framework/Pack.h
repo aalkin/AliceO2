@@ -347,6 +347,12 @@ constexpr auto concatenate_pack_unique(pack<Args1...>, pack<Args2...>)
   return concatenate_pack(p1{}, pack<Args2...>{});
 }
 
+template <typename P1>
+constexpr auto concatenate_pack_unique(P1 p1)
+{
+  return p1;
+}
+
 template <typename P1, typename P2, typename... Ps>
 constexpr auto concatenate_pack_unique(P1 p1, P2 p2, Ps... ps)
 {

@@ -45,6 +45,75 @@
 
 namespace o2::soa
 {
+struct TableSignature {
+  consteval TableSignature(uint32_t D, int V)
+    : desc_hash{D},
+      version{V}
+  {
+  }
+  const uint32_t desc_hash;
+  const int version;
+};
+
+struct TableRef {
+  consteval TableRef()
+    : label_hash{0},
+      desc_hash{0},
+      origin_hash{0},
+      version{0}
+  {
+  }
+  consteval TableRef(uint32_t _label, uint32_t _desc, uint32_t _origin, int _version)
+    : label_hash{_label},
+      desc_hash{_desc},
+      origin_hash{_origin},
+      version{_version}
+  {
+  }
+  uint32_t label_hash;
+  uint32_t desc_hash;
+  uint32_t origin_hash;
+  int version;
+
+  constexpr bool operator==(TableRef const& other) const noexcept
+  {
+    return (this->label_hash == other.label_hash) &&
+           (this->desc_hash == other.desc_hash) &&
+           (this->origin_hash == other.origin_hash) &&
+           (this->version == other.version);
+  }
+
+  constexpr TableRef(TableRef const&) = default;
+  constexpr TableRef& operator=(TableRef const&) = default;
+  constexpr TableRef(TableRef&&) = default;
+  constexpr TableRef& operator=(TableRef&&) = default;
+};
+
+template <size_t N1, size_t N2, std::array<TableRef, N1> ar1, std::array<TableRef, N2> ar2>
+constexpr auto merge()
+{
+  constexpr const int duplicates = std::ranges::count_if(ar2.begin(), ar2.end(), [&](TableRef const& a) { return std::any_of(ar1.begin(), ar1.end(), [&](TableRef const& e) { return e == a; }); });
+  std::array<TableRef, N1 + N2 - duplicates> out;
+
+  auto pos = std::copy(ar1.begin(), ar1.end(), out.begin());
+  std::copy_if(ar2.begin(), ar2.end(), pos, [&](TableRef const& a) { return std::none_of(ar1.begin(), ar1.end(), [&](TableRef const& e) { return e == a; }); });
+  return out;
+}
+
+template <typename T, typename... Ts>
+constexpr auto mergeOriginals()
+  requires(sizeof...(Ts) > 1)
+{
+  constexpr auto tail = mergeOriginals<Ts...>();
+  return merge<T::originals.size(), tail.size(), T::originals, tail>();
+}
+
+template <typename T, typename T1>
+constexpr auto mergeOriginals()
+{
+  return merge<T::originals.size(), T1::originals.size(), T::originals, T1::originals>();
+}
+
 struct OriginEnc {
   static constexpr auto size = 4U;
   uint64_t value;
@@ -52,7 +121,7 @@ struct OriginEnc {
   {
   }
 #if defined(__clang__)
-  consteval OriginEnc(std::string_view in) noexcept : value{0}
+  consteval OriginEnc(std::string_view in) noexcept : value { 0 }
 #elif defined(__GNUC__) || defined(__GNUG__)
   constexpr OriginEnc(std::string_view in) noexcept : value{0}
 #endif
@@ -80,55 +149,6 @@ struct OriginEnc {
   {
     return this->value == other.value;
   }
-};
-
-struct TableSignature {
-  static constexpr auto desc_size = 16U;
-  std::array<uint64_t, 3> values{0UL};
-  int mVersion;
-
-  inline consteval TableSignature(std::array<uint64_t, 3> val, int v) noexcept : values{val}, mVersion{v}
-  {}
-#if defined(__clang__)
-  inline consteval TableSignature(std::string_view in, int v) noexcept : values{0}, mVersion{v}
-#elif defined(__GNUC__) || defined(__GNUG__)
-  inline constexpr TableSignature(std::string_view in, int v) noexcept : values{0}, mVersion{v}
-#endif
-  {
-    for (auto i = 0U; i < (desc_size < (uint32_t)in.size() ? desc_size : (uint32_t)in.size()); ++i) {
-      values[i/8] |= ((uint64_t)in[i]) << (8 * (i % 8));
-    }
-  }
-
-  inline constexpr std::string_view description() const noexcept
-  {
-    return static_cast<const char*>(static_cast<const void*>(values.data()));
-  }
-
-  inline constexpr auto version() const noexcept {
-    return mVersion;
-  }
-
-  constexpr TableSignature(TableSignature const& other) noexcept = default;
-  constexpr TableSignature(TableSignature&& other) noexcept = default;
-  constexpr TableSignature& operator=(TableSignature const& other) noexcept = default;
-  constexpr TableSignature& operator=(TableSignature&& other) noexcept = default;
-
-  constexpr bool operator==(TableSignature const& other) const
-  {
-    return (this->values[0] == other.values[0]) && (this->values[1] == other.values[1]) && (this->values[2] == other.values[2]);
-  }
-};
-
-// template <TableSignature SIG, OriginEnc ORIGIN>
-struct TableRef {
-  consteval TableRef(TableSignature _signature, OriginEnc _origin)
-    : origin{_origin},
-      signature{_signature}
-  {
-  }
-  const OriginEnc origin;
-  const TableSignature signature;
 };
 } // namespace o2::soa
 
@@ -162,20 +182,47 @@ namespace o2::aod
 {
 DECLARE_SOA_METADATA();
 
-template <soa::TableSignature SIG, typename... Cs>
+template <typename D, typename... Cs>
 struct TableMetadataNG {
   using columns = framework::pack<Cs...>;
 };
 
-template <soa::TableSignature SIG>
+template <typename D>
 struct MetadataTraitNG {
   using metadata = void;
 };
+
+template <uint32_t H>
+struct Hash {
+  static constexpr uint32_t hash = H;
+  static constexpr char const* const str{""};
+};
+
+#define O2HASH(_Str_)                              \
+  template <>                                      \
+  struct Hash<_Str_ ""_h> {                        \
+    static constexpr uint32_t hash = _Str_ ""_h;   \
+    static constexpr char const* const str{_Str_}; \
+  };
+
+static inline constexpr int version(const char* const str) {
+    size_t len = 0;
+    int res = 0;
+    while (len < 15 && str[len] != '/') {
+        ++len;
+    }
+    if (len >= 15) {
+      return -1;
+    }
+    for (auto i = len + 1; str[i] != '\0'; ++i) {
+        res = res * 10 + (int)(str[i] - '0');
+    }
+    return res;
 }
+} // namespace o2::aod
 
 namespace o2::soa
 {
-
 struct Binding {
   void const* ptr = nullptr;
   size_t hash = 0;
@@ -200,6 +247,7 @@ struct Binding {
 void accessingInvalidIndexFor(const char* getter);
 void dereferenceWithWrongType();
 void missingFilterDeclaration(int hash, int ai);
+void notBoundTable(const char* tableName);
 
 template <typename... C>
 auto createFieldsFromColumns(framework::pack<C...>)
@@ -923,11 +971,10 @@ concept CanBind = requires(T&& t) {
   { t.B::mColumnIterator };
 };
 
-template <TableSignature SIG, OriginEnc ORIGIN, typename IP, typename... C>
+template <typename D, typename O, typename IP, typename... C>
 struct TableIterator : IP, C... {
  public:
-  using self_t = TableIterator<SIG, ORIGIN, IP, C...>;
-  static constexpr auto parent_ref = TableRef{SIG, ORIGIN};
+  using self_t = TableIterator<D, O, IP, C...>;
   using policy_t = IP;
   using all_columns = framework::pack<C...>;
   using persistent_columns_t = framework::selected_pack<is_persistent_t, C...>;
@@ -935,7 +982,7 @@ struct TableIterator : IP, C... {
   constexpr inline static bool has_index_v = framework::pack_size(index_columns_t{}) > 0;
   using external_index_columns_t = framework::selected_pack<is_external_index_t, C...>;
   using internal_index_columns_t = framework::selected_pack<is_self_index_t, C...>;
-  using bindings_pack_t = decltype([]<typename... Cs>(framework::pack<Cs...>) { return framework::pack<typename Cs::binding_t...>{}; }(external_index_columns_t{})); // decltype(extractBindings(external_index_columns_t{}));
+  using bindings_pack_t = decltype([]<typename... Cs>(framework::pack<Cs...>) -> framework::pack<typename Cs::binding_t...> {}(external_index_columns_t{})); // decltype(extractBindings(external_index_columns_t{}));
 
   TableIterator(arrow::ChunkedArray* columnData[sizeof...(C)], IP&& policy)
     : IP{policy},
@@ -952,7 +999,7 @@ struct TableIterator : IP, C... {
   }
 
   TableIterator() = default;
-  TableIterator(TableIterator<SIG, ORIGIN, IP, C...> const& other)
+  TableIterator(self_t const& other)
     : IP{static_cast<IP const&>(other)},
       C(static_cast<C const&>(other))...
   {
@@ -967,7 +1014,8 @@ struct TableIterator : IP, C... {
     return *this;
   }
 
-  TableIterator(TableIterator<SIG, ORIGIN, FilteredIndexPolicy, C...> const& other) requires std::is_same_v<IP, DefaultIndexPolicy>
+  TableIterator(TableIterator<D, O, FilteredIndexPolicy, C...> const& other)
+    requires std::is_same_v<IP, DefaultIndexPolicy>
     : IP{static_cast<IP const&>(other)},
       C(static_cast<C const&>(other))...
   {
@@ -982,7 +1030,7 @@ struct TableIterator : IP, C... {
 
   TableIterator operator++(int)
   {
-    TableIterator<SIG, ORIGIN, IP, C...> copy = *this;
+    self_t copy = *this;
     this->operator++();
     return copy;
   }
@@ -995,7 +1043,7 @@ struct TableIterator : IP, C... {
 
   TableIterator operator--(int)
   {
-    TableIterator<SIG, ORIGIN, IP, C...> copy = *this;
+    self_t copy = *this;
     this->operator--();
     return copy;
   }
@@ -1755,31 +1803,48 @@ auto select(T const& t, framework::expressions::Filter const& f)
 
 arrow::ChunkedArray* getIndexFromLabel(arrow::Table* table, const char* label);
 
-template <TableSignature SIG, OriginEnc ORIGIN, typename IP, typename... C>
-auto base_iter(framework::pack<C...>&&) -> TableIterator<SIG, ORIGIN, IP, C...>
+template <typename D, typename O, typename IP, typename... C>
+auto base_iter(framework::pack<C...>&&) -> TableIterator<D, O, IP, C...>
 {
 }
 
-template <TableSignature SIG, OriginEnc ORIGIN>
-class TableNG {
+template <TableRef ref>
+auto getColumns()
+{
+  return typename aod::MetadataTraitNG<o2::aod::Hash<ref.desc_hash>>::metadata::columns{};
+}
+
+// template <typename H, TableSignature SIG, uint32_t ORIGIN>
+template <typename L, typename D, typename O, typename... Ts> //size_t N = 0, std::array<TableRef, N> Refs = std::array<TableRef, 0>{}
+class TableNG
+{
  public:
-  static constexpr auto ref = TableRef{SIG, ORIGIN};
-  using self_t = TableNG<SIG, ORIGIN>;
+  static constexpr const auto ref = TableRef{L::hash, D::hash, O::hash, o2::aod::version(D::str)};
+  using self_t = TableNG<L, D, O, Ts...>;
   using table_t = self_t;
 
-  using columns_t = aod::MetadataTraitNG<SIG>::metadata::columns;
+  static constexpr const auto originals = []() {
+    if constexpr (sizeof...(Ts) == 0) {
+      return std::array<TableRef, 1>{ref};
+    } else {
+      return o2::soa::mergeOriginals<Ts...>();
+    }
+  }();
+  using columns_t = decltype([]<size_t... Is>(std::index_sequence<Is...>) {
+    return framework::concatenated_pack_unique_t<decltype(getColumns<originals[Is]>())...>{};
+  }(std::make_index_sequence<originals.size()>()));
 
-  using column_types = decltype([]<typename... C>(framework::pack<C...>&&) { return framework::pack<typename C::type...>{}; }(columns_t{}));
-  using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) { return framework::selected_pack<is_persistent_t, C...>{}; }(columns_t{}));
-  using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) { return framework::selected_pack<is_external_index_t, C...>{}; }(columns_t{}));
-  using internal_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) { return framework::selected_pack<is_self_index_t, C...>{}; }(columns_t{}));
+  // using column_types = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::pack<typename C::type...> {}(columns_t{}));
+  using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_persistent_t, C...> {}(columns_t{}));
+  using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_external_index_t, C...> {}(columns_t{}));
+  using internal_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_self_index_t, C...> {}(columns_t{}));
   template <typename IP>
-  using base_iterator = decltype(base_iter<SIG, ORIGIN, IP>(columns_t{}));
+  using base_iterator = decltype(base_iter<D, O, IP>(columns_t{}));
 
   template <typename IP, typename Parent, typename... T>
   struct TableIteratorBase : base_iterator<IP> {
-    using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>) { return framework::selected_pack<is_external_index_t, C...>{}; }(columns_t{}));
-    using bindings_pack_t = decltype([]<typename... C>(framework::pack<C...>) { return framework::pack<typename C::binding_t...>{}; }(external_index_columns_t{}));
+    using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::selected_pack<is_external_index_t, C...> {}(columns_t{}));
+    using bindings_pack_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::binding_t...> {}(external_index_columns_t{}));
     static constexpr const std::array<TableRef, sizeof...(T)> originals{T::ref...};
     using policy_t = IP;
     using parent_t = Parent;
@@ -1858,8 +1923,8 @@ class TableNG {
       this->mRowIndex = other.mRowIndex;
     }
 
-    template <typename P, typename... O>
-    void matchTo(TableIteratorBase<IP, P, O...> const& other)
+    template <typename P, typename... Os>
+    void matchTo(TableIteratorBase<IP, P, Os...> const& other)
       requires std::is_same_v<typename P::table_t, typename Parent::table_t>
     {
       this->mRowIndex = other.mRowIndex;
@@ -2583,8 +2648,6 @@ constexpr auto concat(T const&... t)
 template <typename T1, typename T2>
 using ConcatBase = decltype(concat<OriginEnc{"CONC"}>(std::declval<T1>(), std::declval<T2>()));
 
-void notBoundTable(const char* tableName);
-
 namespace row_helpers
 {
 template <typename... Cs>
@@ -2656,6 +2719,8 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
 namespace o2::aod
 {
 DECLARE_SOA_ITERATOR_METADATA();
+O2HASH("JOIN");
+O2HASH("JOIN/0");
 }
 
 #define DECLARE_SOA_VERSIONING()                                                                    \
@@ -3517,6 +3582,90 @@ namespace o2::soa
 {
 template <typename T>
 class FilteredBase;
+
+template <typename... Ts>
+struct JoinNG : TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Ts...>
+{
+  using base = TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Ts...>;
+  JoinNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
+    : base{ArrowHelpers::joinTables(std::move(tables)), offset}
+  {
+    bindInternalIndicesTo(this);
+  }
+  using base::bindExternalIndices;
+  using base::bindInternalIndicesTo;
+
+  using self_t = JoinNG<Ts...>;
+  using table_t = base;
+  using table_t::originals;
+  using persistent_columns_t = typename table_t::persistent_columns_t;
+  using iterator = table_t::iterator;
+  using const_iterator = iterator;
+  using unfiltered_iterator = iterator;
+  using unfiltered_const_iterator = const_iterator;
+  using filtered_iterator = table_t::filtered_iterator;
+  using filtered_const_iterator = filtered_iterator;
+
+  iterator begin()
+  {
+    return iterator{this->cached_begin()};
+  }
+
+  const_iterator begin() const
+  {
+    return const_iterator{this->cached_begin()};
+  }
+
+  auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doSliceByCached(this, node, value, cache);
+  }
+
+  auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doSliceByCachedUnsorted(this, node, value, cache);
+  }
+
+  template <typename T1, bool OPT, bool SORTED>
+  auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
+  {
+    return doSliceBy(this, container, value);
+  }
+
+  iterator rawIteratorAt(uint64_t i) const
+  {
+    auto it = iterator{this->cached_begin()};
+    it.setCursor(i);
+    return it;
+  }
+
+  iterator iteratorAt(uint64_t i) const
+  {
+    return rawIteratorAt(i);
+  }
+
+  auto rawSlice(uint64_t start, uint64_t end) const
+  {
+    return self_t{{this->asArrowTable()->Slice(start, end - start + 1)}, start};
+  }
+
+  auto emptySlice() const
+  {
+    return self_t{{this->asArrowTable()->Slice(0, 0)}, 0};
+  }
+
+  template <typename T>
+  static consteval bool contains()
+  {
+    return std::find_if(originals.begin(), originals.end(), [](TableRef const& ref){ return ref.desc_hash == T::ref.desc_hash; }) != originals.end();
+  }
+};
+
+template <typename... Ts>
+constexpr auto joinNG(Ts const&... t)
+{
+  return TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Ts...>(ArrowHelpers::joinTables({t.asArrowTable()...}));
+}
 
 template <typename... Ts>
 struct Join : TableWrap<OriginEnc{"JOIN"}, Ts...>::table_t {

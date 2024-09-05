@@ -757,6 +757,12 @@ class TableBuilder
     }(typename T::table_t::persistent_columns_t{});
   }
 
+  template <typename... Cs>
+  auto cursor(framework::pack<Cs...>)
+  {
+    return this->template persist<typename Cs::type...>({Cs::columnLabel()...});
+  }
+
   template <typename T, typename E>
   auto cursor()
   {
@@ -839,6 +845,15 @@ auto makeEmptyTable(const char* name)
   return b.finalize();
 }
 
+template <typename... Cs>
+auto makeEmptyTable(const char* name, framework::pack<Cs...> p)
+{
+  TableBuilder b;
+  [[maybe_unused]] auto writer = b.cursor(p);
+  b.setLabel(name);
+  return b.finalize();
+}
+
 std::shared_ptr<arrow::Table> spawnerHelper(std::shared_ptr<arrow::Table>& fullTable, std::shared_ptr<arrow::Schema> newSchema, size_t nColumns,
                                             expressions::Projector* projectors, std::vector<std::shared_ptr<arrow::Field>> const& fields, const char* name);
 
@@ -849,6 +864,19 @@ auto spawner(framework::pack<C...> columns, std::vector<std::shared_ptr<arrow::T
   auto fullTable = soa::ArrowHelpers::joinTables(std::move(tables));
   if (fullTable->num_rows() == 0) {
     return makeEmptyTable<soa::Table<ORIGIN, C...>>(name);
+  }
+  static auto fields = o2::soa::createFieldsFromColumns(columns);
+  static auto new_schema = std::make_shared<arrow::Schema>(fields);
+  std::array<expressions::Projector, sizeof...(C)> projectors{{std::move(C::Projector())...}};
+  return spawnerHelper(fullTable, new_schema, sizeof...(C), projectors.data(), fields, name);
+}
+
+template <typename... C>
+auto spawner(framework::pack<C...> columns, std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* name)
+{
+  auto fullTable = soa::ArrowHelpers::joinTables(std::move(tables));
+  if (fullTable->num_rows() == 0) {
+    return makeEmptyTable(name, framework::pack<C...>{});
   }
   static auto fields = o2::soa::createFieldsFromColumns(columns);
   static auto new_schema = std::make_shared<arrow::Schema>(fields);

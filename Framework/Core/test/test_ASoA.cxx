@@ -24,18 +24,6 @@ using namespace o2::framework;
 using namespace arrow;
 using namespace o2::soa;
 
-#define DECLARE(_Name_, _Origin_, _Desc_, _Version_, ...)                                             \
-  O2HASH(#_Name_);                                                                                    \
-  O2HASH(_Desc_ "/" #_Version_);                                                                      \
-  using _Name_##Metadata = TableMetadataNG<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
-  template <typename O>                                                                               \
-  using _Name_##From = TableNG<Hash<#_Name_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;              \
-  using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;                                                   \
-  template <>                                                                                         \
-  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                          \
-    using metadata = _Name_##Metadata;                                                                \
-  };
-
 namespace o2::aod
 {
 namespace test
@@ -54,13 +42,12 @@ DECLARE_SOA_TABLE(Points3DsMk1, "TEST", "PTS3D_1", o2::soa::Index<>, o2::soa::Ma
 DECLARE_SOA_TABLE(Points3DsMk2, "TEST", "PTS3D_2", o2::soa::Index<>, o2::soa::Marker<2>, test::X, test::Y, test::Z);
 DECLARE_SOA_TABLE(Points3DsMk3, "TEST", "PTS3D_3", o2::soa::Index<>, o2::soa::Marker<3>, test::X, test::Y, test::Z);
 
-O2HASH("TEST");
-DECLARE(PointsNG, "TEST", "POINTS", 0, test::X, test::Y);
-DECLARE(Points3DNGs, "TEST", "PTS3D", 0, o2::soa::Index<>, test::X, test::Y, test::Z);
+DECLARE_SOA_TABLE_NG(PointsNG, "TEST", "POINTS", test::X, test::Y);
+DECLARE_SOA_TABLE_NG(Points3DNGs, "TEST", "PTS3D", o2::soa::Index<>, test::X, test::Y, test::Z);
 
-DECLARE(Points3DMk1NGs, "TEST", "PTS3D", 1, o2::soa::Index<>, o2::soa::Marker<1>, test::X, test::Y, test::Z);
-DECLARE(Points3DMk2NGs, "TEST", "PTS3D", 2, o2::soa::Index<>, o2::soa::Marker<2>, test::X, test::Y, test::Z);
-DECLARE(Points3DMk3NGs, "TEST", "PTS3D", 3, o2::soa::Index<>, o2::soa::Marker<3>, test::X, test::Y, test::Z);
+DECLARE_SOA_TABLE_NG_VERSIONED(Points3DMk1NGs, "TEST", "PTS3D", 1, o2::soa::Index<>, o2::soa::Marker<1>, test::X, test::Y, test::Z);
+DECLARE_SOA_TABLE_NG_VERSIONED(Points3DMk2NGs, "TEST", "PTS3D", 2, o2::soa::Index<>, o2::soa::Marker<2>, test::X, test::Y, test::Z);
+DECLARE_SOA_TABLE_NG_VERSIONED(Points3DMk3NGs, "TEST", "PTS3D", 3, o2::soa::Index<>, o2::soa::Marker<3>, test::X, test::Y, test::Z);
 
 namespace test
 {
@@ -69,18 +56,25 @@ DECLARE_SOA_COLUMN_FULL(Color, color, int32_t, "color");
 } // namespace test
 
 DECLARE_SOA_TABLE(Infos, "TEST", "INFOS", test::Color, test::SomeBool);
+DECLARE_SOA_TABLE_NG(InfosNG, "TEST", "INFOS", test::Color, test::SomeBool);
 
 namespace test
 {
 DECLARE_SOA_COLUMN(N, n, int);
 DECLARE_SOA_INDEX_COLUMN(Info, info);
+DECLARE_SOA_INDEX_COLUMN_FULL(InfoNG, infong, int, InfosNG, "");
 DECLARE_SOA_INDEX_COLUMN_FULL(PointA, pointA, int, Points, "_A");
 DECLARE_SOA_INDEX_COLUMN_FULL(PointB, pointB, int, Points, "_B");
+DECLARE_SOA_INDEX_COLUMN_FULL(PointAng, pointAng, int, PointsNG, "_A");
+DECLARE_SOA_INDEX_COLUMN_FULL(PointBng, pointBng, int, PointsNG, "_B");
 DECLARE_SOA_COLUMN_FULL(Thickness, thickness, int, "thickness");
 } // namespace test
 
 DECLARE_SOA_TABLE(Segments, "TEST", "SEGMENTS", test::N, test::PointAId, test::PointBId, test::InfoId);
 DECLARE_SOA_TABLE(SegmentsExtras, "TEST", "SEGMENTSEX", test::Thickness);
+
+DECLARE_SOA_TABLE_NG(SegmentsNG, "TEST", "SEGMENTS", test::N, test::PointAngId, test::PointBngId, test::InfoNGId);
+DECLARE_SOA_TABLE_NG(SegmentsExtrasNG, "TEST", "SEGMENTSPLUS", test::Thickness);
 
 namespace test
 {
@@ -125,9 +119,6 @@ TEST_CASE("TestMarkersNG")
   REQUIRE(pt1.begin().mark() == (size_t)1);
   REQUIRE(pt2.begin().mark() == (size_t)2);
   REQUIRE(pt3.begin().mark() == (size_t)3);
-
-  using JoinTest = JoinNG<o2::aod::Points3DMk1NGs, o2::aod::Points3DMk2NGs>;
-  o2::framework::print_pack<JoinTest>();
 }
 
 TEST_CASE("TestTableIteration")
@@ -208,11 +199,6 @@ TEST_CASE("TestTableIteration")
   }
 }
 
-namespace o2::aod
-{
-DECLARE(Test, "AOD", "TESTT", 0, o2::aod::test::X, o2::aod::test::Y);
-}
-
 TEST_CASE("TestTableIterationNG")
 {
   TableBuilder builder;
@@ -249,13 +235,13 @@ TEST_CASE("TestTableIterationNG")
   arrow::ChunkedArray* chunks[2] = {
                                     table->column(0).get(),
                                     table->column(1).get()};
-  o2::aod::Points::iterator tests(chunks, {table->num_rows(), 0});
+  o2::aod::PointsNG::iterator tests(chunks, {table->num_rows(), 0});
   REQUIRE(tests.x() == 0);
   REQUIRE(tests.y() == 0);
   ++tests;
   REQUIRE(tests.x() == 0);
   REQUIRE(tests.y() == 1);
-  using Test = o2::aod::Test;
+  using Test = InPlaceTableNG<0, o2::aod::test::X, o2::aod::test::Y>;
   Test tests2{table};
   size_t value = 0;
   auto b = tests2.begin();
@@ -291,7 +277,6 @@ TEST_CASE("TestTableIterationNG")
   }
 }
 
-
 TEST_CASE("TestDynamicColumns")
 {
   TableBuilder builder;
@@ -321,12 +306,6 @@ TEST_CASE("TestDynamicColumns")
   }
 }
 
-namespace o2::aod
-{
-DECLARE(Test1, "AOD", "TESTT", 1, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::X, o2::aod::test::Y>);
-DECLARE(Test2, "AOD", "TESTT", 2, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::Y, o2::aod::test::Y>);
-}
-
 TEST_CASE("TestDynamicColumnsNG")
 {
   TableBuilder builder;
@@ -341,18 +320,18 @@ TEST_CASE("TestDynamicColumnsNG")
   rowWriter(0, 1, 7);
   auto table = builder.finalize();
 
-  using Test = o2::aod::Test1;
+  using Test1 = InPlaceTableNG<"A"_h, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::X, o2::aod::test::Y>>;
 
-  Test tests{table};
-  for (auto& test : tests) {
-    REQUIRE(test.sum() == test.x() + test.y());
+  Test1 tests1{table};
+  for (auto& test : tests1) {
+    REQUIRE(test.sum() == (test.x() + test.y()));
   }
 
-  using Test2 = o2::aod::Test2;
+  using Test2 = InPlaceTableNG<"B"_h, o2::aod::test::X, o2::aod::test::Y, o2::aod::test::Sum<o2::aod::test::Y, o2::aod::test::Y>>;
 
   Test2 tests2{table};
   for (auto& test : tests2) {
-    REQUIRE(test.sum() == test.y() + test.y());
+    CHECK(test.sum() == (test.y() + test.y()));
   }
 }
 
@@ -460,6 +439,81 @@ TEST_CASE("TestJoinedTables")
     REQUIRE(15 == test.x() + test.y() + test.z());
   }
   using TestMoreThanTwo = Join<TestX, TestY, TestZ>;
+  TestMoreThanTwo tests4{{tableX, tableY, tableZ}, 0};
+  for (auto& test : tests4) {
+    REQUIRE(15 == test.x() + test.y() + test.z());
+  }
+}
+
+TEST_CASE("TestJoinedTablesNG")
+{
+  TableBuilder builderX;
+  auto rowWriterX = builderX.persist<int32_t>({"fX"});
+  rowWriterX(0, 0);
+  rowWriterX(0, 1);
+  rowWriterX(0, 2);
+  rowWriterX(0, 3);
+  rowWriterX(0, 4);
+  rowWriterX(0, 5);
+  rowWriterX(0, 6);
+  rowWriterX(0, 7);
+  auto tableX = builderX.finalize();
+
+  TableBuilder builderY;
+  auto rowWriterY = builderY.persist<int32_t>({"fY"});
+  rowWriterY(0, 7);
+  rowWriterY(0, 6);
+  rowWriterY(0, 5);
+  rowWriterY(0, 4);
+  rowWriterY(0, 3);
+  rowWriterY(0, 2);
+  rowWriterY(0, 1);
+  rowWriterY(0, 0);
+  auto tableY = builderY.finalize();
+
+  TableBuilder builderZ;
+  auto rowWriterZ = builderZ.persist<int32_t>({"fZ"});
+  rowWriterZ(0, 8);
+  rowWriterZ(0, 8);
+  rowWriterZ(0, 8);
+  rowWriterZ(0, 8);
+  rowWriterZ(0, 8);
+  rowWriterZ(0, 8);
+  rowWriterZ(0, 8);
+  rowWriterZ(0, 8);
+  auto tableZ = builderZ.finalize();
+
+  using TestX = InPlaceTableNG<"A0"_h, o2::aod::test::X>;
+  using TestY = InPlaceTableNG<"A1"_h, o2::aod::test::Y>;
+  using TestZ = InPlaceTableNG<"A2"_h, o2::aod::test::Z>;
+  using Test = JoinNG<TestX, TestY>;
+
+  REQUIRE(Test::contains<TestX>());
+  REQUIRE(Test::contains<TestY>());
+  REQUIRE(!Test::contains<TestZ>());
+
+  Test tests{{tableX, tableY}, 0};
+
+  REQUIRE(tests.contains<TestX>());
+  REQUIRE(tests.contains<TestY>());
+  REQUIRE(!tests.contains<TestZ>());
+
+  for (auto& test : tests) {
+    REQUIRE(7 == test.x() + test.y());
+  }
+
+  auto tests2 = joinNG(TestX{tableX}, TestY{tableY});
+  static_assert(std::is_same_v<Test::self_t, decltype(tests2)>, "Joined tables should have the same type, regardless how we construct them");
+  for (auto& test : tests2) {
+    REQUIRE(7 == test.x() + test.y());
+  }
+
+  auto tests3 = joinNG(TestX{tableX}, TestY{tableY}, TestZ{tableZ});
+
+  for (auto& test : tests3) {
+    REQUIRE(15 == test.x() + test.y() + test.z());
+  }
+  using TestMoreThanTwo = JoinNG<TestX, TestY, TestZ>;
   TestMoreThanTwo tests4{{tableX, tableY, tableZ}, 0};
   for (auto& test : tests4) {
     REQUIRE(15 == test.x() + test.y() + test.z());
@@ -639,6 +693,179 @@ TEST_CASE("TestConcatTables")
   REQUIRE(i == 3);
 }
 
+TEST_CASE("TestConcatTablesNG")
+{
+  TableBuilder builderA;
+  auto rowWriterA = builderA.persist<int32_t, int32_t>({"fX", "fY"});
+  rowWriterA(0, 0, 0);
+  rowWriterA(0, 1, 0);
+  rowWriterA(0, 2, 0);
+  rowWriterA(0, 3, 0);
+  rowWriterA(0, 4, 0);
+  rowWriterA(0, 5, 0);
+  rowWriterA(0, 6, 0);
+  rowWriterA(0, 7, 0);
+  auto tableA = builderA.finalize();
+  REQUIRE(tableA->num_rows() == 8);
+
+  TableBuilder builderB;
+  auto rowWriterB = builderB.persist<int32_t>({"fX"});
+  rowWriterB(0, 8);
+  rowWriterB(0, 9);
+  rowWriterB(0, 10);
+  rowWriterB(0, 11);
+  rowWriterB(0, 12);
+  rowWriterB(0, 13);
+  rowWriterB(0, 14);
+  rowWriterB(0, 15);
+  auto tableB = builderB.finalize();
+
+  TableBuilder builderC;
+  auto rowWriterC = builderC.persist<int32_t>({"fZ"});
+  rowWriterC(0, 8);
+  rowWriterC(0, 9);
+  rowWriterC(0, 10);
+  rowWriterC(0, 11);
+  rowWriterC(0, 12);
+  rowWriterC(0, 13);
+  rowWriterC(0, 14);
+  rowWriterC(0, 15);
+  auto tableC = builderC.finalize();
+
+  TableBuilder builderD;
+  auto rowWriterD = builderD.persist<int32_t, int32_t>({"fX", "fZ"});
+  rowWriterD(0, 16, 8);
+  rowWriterD(0, 17, 9);
+  rowWriterD(0, 18, 10);
+  rowWriterD(0, 19, 11);
+  rowWriterD(0, 20, 12);
+  rowWriterD(0, 21, 13);
+  rowWriterD(0, 22, 14);
+  rowWriterD(0, 23, 15);
+  auto tableD = builderD.finalize();
+
+  using TestA = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;//o2::aod::TestA;
+  using TestB = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X>;//o2::aod::TestB;
+  using TestC = InPlaceTableNG<0, o2::aod::test::Z>;//o2::aod::TestC;
+  using TestD = InPlaceTableNG<0, o2::aod::test::X, o2::aod::test::Z>;//o2::aod::TestD;
+  using ConcatTest = ConcatNG<TestA, TestB>;
+  using JoinedTest = JoinNG<TestA, TestC>;
+  using NestedJoinTest = JoinNG<JoinedTest, TestD>;
+  using NestedConcatTest = ConcatNG<JoinNG<TestA, TestB>, TestD>;
+
+  static_assert(std::is_same_v<NestedJoinTest::columns_t, o2::framework::pack<o2::soa::Index<>, o2::aod::test::Y, o2::aod::test::X, o2::aod::test::Z>>, "Bad nested join");
+
+  static_assert(std::is_same_v<ConcatTest::columns_t, o2::framework::pack<o2::soa::Index<>, o2::aod::test::X>>, "Bad intersection of columns");
+  ConcatTest tests{tableA, tableB};
+  REQUIRE(16 == tests.size());
+  for (auto& test : tests) {
+    REQUIRE(test.index() == test.x());
+  }
+
+  static_assert(std::is_same_v<NestedConcatTest::columns_t, o2::framework::pack<o2::aod::test::X>>, "Bad nested concat");
+
+         // Hardcode a selection for the first 5 odd numbers
+  using FilteredTest = FilteredNG<TestA>;
+  using namespace o2::framework;
+  expressions::Filter testf = (o2::aod::test::x == 1) || (o2::aod::test::x == 3);
+  gandiva::Selection selection;
+  auto status = gandiva::SelectionVector::MakeInt64(tests.size(), arrow::default_memory_pool(), &selection);
+  REQUIRE(status.ok());
+
+  auto fptr = tableA->schema()->GetFieldByName("fX");
+  REQUIRE(fptr != nullptr);
+  REQUIRE(fptr->name() == "fX");
+  REQUIRE(fptr->type()->id() == arrow::Type::INT32);
+
+  auto node_x = gandiva::TreeExprBuilder::MakeField(fptr);
+  auto literal_1 = gandiva::TreeExprBuilder::MakeLiteral(static_cast<int32_t>(1));
+  auto literal_3 = gandiva::TreeExprBuilder::MakeLiteral(static_cast<int32_t>(3));
+  auto equals_to_1 = gandiva::TreeExprBuilder::MakeFunction("equal", {node_x, literal_1}, arrow::boolean());
+  auto equals_to_3 = gandiva::TreeExprBuilder::MakeFunction("equal", {node_x, literal_3}, arrow::boolean());
+  auto node_or = gandiva::TreeExprBuilder::MakeOr({equals_to_1, equals_to_3});
+  auto condition = gandiva::TreeExprBuilder::MakeCondition(node_or);
+  REQUIRE(condition->ToString() == "bool equal((int32) fX, (const int32) 1) || bool equal((int32) fX, (const int32) 3)");
+  std::shared_ptr<gandiva::Filter> filter;
+  status = gandiva::Filter::Make(tableA->schema(), condition, &filter);
+  REQUIRE(status.ToString() == "OK");
+
+  arrow::TableBatchReader reader(*tableA);
+  std::shared_ptr<RecordBatch> batch;
+  auto s = reader.ReadNext(&batch);
+  REQUIRE(s.ok());
+  REQUIRE(batch != nullptr);
+  REQUIRE(batch->num_rows() == 8);
+  auto st = filter->Evaluate(*batch, selection);
+  REQUIRE(st.ToString() == "OK");
+
+  gandiva::Selection selection_f = expressions::createSelection(tableA, testf);
+
+  TestA testA{tableA};
+  FilteredTest filtered{{testA.asArrowTable()}, selection_f};
+  REQUIRE(2 == filtered.size());
+
+  auto i = 0;
+  REQUIRE(filtered.begin() != filtered.end());
+  for (auto& f : filtered) {
+    REQUIRE(i * 2 + 1 == f.x());
+    REQUIRE(i * 2 + 1 == f.index());
+    i++;
+  }
+  REQUIRE(i == 2);
+
+  // Hardcode a selection for the first 5 odd numbers
+  using FilteredConcatTest = FilteredNG<ConcatTest::table_t>;
+  using namespace o2::framework;
+  gandiva::Selection selectionConcat;
+  status = gandiva::SelectionVector::MakeInt64(tests.size(), arrow::default_memory_pool(), &selectionConcat);
+  REQUIRE(status.ok() == true);
+  selectionConcat->SetIndex(0, 0);
+  selectionConcat->SetIndex(1, 5);
+  selectionConcat->SetIndex(2, 10);
+  selectionConcat->SetNumSlots(3);
+  ConcatTest concatTest{tableA, tableB};
+  FilteredConcatTest concatTestTable{{concatTest.asArrowTable()}, selectionConcat};
+  REQUIRE(3 == concatTestTable.size());
+
+  i = 0;
+  auto b = concatTestTable.begin();
+  auto e = concatTestTable.end();
+
+  REQUIRE(b.mRowIndex == 0);
+  REQUIRE(b.getSelectionRow() == 0);
+  REQUIRE(e.index == 3);
+
+  REQUIRE(concatTestTable.begin() != concatTestTable.end());
+  for (auto& f : concatTestTable) {
+    REQUIRE(i * 5 == f.x());
+    REQUIRE(i * 5 == f.index());
+    REQUIRE(i == f.filteredIndex());
+    i++;
+  }
+  REQUIRE(i == 3);
+
+  // Test with a Joined table
+  using FilteredJoinTest = FilteredNG<JoinedTest::table_t>;
+  gandiva::Selection selectionJoin;
+  status = gandiva::SelectionVector::MakeInt64(tests.size(), arrow::default_memory_pool(), &selectionJoin);
+  REQUIRE(status.ok() == true);
+  selectionJoin->SetIndex(0, 0);
+  selectionJoin->SetIndex(1, 2);
+  selectionJoin->SetIndex(2, 4);
+  selectionJoin->SetNumSlots(3);
+  JoinedTest testJoin{{tableA, tableC}, 0};
+  FilteredJoinTest filteredJoin{{testJoin.asArrowTable()}, selectionJoin};
+
+  i = 0;
+  REQUIRE(filteredJoin.begin() != filteredJoin.end());
+  for (auto& f : filteredJoin) {
+    REQUIRE(i * 2 == f.x());
+    REQUIRE(i * 2 == f.index());
+    i++;
+  }
+  REQUIRE(i == 3);
+}
+
 TEST_CASE("TestDereference")
 {
   TableBuilder builderA;
@@ -712,6 +939,79 @@ TEST_CASE("TestDereference")
   REQUIRE(se.thickness() == 1);
 }
 
+TEST_CASE("TestDereferenceNG")
+{
+  TableBuilder builderA;
+  auto pointsWriter = builderA.cursor<o2::aod::PointsNG>();
+  pointsWriter(0, 0, 0);
+  pointsWriter(0, 3, 4);
+  auto pointsT = builderA.finalize();
+  o2::aod::PointsNG points{pointsT};
+  REQUIRE(pointsT->num_rows() == 2);
+
+  TableBuilder builderA2;
+  auto infoWriter = builderA2.cursor<o2::aod::InfosNG>();
+  infoWriter(0, 0, true);
+  infoWriter(0, 1, false);
+  infoWriter(0, 4, true);
+  auto infosT = builderA2.finalize();
+  o2::aod::InfosNG infos{infosT};
+  REQUIRE(infos.begin().someBool() == true);
+  REQUIRE((infos.begin() + 1).someBool() == false);
+  REQUIRE((infos.begin() + 2).someBool() == true);
+  REQUIRE((infos.begin() + 2).color() == 4);
+  REQUIRE(infosT->num_rows() == 3);
+
+  TableBuilder builderB;
+  auto segmentsWriter = builderB.cursor<o2::aod::SegmentsNG>();
+  segmentsWriter(0, 10, 0, 1, 2);
+  auto segmentsT = builderB.finalize();
+  o2::aod::SegmentsNG segments{segmentsT};
+  REQUIRE(segmentsT->num_rows() == 1);
+
+  TableBuilder builderC;
+  auto segmentsExtraWriter = builderC.cursor<o2::aod::SegmentsExtrasNG>();
+  segmentsExtraWriter(0, 1);
+  auto segmentsExtraT = builderC.finalize();
+  o2::aod::SegmentsExtrasNG segmentsExtras{segmentsExtraT};
+  REQUIRE(segmentsExtraT->num_rows() == 1);
+
+  REQUIRE(segments.begin().pointAngId() == 0);
+  REQUIRE(segments.begin().pointBngId() == 1);
+  static_assert(std::is_same_v<decltype(segments.begin().pointAng()), o2::aod::PointsNG::iterator>);
+  auto i = segments.begin();
+  using namespace o2::framework;
+  i.bindExternalIndices(&points, &infos);
+  REQUIRE(i.n() == 10);
+  REQUIRE(i.infong().color() == 4);
+  REQUIRE(i.infong().someBool() == true);
+  REQUIRE(i.pointAng().x() == 0);
+  REQUIRE(i.pointAng().y() == 0);
+  REQUIRE(i.pointBng().x() == 3);
+  REQUIRE(i.pointBng().y() == 4);
+
+  segments.bindExternalIndices(&points, &infos);
+  auto j = segments.begin();
+  REQUIRE(j.n() == 10);
+  REQUIRE(j.infong().color() == 4);
+  REQUIRE(j.infong().someBool() == true);
+  REQUIRE(j.pointAng().x() == 0);
+  REQUIRE(j.pointAng().y() == 0);
+  REQUIRE(j.pointBng().x() == 3);
+  REQUIRE(j.pointBng().y() == 4);
+
+  auto joined = joinNG(segments, segmentsExtras);
+  joined.bindExternalIndices(&points, &infos);
+  auto se = joined.begin();
+  REQUIRE(se.n() == 10);
+  REQUIRE(se.infong().color() == 4);
+  REQUIRE(se.pointAng().x() == 0);
+  REQUIRE(se.pointAng().y() == 0);
+  REQUIRE(se.pointBng().x() == 3);
+  REQUIRE(se.pointBng().y() == 4);
+  REQUIRE(se.thickness() == 1);
+}
+
 TEST_CASE("TestSchemaCreation")
 {
   auto schema = std::make_shared<arrow::Schema>(createFieldsFromColumns(o2::aod::Points::persistent_columns_t{}));
@@ -737,7 +1037,6 @@ TEST_CASE("TestFilteredOperators")
 
   using TestA = o2::soa::Table<OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
   using FilteredTest = Filtered<TestA>;
-  using NestedFilteredTest = Filtered<Filtered<TestA>>;
   using namespace o2::framework;
 
   expressions::Filter f1 = o2::aod::test::x < 4;
@@ -757,8 +1056,81 @@ TEST_CASE("TestFilteredOperators")
   FilteredTest filteredUnion = filtered1 + filtered2;
   REQUIRE(6 == filteredUnion.size());
 
-  std::vector<std::tuple<int32_t, int32_t>> expectedUnion{
-    {0, 8}, {1, 9}, {2, 10}, {3, 11}, {6, 14}, {7, 15}};
+  std::vector<std::tuple<int32_t, int32_t>> expectedUnion{{0, 8}, {1, 9}, {2, 10}, {3, 11}, {6, 14}, {7, 15}};
+  auto i = 0;
+  for (auto& f : filteredUnion) {
+    REQUIRE(std::get<0>(expectedUnion[i]) == f.x());
+    REQUIRE(std::get<1>(expectedUnion[i]) == f.y());
+    REQUIRE(std::get<0>(expectedUnion[i]) == f.index());
+    i++;
+  }
+  REQUIRE(i == 6);
+
+  FilteredTest filteredIntersection = filtered1 * filtered2;
+  REQUIRE(0 == filteredIntersection.size());
+
+  i = 0;
+  for (auto const& _ : filteredIntersection) {
+    i++;
+  }
+  REQUIRE(i == 0);
+
+  expressions::Filter f3 = o2::aod::test::x < 3;
+  auto s3 = expressions::createSelection(testA.asArrowTable(), f3);
+  FilteredTest filtered3{{testA.asArrowTable()}, s3};
+  REQUIRE(3 == filtered3.size());
+  REQUIRE(filtered3.begin() != filtered3.end());
+
+  FilteredTest unionIntersection = (filtered1 + filtered2) * filtered3;
+  REQUIRE(3 == unionIntersection.size());
+
+  i = 0;
+  for (auto& f : unionIntersection) {
+    REQUIRE(i == f.x());
+    REQUIRE(i + 8 == f.y());
+    REQUIRE(i == f.index());
+    i++;
+  }
+  REQUIRE(i == 3);
+}
+
+TEST_CASE("TestFilteredOperatorsNG")
+{
+  TableBuilder builderA;
+  auto rowWriterA = builderA.persist<int32_t, int32_t>({"fX", "fY"});
+  rowWriterA(0, 0, 8);
+  rowWriterA(0, 1, 9);
+  rowWriterA(0, 2, 10);
+  rowWriterA(0, 3, 11);
+  rowWriterA(0, 4, 12);
+  rowWriterA(0, 5, 13);
+  rowWriterA(0, 6, 14);
+  rowWriterA(0, 7, 15);
+  auto tableA = builderA.finalize();
+  REQUIRE(tableA->num_rows() == 8);
+
+  using TestA = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>; //o2::soa::Table<OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
+  using FilteredTest = FilteredNG<TestA>;
+  using namespace o2::framework;
+
+  expressions::Filter f1 = o2::aod::test::x < 4;
+  expressions::Filter f2 = o2::aod::test::y > 13;
+
+  TestA testA{tableA};
+  auto s1 = expressions::createSelection(testA.asArrowTable(), f1);
+  FilteredTest filtered1{{testA.asArrowTable()}, s1};
+  REQUIRE(4 == filtered1.size());
+  REQUIRE(filtered1.begin() != filtered1.end());
+
+  auto s2 = expressions::createSelection(testA.asArrowTable(), f2);
+  FilteredTest filtered2{{testA.asArrowTable()}, s2};
+  REQUIRE(2 == filtered2.size());
+  REQUIRE(filtered2.begin() != filtered2.end());
+
+  FilteredTest filteredUnion = filtered1 + filtered2;
+  REQUIRE(6 == filteredUnion.size());
+
+  std::vector<std::tuple<int32_t, int32_t>> expectedUnion{{0, 8}, {1, 9}, {2, 10}, {3, 11}, {6, 14}, {7, 15}};
   auto i = 0;
   for (auto& f : filteredUnion) {
     REQUIRE(std::get<0>(expectedUnion[i]) == f.x());
@@ -852,14 +1224,70 @@ TEST_CASE("TestNestedFiltering")
   REQUIRE(i == 1);
 }
 
+TEST_CASE("TestNestedFilteringNG")
+{
+  TableBuilder builderA;
+  auto rowWriterA = builderA.persist<int32_t, int32_t>({"fX", "fY"});
+  rowWriterA(0, 0, 8);
+  rowWriterA(0, 1, 9);
+  rowWriterA(0, 2, 10);
+  rowWriterA(0, 3, 11);
+  rowWriterA(0, 4, 12);
+  rowWriterA(0, 5, 13);
+  rowWriterA(0, 6, 14);
+  rowWriterA(0, 7, 15);
+  auto tableA = builderA.finalize();
+  REQUIRE(tableA->num_rows() == 8);
+
+  using TestA = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
+  using FilteredTest = FilteredNG<TestA>;
+  using NestedFilteredTest = FilteredNG<FilteredNG<TestA>>;
+  using TripleNestedFilteredTest = FilteredNG<FilteredNG<FilteredNG<TestA>>>;
+  using namespace o2::framework;
+
+  expressions::Filter f1 = o2::aod::test::x < 4;
+  expressions::Filter f2 = o2::aod::test::y > 9;
+  expressions::Filter f3 = o2::aod::test::x < 3;
+
+  TestA testA{tableA};
+  auto s1 = expressions::createSelection(testA.asArrowTable(), f1);
+  FilteredTest filtered{{testA.asArrowTable()}, s1};
+  REQUIRE(4 == filtered.size());
+  REQUIRE(filtered.begin() != filtered.end());
+
+  auto s2 = expressions::createSelection(filtered.asArrowTable(), f2);
+  NestedFilteredTest nestedFiltered{{filtered}, s2};
+  REQUIRE(2 == nestedFiltered.size());
+  auto i = 0;
+  for (auto& f : nestedFiltered) {
+    REQUIRE(i + 2 == f.x());
+    REQUIRE(i + 10 == f.y());
+    REQUIRE(i + 2 == f.index());
+    i++;
+  }
+  REQUIRE(i == 2);
+
+  auto s3 = expressions::createSelection(nestedFiltered.asArrowTable(), f3);
+  TripleNestedFilteredTest tripleFiltered{{nestedFiltered}, s3};
+  REQUIRE(1 == tripleFiltered.size());
+  i = 0;
+  for (auto& f : tripleFiltered) {
+    REQUIRE(i + 2 == f.x());
+    REQUIRE(i + 10 == f.y());
+    REQUIRE(i + 2 == f.index());
+    i++;
+  }
+  REQUIRE(i == 1);
+}
+
 TEST_CASE("TestEmptyTables")
 {
   TableBuilder bPoints;
-  auto pwriter = bPoints.cursor<o2::aod::Points>();
+  [[maybe_unused]]auto pwriter = bPoints.cursor<o2::aod::Points>();
   auto pempty = bPoints.finalize();
 
   TableBuilder bInfos;
-  auto iwriter = bInfos.cursor<o2::aod::Infos>();
+  [[maybe_unused]]auto iwriter = bInfos.cursor<o2::aod::Infos>();
   auto iempty = bInfos.finalize();
 
   o2::aod::Points p{pempty};
@@ -869,6 +1297,26 @@ TEST_CASE("TestEmptyTables")
   PI pi{{pempty, iempty}, 0};
   REQUIRE(pi.size() == 0);
   auto spawned = Extend<o2::aod::Points, o2::aod::test::ESum>(p);
+  REQUIRE(spawned.size() == 0);
+}
+
+TEST_CASE("TestEmptyTablesNG")
+{
+  TableBuilder bPoints;
+  [[maybe_unused]]auto pwriter = bPoints.cursor<o2::aod::PointsNG>();
+  auto pempty = bPoints.finalize();
+
+  TableBuilder bInfos;
+  [[maybe_unused]]auto iwriter = bInfos.cursor<o2::aod::InfosNG>();
+  auto iempty = bInfos.finalize();
+
+  o2::aod::PointsNG p{pempty};
+  o2::aod::InfosNG i{iempty};
+
+  using PI = JoinNG<o2::aod::PointsNG, o2::aod::InfosNG>;
+  PI pi{{pempty, iempty}, 0};
+  REQUIRE(pi.size() == 0);
+  auto spawned = Extend<o2::aod::PointsNG, o2::aod::test::ESum>(p);
   REQUIRE(spawned.size() == 0);
 }
 
@@ -1521,7 +1969,7 @@ TEST_CASE("TestCombinedGetter")
 
 namespace o2::aod
 {
-DECLARE(TestR, "AOD", "TESTDESCRIPTION", 0,
+DECLARE_SOA_TABLE_NG(TestR, "AOD", "TESTDESCRIPTION",
         table::One, table::Two, table::Three, table::Four,
         table::Five<table::Four>)
 }

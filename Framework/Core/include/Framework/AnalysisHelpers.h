@@ -612,6 +612,7 @@ namespace o2::soa
 {
 /// On-the-fly adding of expression columns
 template <typename T, typename... Cs>
+  requires (soa::is_soa_table_like_v<T>)
 auto Extend(T const& table)
 {
   static_assert((soa::is_type_spawnable_v<Cs> && ...), "You can only extend a table with expression columns");
@@ -619,13 +620,32 @@ auto Extend(T const& table)
   return output_t{{o2::framework::spawner<OriginEnc{"JOIN"}>(framework::pack<Cs...>{}, {table.asArrowTable()}, "dynamicExtension"), table.asArrowTable()}, 0};
 }
 
+template <typename T, typename... Cs>
+  requires (framework::is_base_of_template_v<TableNG, T>)
+auto Extend(T const& table)
+{
+  static_assert((soa::is_type_spawnable_v<Cs> && ...), "You can only extend a table with expression columns");
+  using output_t = JoinNG<T, soa::TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Cs...>>;
+  return output_t{{o2::framework::spawner(framework::pack<Cs...>{}, {table.asArrowTable()}, "dynamicExtension"), table.asArrowTable()}, 0};
+}
+
 /// Template function to attach dynamic columns on-the-fly (e.g. inside
 /// process() function). Dynamic columns need to be compatible with the table.
 template <typename T, typename... Cs>
+  requires (soa::is_soa_table_like_v<T>)
 auto Attach(T const& table)
 {
   static_assert((framework::is_base_of_template_v<o2::soa::DynamicColumn, Cs> && ...), "You can only attach dynamic columns");
   using output_t = Join<T, o2::soa::Table<OriginEnc{"JOIN"}, Cs...>>;
+  return output_t{{table.asArrowTable()}, table.offset()};
+}
+
+template <typename T, typename... Cs>
+  requires (framework::is_base_of_template_v<TableNG, T>)
+auto Attach(T const& table)
+{
+  static_assert((framework::is_base_of_template_v<o2::soa::DynamicColumn, Cs> && ...), "You can only attach dynamic columns");
+  using output_t = JoinNG<T, o2::soa::TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Cs...>>;
   return output_t{{table.asArrowTable()}, table.offset()};
 }
 } // namespace o2::soa

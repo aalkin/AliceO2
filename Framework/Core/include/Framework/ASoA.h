@@ -160,6 +160,20 @@ struct OriginEnc {
     return this->value == other.value;
   }
 };
+
+template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
+struct is_base_of_template_origin_impl {
+  template <o2::soa::OriginEnc ORIGIN, typename... Ts>
+  static constexpr std::true_type test(const base<ORIGIN, Ts...>*);
+  static constexpr std::false_type test(...);
+  using type = decltype(test(std::declval<derived*>()));
+};
+
+template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
+using is_base_of_template_origin = typename is_base_of_template_origin_impl<base, derived>::type;
+
+template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
+inline constexpr bool is_base_of_template_origin_v = is_base_of_template_origin<base, derived>::value;
 } // namespace o2::soa
 
 template <>
@@ -1440,10 +1454,47 @@ constexpr bool are_bindings_compatible_v(framework::pack<Os...>&&)
   }
 }
 
+template <typename T>
+inline constexpr bool is_soa_table_like_v = soa::is_base_of_template_origin_v<soa::Table, T>;
+
+/// special case for the template with origin
+template <typename T, template <OriginEnc, typename...> class Ref>
+struct is_specialization_origin : std::false_type {
+};
+
+template <template <OriginEnc, typename...> class Ref, OriginEnc ORIGIN, typename... Args>
+struct is_specialization_origin<Ref<ORIGIN, Args...>, Ref> : std::true_type {
+};
+
+template <typename T, template <OriginEnc, typename...> class Ref>
+inline constexpr bool is_specialization_origin_v = is_specialization_origin<T, Ref>::value;
+
+//! Helper to check if a type T is an iterator
+template <typename T>
+inline constexpr bool is_soa_iterator_v = soa::is_base_of_template_origin_v<RowViewCore, T> || soa::is_specialization_origin_v<T, RowViewCore>;
+
 template <typename T, typename B>
-constexpr bool is_binding_compatible_v()
+  requires((o2::soa::is_soa_iterator_v<T> || o2::soa::is_soa_table_like_v<T>) && o2::soa::is_soa_table_like_v<B>)
+consteval bool is_binding_compatible_v()
 {
   return are_bindings_compatible_v<T>(originals_pack_t<B>{});
+}
+
+template <typename A>
+concept WithOriginals = requires() {
+  A::originals.size();
+};
+
+template <typename T>
+concept WithSources = requires() {
+  o2::aod::MetadataTraitNG<T>::metadata::sources.size();
+};
+
+template <typename T, typename B>
+  requires WithOriginals<T> && WithOriginals<B>
+consteval bool is_binding_compatible_v()
+{
+  return std::ranges::count_if(B::originals.begin(), B::originals.end(), [&](TableRef const& a) { return std::any_of(T::originals.begin(), T::originals.end(), [&](TableRef const& e) { return e.desc_hash == a.desc_hash; }); }) != 0;
 }
 
 template <typename T, typename B>
@@ -1483,6 +1534,37 @@ static constexpr std::string getLabelFromType()
   }
 }
 
+template <typename T>
+  requires WithOriginals<T>
+static constexpr std::string getLabelFromTypeNG()
+{
+  return std::string{o2::aod::Hash<std::decay_t<T>::originals[0].label_hash>::str};
+}
+
+template <typename T>
+  requires framework::is_base_of_template_v<TableIterator, std::decay_t<T>>
+static constexpr std::string getLabelFromTypeNG()
+{
+  return getLabelFromTypeNG<typename std::decay_t<T>::parent_t>();
+}
+
+template <typename L, typename D, typename O, typename Key, typename H, typename... Ts>
+class IndexTableNG;
+
+template <typename T>
+  requires framework::is_specialization_v<T, o2::soa::IndexTableNG>
+static constexpr std::string getLabelFromTypeNG()
+{
+  return getLabelFromTypeNG<typename std::decay_t<T>::first_t>();
+}
+
+template <typename T>
+  requires WithSources<T>
+static constexpr std::string getLabelFromTypeNG()
+{
+  return getLabelFromTypeNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>();
+}
+
 template <typename... C>
 static constexpr auto hasColumnForKey(framework::pack<C...>, std::string const& key)
 {
@@ -1490,9 +1572,16 @@ static constexpr auto hasColumnForKey(framework::pack<C...>, std::string const& 
 }
 
 template <typename T>
+  requires soa::is_soa_table_like_v<T>
 static constexpr std::pair<bool, std::string> hasKey(std::string const& key)
 {
   return {hasColumnForKey(typename T::persistent_columns_t{}, key), getLabelFromType<T>()};
+}
+
+template <TableRef ref>
+static constexpr std::pair<bool, std::string> hasKey(std::string const& key)
+{
+  return {hasColumnForKey(typename aod::MetadataTraitNG<o2::aod::Hash<ref.desc_hash>>::metadata::columns{}, key), o2::aod::Hash<ref.label_hash>::str};
 }
 
 template <typename... C>
@@ -1505,6 +1594,7 @@ void notFoundColumn(const char* label, const char* key);
 void missingOptionalPreslice(const char* label, const char* key);
 
 template <typename T, bool OPT = false>
+  requires soa::is_soa_table_like_v<T>
 static constexpr std::string getLabelFromTypeForKey(std::string const& key)
 {
   if constexpr (soa::is_type_with_originals_v<std::decay_t<T>>) {
@@ -1522,6 +1612,32 @@ static constexpr std::string getLabelFromTypeForKey(std::string const& key)
   }
   if constexpr (!OPT) {
     notFoundColumn(getLabelFromType<std::decay_t<T>>().data(), key.data());
+  } else {
+    return "[MISSING]";
+  }
+  O2_BUILTIN_UNREACHABLE();
+}
+
+template <typename T, bool OPT = false>
+  requires WithOriginals<T>
+static constexpr std::string getLabelFromTypeForKey(std::string const& key)
+{
+  if constexpr (T::originals.size() == 1) {
+    auto locate = hasKey<T::originals[0]>(key);
+    if (locate.first) {
+      return locate.second;
+    }
+  } else {
+    auto locate = [&]<size_t... Is>(std::index_sequence<Is...>) {
+      return std::vector{hasKey<T::originals[Is]>(key)...};
+    }(std::make_index_sequence<T::originals.size()>{});
+    auto it = std::find_if(locate.begin(), locate.end(), [](auto const& x) { return x.first; });
+    if (it != locate.end()) {
+      return it->second;
+    }
+  }
+  if constexpr (!OPT) {
+    notFoundColumn(getLabelFromTypeNG<std::decay_t<T>>().data(), key.data());
   } else {
     return "[MISSING]";
   }
@@ -1630,36 +1746,6 @@ using PresliceOptional = PresliceBase<T, true, true>;
 
 namespace o2::soa
 {
-/// special case for the template with origin
-template <typename T, template <OriginEnc, typename...> class Ref>
-struct is_specialization_origin : std::false_type {
-};
-
-template <template <OriginEnc, typename...> class Ref, OriginEnc ORIGIN, typename... Args>
-struct is_specialization_origin<Ref<ORIGIN, Args...>, Ref> : std::true_type {
-};
-
-template <typename T, template <OriginEnc, typename...> class Ref>
-inline constexpr bool is_specialization_origin_v = is_specialization_origin<T, Ref>::value;
-
-template <template <OriginEnc, typename...> class base, typename derived>
-struct is_base_of_template_origin_impl {
-  template <OriginEnc ORIGIN, typename... Ts>
-  static constexpr std::true_type test(const base<ORIGIN, Ts...>*);
-  static constexpr std::false_type test(...);
-  using type = decltype(test(std::declval<derived*>()));
-};
-
-template <template <OriginEnc, typename...> class base, typename derived>
-using is_base_of_template_origin = typename is_base_of_template_origin_impl<base, derived>::type;
-
-template <template <OriginEnc, typename...> class base, typename derived>
-inline constexpr bool is_base_of_template_origin_v = is_base_of_template_origin<base, derived>::value;
-
-//! Helper to check if a type T is an iterator
-template <typename T>
-inline constexpr bool is_soa_iterator_v = soa::is_base_of_template_origin_v<RowViewCore, T> || soa::is_specialization_origin_v<T, RowViewCore>;
-
 template <typename T>
 inline consteval bool is_soa_filtered_iterator_v()
 {
@@ -1678,15 +1764,17 @@ template <typename T>
 using is_soa_table_t = typename soa::is_specialization_origin<T, soa::Table>;
 
 template <typename T>
-inline constexpr bool is_soa_table_like_v = soa::is_base_of_template_origin_v<soa::Table, T>;
-
-template <typename T>
 class FilteredBase;
 template <typename T>
 class Filtered;
 
 template <typename T>
-inline constexpr bool is_soa_filtered_v = framework::is_base_of_template_v<soa::FilteredBase, T>;
+class FilteredBaseNG;
+template <typename T>
+class FilteredNG;
+
+template <typename T>
+inline constexpr bool is_soa_filtered_v = framework::is_base_of_template_v<soa::FilteredBase, T> || framework::is_base_of_template_v<soa::FilteredBaseNG, T>;
 
 /// Helper function to extract bound indices
 template <typename... Is>
@@ -1833,7 +1921,7 @@ auto select(T const& t, framework::expressions::Filter const& f)
 arrow::ChunkedArray* getIndexFromLabel(arrow::Table* table, const char* label);
 
 template <typename D, typename O, typename IP, typename... C>
-auto base_iter(framework::pack<C...>&&) -> TableIterator<D, O, IP, C...>
+consteval auto base_iter(framework::pack<C...>&&) -> TableIterator<D, O, IP, C...>
 {
 }
 
@@ -1841,6 +1929,20 @@ template <TableRef ref>
 consteval auto getColumns()
 {
   return typename aod::MetadataTraitNG<o2::aod::Hash<ref.desc_hash>>::metadata::columns{};
+}
+
+template <typename... Ts>
+consteval auto originalsPack()
+  requires(sizeof...(Ts) > 0 && (o2::soa::is_soa_column_v<Ts>() && ...))
+{
+  return framework::pack<>{};
+}
+
+template <typename... Ts>
+consteval auto originalsPack()
+  requires(sizeof...(Ts) > 0 && !(o2::soa::is_soa_column_v<Ts>() && ...))
+{
+  return framework::pack<Ts...>{};
 }
 
 template <typename L, typename D, typename O, typename... Ts>
@@ -2038,8 +2140,26 @@ class TableNG
 
   template <typename IP, typename Parent, typename... T>
   using iterator_template = TableIteratorBase<IP, Parent, T...>;
-  using iterator = std::conditional_t<sizeof...(Ts) == 0, iterator_template<DefaultIndexPolicy, table_t, table_t>, iterator_template<DefaultIndexPolicy, table_t, Ts...>>;
-  using filtered_iterator = std::conditional_t<sizeof...(Ts) == 0, iterator_template<FilteredIndexPolicy, table_t, table_t>, iterator_template<FilteredIndexPolicy, table_t, Ts...>>;
+
+  template <typename IP, typename Parent>
+  static consteval auto full_iter()
+  {
+    if constexpr (sizeof...(Ts) == 0) {
+      return iterator_template<IP, Parent>{};
+    } else {
+      if constexpr ((o2::soa::is_soa_column_v<Ts>() && ...)) {
+        return iterator_template<IP, Parent>{};
+      } else {
+        return iterator_template<IP, Parent, Ts...>{};
+      }
+    }
+  }
+
+  template <typename IP, typename Parent>
+  using iterator_template_o = decltype(full_iter<IP, Parent>());
+
+  using iterator = iterator_template_o<DefaultIndexPolicy, table_t>;
+  using filtered_iterator = iterator_template_o<FilteredIndexPolicy, table_t>;
 
   using unfiltered_iterator = iterator;
   using const_iterator = iterator;
@@ -3563,6 +3683,26 @@ O2HASH("TEST/0");
     using metadata = _Name_##Metadata;                                                                \
   };
 
+#define DECLARE_SOA_EXTENDED_TABLE_NG_FULL(_Name_, _Label_, _OriginalTable_, _Origin_, _Desc_, _Version_, ...) \
+  O2HASH(_Label_);                                                                                             \
+  O2HASH(_Desc_ "/" #_Version_);                                                                               \
+  template <typename O>                                                                                        \
+  using _Name_##ExtensionFrom = TableNG<Hash<_Label_ ""_h>, Hash<_Desc "/" #_Version_ ""_h>, O>;               \
+  using _Name_ = _Name_##ExtensionFrom<Hash<_Origin_ ""_h>>;                                                   \
+  template <>                                                                                                  \
+  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                                   \
+    using metadata = _Name_##ExtensionMetadata;                                                                \
+  };                                                                                                           \
+  template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                         \
+  struct _Name_##ExtensionMetadata : TableMetadataNG<Hash<_Desc "/" #_Version_ ""_h>, __VA_ARGS__> {           \
+    using base_table_t = _Name_##ExtensionFrom<O>;                                                             \
+    using expression_pack_t = framework::pack<__VA_ARGS>;                                                      \
+    static constexpr auto sources = _OriginalTable_::originals;                                                \
+  };                                                                                                           \
+  template <typename O>                                                                                        \
+  using _Name_##From = o2::soa::JoinNG<_OriginalTable_, _Name_##ExtensionFrom<O>>;                             \
+  using _Name_ = _Name_##From < o2::aod::Hash<_Origin_ ""_h>;
+
 #define DECLARE_SOA_TABLE_NG_FULL(_Name_, _Label_, _Origin_, _Desc_, ...)                             \
   DECLARE_SOA_TABLE_NG_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, 0, __VA_ARGS__)
 
@@ -3681,11 +3821,11 @@ struct JoinNG : TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::
   using table_t::originals;
   using columns_t = typename table_t::columns_t;
   using persistent_columns_t = typename table_t::persistent_columns_t;
-  using iterator = table_t::iterator;
+  using iterator = table_t::template iterator_template<DefaultIndexPolicy, self_t, Ts...>;
   using const_iterator = iterator;
   using unfiltered_iterator = iterator;
   using unfiltered_const_iterator = const_iterator;
-  using filtered_iterator = table_t::filtered_iterator;
+  using filtered_iterator = table_t::template iterator_template<FilteredIndexPolicy, self_t, Ts...>;
   using filtered_const_iterator = filtered_iterator;
 
   iterator begin()
@@ -3774,11 +3914,11 @@ struct ConcatNG : TableNG<o2::aod::Hash<"CONC"_h>, o2::aod::Hash<"CONC/0"_h>, o2
   using columns_t = typename table_t::columns_t;
   using persistent_columns_t = typename table_t::persistent_columns_t;
 
-  using iterator = table_t::iterator;
+  using iterator = table_t::template iterator_template<DefaultIndexPolicy, self_t, Ts...>;
   using const_iterator = iterator;
   using unfiltered_iterator = iterator;
   using unfiltered_const_iterator = const_iterator;
-  using filtered_iterator = table_t::filtered_iterator;
+  using filtered_iterator = table_t::template iterator_template<FilteredIndexPolicy, self_t, Ts...>;
   using filtered_const_iterator = filtered_iterator;
 };
 
@@ -3928,8 +4068,8 @@ class FilteredBaseNG : public T
     using persistent_columns_t = typename T::persistent_columns_t;
     using external_index_columns_t = typename T::external_index_columns_t;
 
-    using iterator = T::filtered_iterator;
-    using unfiltered_iterator = T::iterator;
+    using iterator = T::template iterator_template_o<FilteredIndexPolicy, self_t>;
+    using unfiltered_iterator = T::template iterator_template_o<DefaultIndexPolicy, self_t>;
     using const_iterator = iterator;
 
     FilteredBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
@@ -4188,11 +4328,11 @@ class FilteredNG : public FilteredBaseNG<T>
 {
   public:
    using base_t = T;
-   using self_t = Filtered<T>;
+   using self_t = FilteredNG<T>;
    using table_t = typename FilteredBaseNG<T>::table_t;
 
-   using iterator = FilteredBaseNG<T>::iterator;
-   using unfiltered_iterator = FilteredBaseNG<T>::unfiltered_iterator;
+   using iterator = T::template iterator_template_o<FilteredIndexPolicy, self_t>;
+   using unfiltered_iterator = T::template iterator_template_o<DefaultIndexPolicy, self_t>;
    using const_iterator = iterator;
 
     iterator begin()
@@ -5110,30 +5250,30 @@ class Filtered<Filtered<T>> : public FilteredBase<typename T::table_t>
 /// First argument is the key table (BCs for the Collisions+ZDCs case), the rest
 /// are index columns defined for the required tables.
 /// First index will be used by process() as the grouping
-  template <typename L, typename D, typename O, typename Key, typename H, typename... Ts>
-  struct IndexTableNG : TableNG<L, D, O, soa::Index<>, H, Ts...> {
-    using self_t = IndexTableNG<L, D, O, Key, H, Ts...>;
-    using base_t = TableNG<L, D, O, soa::Index<>, H, Ts...>;
-    using table_t = base_t;
-    using safe_base_t = TableNG<L, D, O, H, Ts...>;
-    using indexing_t = Key;
-    using first_t = typename H::binding_t;
-    using rest_t = framework::pack<typename Ts::binding_t...>;
-    using sources_t = originals_pack_t<Key, first_t, typename Ts::binding_t...>;
+template <typename L, typename D, typename O, typename Key, typename H, typename... Ts>
+struct IndexTableNG : TableNG<L, D, O, soa::Index<>, H, Ts...> {
+  using self_t = IndexTableNG<L, D, O, Key, H, Ts...>;
+  using base_t = TableNG<L, D, O, soa::Index<>, H, Ts...>;
+  using table_t = base_t;
+  using safe_base_t = TableNG<L, D, O, H, Ts...>;
+  using indexing_t = Key;
+  using first_t = typename H::binding_t;
+  using rest_t = framework::pack<typename Ts::binding_t...>;
+  using sources_t = originals_pack_t<Key, first_t, typename Ts::binding_t...>;
 
-    IndexTableNG(std::shared_ptr<arrow::Table> table, uint64_t offset = 0)
-      : base_t{table, offset}
-    {
-    }
+  IndexTableNG(std::shared_ptr<arrow::Table> table, uint64_t offset = 0)
+    : base_t{table, offset}
+  {
+  }
 
-    IndexTableNG(IndexTableNG const&) = default;
-    IndexTableNG(IndexTableNG&&) = default;
-    IndexTableNG& operator=(IndexTableNG const&) = default;
-    IndexTableNG& operator=(IndexTableNG&&) = default;
+  IndexTableNG(IndexTableNG const&) = default;
+  IndexTableNG(IndexTableNG&&) = default;
+  IndexTableNG& operator=(IndexTableNG const&) = default;
+  IndexTableNG& operator=(IndexTableNG&&) = default;
 
-    using iterator = typename base_t::template iterator_template<self_t, self_t>;
-    using const_iterator = iterator;
-  };
+  using iterator = typename base_t::template iterator_template<self_t, self_t>;
+  using const_iterator = iterator;
+};
 
 template <OriginEnc ORIGIN, typename Key, typename H, typename... Ts>
 struct IndexTable : Table<ORIGIN, soa::Index<>, H, Ts...> {

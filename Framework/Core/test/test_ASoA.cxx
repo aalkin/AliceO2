@@ -83,6 +83,7 @@ DECLARE_SOA_COLUMN(L2, l2, std::vector<int>);
 } // namespace test
 
 DECLARE_SOA_TABLE(Lists, "TEST", "LISTS", o2::soa::Index<>, test::L1, test::L2);
+DECLARE_SOA_TABLE_NG(ListsNG, "TEST", "LISTS", o2::soa::Index<>, test::L1, test::L2);
 } // namespace o2::aod
 
 TEST_CASE("TestMarkers")
@@ -1323,15 +1324,23 @@ TEST_CASE("TestEmptyTablesNG")
 namespace o2::aod
 {
 DECLARE_SOA_TABLE(Origints, "TEST", "ORIG", o2::soa::Index<>, test::X, test::SomeBool);
+DECLARE_SOA_TABLE_NG(OrigintNGs, "TEST", "ORIG", o2::soa::Index<>, test::X, test::SomeBool);
 namespace test
 {
 DECLARE_SOA_INDEX_COLUMN(Origint, origint);
+DECLARE_SOA_INDEX_COLUMN(OrigintNG, origintng);
 DECLARE_SOA_INDEX_COLUMN_FULL(AltOrigint, altOrigint, int, Origints, "_alt");
+DECLARE_SOA_INDEX_COLUMN_FULL(AltOrigintNG, altOrigintng, int, OrigintNGs, "_alt");
 DECLARE_SOA_ARRAY_INDEX_COLUMN(Origint, origints);
+DECLARE_SOA_ARRAY_INDEX_COLUMN(OrigintNG, origints);
 } // namespace test
 DECLARE_SOA_TABLE(References, "TEST", "REFS", o2::soa::Index<>, test::OrigintId);
 DECLARE_SOA_TABLE(OtherReferences, "TEST", "OREFS", o2::soa::Index<>, test::AltOrigintId);
 DECLARE_SOA_TABLE(ManyReferences, "TEST", "MREFS", o2::soa::Index<>, test::OrigintIds);
+
+DECLARE_SOA_TABLE_NG(ReferenceNGs, "TEST", "REFS", o2::soa::Index<>, test::OrigintNGId);
+DECLARE_SOA_TABLE_NG(OtherReferenceNGs, "TEST", "OERFS", o2::soa::Index<>, test::AltOrigintNGId);
+DECLARE_SOA_TABLE_NG(ManyReferenceNGs, "TEST", "MREFS", o2::soa::Index<>, test::OrigintNGIds);
 } // namespace o2::aod
 TEST_CASE("TestIndexToFiltered")
 {
@@ -1384,13 +1393,68 @@ TEST_CASE("TestIndexToFiltered")
     REQUIRE(fos.size() == 6);
   }
 }
+
+TEST_CASE("TestIndexToFilteredNG")
+{
+  TableBuilder b;
+  auto writer = b.cursor<o2::aod::OrigintNGs>();
+  for (auto i = 0; i < 20; ++i) {
+    writer(0, i, i % 3 == 0);
+  }
+  auto origins = b.finalize();
+  o2::aod::OrigintNGs o{origins};
+
+  TableBuilder z;
+  auto writer_z = z.cursor<o2::aod::ManyReferenceNGs>();
+  std::vector<int> ids;
+  for (auto i = 0; i < 5; ++i) {
+    ids.clear();
+    for (auto j = 0; j < 20; ++j) {
+      ids.push_back(j);
+    }
+    writer_z(0, ids);
+  }
+  auto mrefs = z.finalize();
+  o2::aod::ManyReferenceNGs m{mrefs};
+
+  TableBuilder w;
+  auto writer_w = w.cursor<o2::aod::ReferenceNGs>();
+  for (auto i = 0; i < 5 * 20; ++i) {
+    writer_w(0, i % 20);
+  }
+  auto refs = w.finalize();
+  o2::aod::ReferenceNGs r{refs};
+  expressions::Filter flt = o2::aod::test::someBool == true;
+  using Flt = o2::soa::FilteredNG<o2::aod::OrigintNGs>;
+  auto selection = expressions::createSelection(o.asArrowTable(), flt);
+  Flt f{{o.asArrowTable()}, selection};
+  r.bindExternalIndices(&f);
+  auto it = r.begin();
+  it.moveByIndex(23);
+  REQUIRE(it.origintng_as<Flt>().globalIndex() == 3);
+  it++;
+  REQUIRE(it.origintng_as<Flt>().globalIndex() == 4);
+  it++;
+  REQUIRE(it.origintng_as<Flt>().globalIndex() == 5);
+
+  m.bindExternalIndices(&f);
+  for (auto const& row : m) {
+    auto os = row.origints_as<Flt>();
+    auto fos = row.filtered_origints_as<Flt>();
+    REQUIRE(os.size() == 20);
+    REQUIRE(fos.size() == 6);
+  }
+}
 namespace o2::aod
 {
 namespace test
 {
 DECLARE_SOA_INDEX_COLUMN_FULL(SinglePoint, singlePoint, int32_t, Points3Ds, "");
+DECLARE_SOA_INDEX_COLUMN_FULL(SinglePointNG, singlePointng, int32_t, Points3DNGs, "");
 DECLARE_SOA_ARRAY_INDEX_COLUMN(Points3D, pointGroup);
+DECLARE_SOA_ARRAY_INDEX_COLUMN(Points3DNG, pointGroup);
 DECLARE_SOA_SLICE_INDEX_COLUMN(Points3D, pointSlice);
+DECLARE_SOA_SLICE_INDEX_COLUMN(Points3DNG, pointSlice);
 DECLARE_SOA_SELF_INDEX_COLUMN(OtherPoint, otherPoint);
 DECLARE_SOA_SELF_SLICE_INDEX_COLUMN(PointSeq, pointSeq);
 DECLARE_SOA_SELF_ARRAY_INDEX_COLUMN(PointSet, pointSet);
@@ -1400,6 +1464,11 @@ DECLARE_SOA_TABLE(PointsRef, "TEST", "PTSREF", test::Points3DIdSlice, test::Poin
 DECLARE_SOA_TABLE(PointsRefF, "TEST", "PTSREFF", test::SinglePointId, test::Points3DIdSlice, test::Points3DIds);
 DECLARE_SOA_TABLE(PointsSelfIndex, "TEST", "PTSSLF", o2::soa::Index<>, test::X, test::Y, test::Z, test::OtherPointId,
                   test::PointSeqIdSlice, test::PointSetIds);
+
+DECLARE_SOA_TABLE_NG(PointsRefNG, "TEST", "PTSREF", test::Points3DNGIdSlice, test::Points3DNGIds);
+DECLARE_SOA_TABLE_NG(PointsRefFNG, "TEST", "PTSREFF", test::SinglePointNGId, test::Points3DNGIdSlice, test::Points3DNGIds);
+DECLARE_SOA_TABLE_NG(PointsSelfIndexNG, "TEST", "PTSSLF", o2::soa::Index<>, test::X, test::Y, test::Z, test::OtherPointId,
+                     test::PointSeqIdSlice, test::PointSetIds);
 } // namespace o2::aod
 
 TEST_CASE("TestAdvancedIndices")
@@ -1553,9 +1622,161 @@ TEST_CASE("TestAdvancedIndices")
   }
 }
 
+TEST_CASE("TestAdvancedIndicesNG")
+{
+  TableBuilder b1;
+  auto pwriter = b1.persist<int, int, int>({"fX", "fY", "fZ"});
+  for (auto i = 0; i < 20; ++i) {
+    pwriter(0, -1 * i, (int)(i / 2), 2 * i);
+  }
+  auto tpts1 = b1.finalize();
+
+  TableBuilder b2;
+  auto prwriter = b2.cursor<o2::aod::PointsRefNG>();
+  auto a = std::array{0, 1};
+  auto aa = std::vector{2, 3, 4};
+  prwriter(0, &a[0], aa);
+  a = {4, 10};
+  aa = {12, 2, 19};
+  prwriter(0, &a[0], aa);
+  auto t2 = b2.finalize();
+
+  auto pt = o2::aod::Points3DNGs{tpts1};
+  auto prt = o2::aod::PointsRefNG{t2};
+  prt.bindExternalIndices(&pt);
+
+  auto it = prt.begin();
+  auto s1 = it.pointSlice();
+  auto g1 = it.pointGroup();
+  auto bb = std::is_same_v<decltype(s1), o2::aod::Points3DNGs>;
+  REQUIRE(bb);
+  REQUIRE(s1.size() == 2);
+  aa = {2, 3, 4};
+  for (int i = 0; i < 3; ++i) {
+    REQUIRE(g1[i].globalIndex() == aa[i]);
+  }
+
+  // Check the X coordinate of the points in the pointGroup
+  // for the first point.
+  for (auto& p : it.pointGroup_as<o2::aod::Points3DNGs>()) {
+    REQUIRE(p.x() == -1 * p.globalIndex());
+  }
+
+  ++it;
+  auto s2 = it.pointSlice();
+  auto g2 = it.pointGroup();
+  REQUIRE(s2.size() == 7);
+  aa = {12, 2, 19};
+  for (int i = 0; i < 3; ++i) {
+    REQUIRE(g2[i].globalIndex() == aa[i]);
+  }
+
+  using Flt = o2::soa::FilteredNG<o2::aod::Points3DNGs>;
+  expressions::Filter fltx = (o2::aod::test::x <= -6);
+  Flt f{{tpts1}, expressions::createSelection(tpts1, fltx)};
+  prt.bindExternalIndices(&f);
+
+  auto it2 = prt.begin();
+  auto s1f = it2.pointSlice_as<Flt>();
+  auto g1f = it2.pointGroup_as<Flt>();
+  REQUIRE(s1f.size() == 2);
+  aa = {2, 3, 4};
+  for (int i = 0; i < 3; ++i) {
+    REQUIRE(g1f[i].globalIndex() == aa[i]);
+  }
+
+  ++it2;
+  auto s2f = it2.pointSlice_as<Flt>();
+  auto g2f = it2.pointGroup_as<Flt>();
+  REQUIRE(s2f.size() == 7);
+  aa = {12, 2, 19};
+  for (int i = 0; i < 3; ++i) {
+    REQUIRE(g2f[i].globalIndex() == aa[i]);
+  }
+
+  TableBuilder b3;
+  auto pswriter = b3.cursor<o2::aod::PointsSelfIndexNG>();
+  int references[] = {19, 2, 0, 13, 4, 6, 5, 5, 11, 9, 3, 8, 16, 14, 1, 18, 12, 18, 2, 7};
+  int slice[2] = {-1, -1};
+  std::vector<int> pset;
+  std::array<int, 4> withSlices = {3, 6, 13, 19};
+  std::array<std::pair<int, int>, 4> bounds = {std::pair{1, 5}, std::pair{3, 3}, std::pair{11, 11}, std::pair{10, 18}};
+  std::array<int, 4> withSets = {0, 1, 13, 14};
+  unsigned int sizes[] = {3, 1, 5, 4};
+  unsigned int c1 = 0;
+  unsigned int c2 = 0;
+  for (auto i = 0; i < 20; ++i) {
+    pset.clear();
+    slice[0] = -1;
+    slice[1] = -1;
+    if (c1 < withSlices.size() && i == withSlices[c1]) {
+      slice[0] = bounds[c1].first;
+      slice[1] = bounds[c1].second;
+      ++c1;
+    }
+    if (c2 < withSets.size() && i == withSets[c2]) {
+      for (auto z = 0U; z < sizes[c2]; ++z) {
+        pset.push_back(i + 1 + z);
+      }
+      ++c2;
+    }
+    pswriter(0, -1 * i, 0.5 * i, 2 * i, references[i], slice, pset);
+  }
+  auto t3 = b3.finalize();
+  auto pst = o2::aod::PointsSelfIndexNG{t3};
+  pst.bindInternalIndicesTo(&pst);
+  auto i = 0;
+  c1 = 0;
+  c2 = 0;
+  for (auto& p : pst) {
+    auto op = p.otherPoint_as<o2::aod::PointsSelfIndexNG>();
+    auto bbb = std::is_same_v<decltype(op), o2::aod::PointsSelfIndexNG::iterator>;
+    REQUIRE(bbb);
+    REQUIRE(op.globalIndex() == references[i]);
+
+    auto ops = p.pointSeq_as<o2::aod::PointsSelfIndexNG>();
+    auto bbbs = std::is_same_v<decltype(ops), o2::aod::PointsSelfIndexNG>;
+    REQUIRE(bbbs);
+
+    if (i == withSlices[c1]) {
+      auto it = ops.begin();
+      REQUIRE(ops.size() == bounds[c1].second - bounds[c1].first + 1);
+      REQUIRE(it.globalIndex() == bounds[c1].first);
+      for (auto j = 1; j < ops.size(); ++j) {
+        ++it;
+      }
+      REQUIRE(it.globalIndex() == bounds[c1].second);
+      ++c1;
+    } else {
+      REQUIRE(ops.size() == 0);
+    }
+
+    auto opss = p.pointSet_as<o2::aod::PointsSelfIndexNG>();
+    auto bbba = std::is_same_v<decltype(opss), std::vector<o2::aod::PointsSelfIndexNG::iterator>>;
+    REQUIRE(bbba);
+
+    auto opss_ids = p.pointSetIds();
+    if (c2 < withSets.size() && i == withSets[c2]) {
+      REQUIRE(opss.size() == sizes[c2]);
+      REQUIRE(opss.begin()->globalIndex() == i + 1);
+      REQUIRE(opss.back().globalIndex() == i + sizes[c2]);
+      int c3 = 0;
+      for (auto& id : opss_ids) {
+        REQUIRE(id == i + 1 + c3);
+        ++c3;
+      }
+      ++c2;
+    } else {
+      REQUIRE(opss.size() == 0);
+    }
+    ++i;
+  }
+}
+
 namespace o2::aod
 {
 DECLARE_SOA_TABLE(PointsSelfRef, "TEST", "PTSSR", test::OtherPointId, test::PointSeqIdSlice, test::PointSetIds);
+DECLARE_SOA_TABLE_NG(PointsSelfRefNG, "TEST", "PTSSR", test::OtherPointId, test::PointSeqIdSlice, test::PointSetIds);
 }
 
 TEST_CASE("TestSelfIndexRecursion")
@@ -1721,6 +1942,170 @@ TEST_CASE("TestSelfIndexRecursion")
   }
 }
 
+TEST_CASE("TestSelfIndexRecursionNG")
+{
+  TableBuilder b3;
+  auto pswriter = b3.cursor<o2::aod::PointsSelfIndexNG>();
+  int references[] = {19, 2, 0, 13, 4, 6, 5, 5, 11, 9, 3, 8, 16, 14, 1, 18, 12, 18, 2, 7};
+  int slice[2] = {-1, -1};
+  std::vector<int> pset;
+  std::array<int, 4> withSlices = {3, 6, 13, 19};
+  std::array<std::pair<int, int>, 4> bounds = {std::pair{1, 5}, std::pair{3, 3}, std::pair{11, 11}, std::pair{10, 18}};
+  std::array<int, 4> withSets = {0, 1, 13, 14};
+  unsigned int sizes[] = {3, 1, 5, 4};
+  unsigned int c1 = 0;
+  unsigned int c2 = 0;
+  for (auto i = 0; i < 20; ++i) {
+    pset.clear();
+    slice[0] = -1;
+    slice[1] = -1;
+    if (c1 < withSlices.size() && i == withSlices[c1]) {
+      slice[0] = bounds[c1].first;
+      slice[1] = bounds[c1].second;
+      ++c1;
+    }
+    if (c2 < withSets.size() && i == withSets[c2]) {
+      for (auto z = 0U; z < sizes[c2]; ++z) {
+        pset.push_back(i + 1 + z);
+      }
+      ++c2;
+    }
+    pswriter(0, -1 * i, 0.5 * i, 2 * i, references[i], slice, pset);
+  }
+  auto t3 = b3.finalize();
+  auto pst = o2::aod::PointsSelfIndexNG{t3};
+  pst.bindInternalIndicesTo(&pst);
+
+  // FIXME: only 4 levels of recursive self-index dereference are tested
+  for (auto& p : pst) {
+    auto ops = p.pointSeq_as<o2::aod::PointsSelfIndexNG>();
+    for (auto& pp : ops) {
+      auto bpp = std::is_same_v<std::decay_t<decltype(pp)>, o2::aod::PointsSelfIndexNG::iterator>;
+      REQUIRE(bpp);
+      auto opps = pp.pointSeq_as<o2::aod::PointsSelfIndexNG>();
+      for (auto& ppp : opps) {
+        auto bppp = std::is_same_v<std::decay_t<decltype(ppp)>, o2::aod::PointsSelfIndexNG::iterator>;
+        REQUIRE(bppp);
+        auto oppps = ppp.pointSeq_as<o2::aod::PointsSelfIndexNG>();
+        for (auto& pppp : oppps) {
+          auto bpppp = std::is_same_v<std::decay_t<decltype(pppp)>, o2::aod::PointsSelfIndexNG::iterator>;
+          REQUIRE(bpppp);
+          auto opppps = pppp.pointSeq_as<o2::aod::PointsSelfIndexNG>();
+        }
+      }
+    }
+  }
+
+  using FullPoints = o2::soa::JoinNG<o2::aod::Points3DNGs, o2::aod::PointsSelfRefNG>;
+  TableBuilder b;
+  auto corewriter = b.cursor<o2::aod::Points3DNGs>();
+  for (auto i = 0; i < 20; ++i) {
+    corewriter(0, -1 * i, 0.5 * i, 2 * i);
+  }
+  auto t1 = b.finalize();
+
+  c1 = 0;
+  c2 = 0;
+  TableBuilder be;
+  auto extwriter = be.cursor<o2::aod::PointsSelfRefNG>();
+  for (auto i = 0; i < 20; ++i) {
+    pset.clear();
+    slice[0] = -1;
+    slice[1] = -1;
+    if (c1 < withSlices.size() && i == withSlices[c1]) {
+      slice[0] = bounds[c1].first;
+      slice[1] = bounds[c1].second;
+      ++c1;
+    }
+    if (c2 < withSets.size() && i == withSets[c2]) {
+      for (auto z = 0U; z < sizes[c2]; ++z) {
+        pset.push_back(i + 1 + z);
+      }
+      ++c2;
+    }
+    extwriter(0, references[i], slice, pset);
+  }
+  auto t2 = be.finalize();
+
+  FullPoints fp({t1, t2});
+  fp.bindInternalIndicesTo(&fp);
+
+  // FIXME: only 4 levels of recursive self-index dereference are tested
+  // self-index binding should stay the same for recursive dereferences
+  for (auto& p : fp) {
+    REQUIRE(std::is_same_v<std::decay_t<decltype(p)>, FullPoints::iterator>);
+    auto ops = p.pointSeq_as<FullPoints>();
+    for (auto& pp : ops) {
+      REQUIRE(std::is_same_v<std::decay_t<decltype(pp)>, FullPoints::iterator>);
+      auto opps = pp.pointSeq_as<FullPoints>();
+      for (auto& ppp : opps) {
+        REQUIRE(std::is_same_v<std::decay_t<decltype(ppp)>, FullPoints::iterator>);
+        auto oppps = ppp.pointSeq_as<FullPoints>();
+        for (auto& pppp : oppps) {
+          REQUIRE(std::is_same_v<std::decay_t<decltype(pppp)>, FullPoints::iterator>);
+          auto opppps = pppp.pointSeq_as<FullPoints>();
+        }
+      }
+    }
+  }
+
+  auto const& fpa = fp;
+
+  // iterators acquired through different means should have consistent types
+  for (auto& it1 : fpa) {
+    [[maybe_unused]] auto it2 = fpa.rawIteratorAt(0);
+    [[maybe_unused]] auto it3 = fpa.iteratorAt(0);
+    auto bit1 = std::is_same_v<std::decay_t<decltype(it1)>, std::decay_t<decltype(it2)>>;
+    REQUIRE(bit1);
+    auto bit2 = std::is_same_v<std::decay_t<decltype(it1)>, std::decay_t<decltype(it3)>>;
+    REQUIRE(bit2);
+  }
+
+  using FilteredPoints = o2::soa::FilteredNG<FullPoints>;
+  FilteredPoints ffp({t1, t2}, {1, 2, 3}, 0);
+  ffp.bindInternalIndicesTo(&ffp);
+
+  // Filter should not interfere with self-index and the binding should stay the same
+  for (auto& p : ffp) {
+    REQUIRE(std::is_same_v<std::decay_t<decltype(p)>, FilteredPoints::iterator>);
+    REQUIRE(std::is_same_v<std::decay_t<decltype(p)>::parent_t, FilteredPoints>);
+    auto ops = p.pointSeq_as<typename std::decay_t<decltype(p)>::parent_t>();
+    for (auto& pp : ops) {
+      REQUIRE(std::is_same_v<std::decay_t<decltype(pp)>::parent_t, FilteredPoints>);
+      auto opps = pp.pointSeq_as<FilteredPoints>();
+      for (auto& ppp : opps) {
+        REQUIRE(std::is_same_v<std::decay_t<decltype(ppp)>, FilteredPoints::iterator>);
+        auto oppps = ppp.pointSeq_as<FilteredPoints>();
+        for (auto& pppp : oppps) {
+          REQUIRE(std::is_same_v<std::decay_t<decltype(pppp)>, FilteredPoints::iterator>);
+          auto opppps = pppp.pointSeq_as<FilteredPoints>();
+        }
+      }
+    }
+  }
+
+  auto const& ffpa = ffp;
+
+  // rawIteratorAt() should create an unfiltered iterator, unlike begin() and iteratorAt()
+  for (auto& it1 : ffpa) {
+    [[maybe_unused]] auto it2 = ffpa.rawIteratorAt(0);
+    [[maybe_unused]] auto it3 = ffpa.iteratorAt(0);
+    using T1 = std::decay_t<decltype(it1)>;
+    using T2 = std::decay_t<decltype(it2)>;
+    using T3 = std::decay_t<decltype(it3)>;
+    auto bit1 = !std::is_same_v<T1, T2>;
+    REQUIRE(bit1);
+    auto bit2 = !std::is_same_v<T1, T3>;
+    REQUIRE(bit2);
+    auto bit3 = std::is_same_v<typename T1::policy_t, typename T3::policy_t>;
+    REQUIRE(bit3);
+    auto bit4 = std::is_same_v<typename T1::policy_t, o2::soa::FilteredIndexPolicy>;
+    REQUIRE(bit4);
+    auto bit5 = std::is_same_v<typename T2::policy_t, o2::soa::DefaultIndexPolicy>;
+    REQUIRE(bit5);
+  }
+}
+
 TEST_CASE("TestListColumns")
 {
   TableBuilder b;
@@ -1739,6 +2124,43 @@ TEST_CASE("TestListColumns")
   }
   auto lt = b.finalize();
   o2::aod::Lists tbl{lt};
+  auto s = 1U;
+  for (auto& row : tbl) {
+    auto f = row.l1();
+    auto i = row.l2();
+    auto constexpr bf = std::is_same_v<decltype(f), gsl::span<const float, (size_t)-1>>;
+    auto constexpr bi = std::is_same_v<decltype(i), gsl::span<const int, (size_t)-1>>;
+    REQUIRE(bf);
+    REQUIRE(bi);
+    REQUIRE(f.size() == s);
+    REQUIRE(i.size() == s);
+
+    for (auto j = 0u; j < f.size(); ++j) {
+      REQUIRE(f[j] == 0.1231233f * (float)j + 0.1982798f);
+      REQUIRE(i[j] == (int)j + 10);
+    }
+    ++s;
+  }
+}
+
+TEST_CASE("TestListColumnsNG")
+{
+  TableBuilder b;
+  auto writer = b.cursor<o2::aod::ListsNG>();
+  std::vector<float> floats;
+  std::vector<int> ints;
+  for (auto i = 1; i < 11; ++i) {
+    floats.clear();
+    ints.clear();
+    for (auto j = 0; j < i; ++j) {
+      floats.push_back(0.1231233f * (float)j + 0.1982798f);
+      ints.push_back(j + 10);
+    }
+
+    writer(0, floats, ints);
+  }
+  auto lt = b.finalize();
+  o2::aod::ListsNG tbl{lt};
   auto s = 1U;
   for (auto& row : tbl) {
     auto f = row.l1();
@@ -1789,6 +2211,41 @@ TEST_CASE("TestSliceByCached")
     REQUIRE(cachedSlice.size() == 5);
     for (auto& ri : cachedSlice) {
       REQUIRE(ri.origintId() == oi.globalIndex());
+    }
+  }
+}
+
+TEST_CASE("TestSliceByCachedNG")
+{
+  TableBuilder b;
+  auto writer = b.cursor<o2::aod::OrigintNGs>();
+  for (auto i = 0; i < 20; ++i) {
+    writer(0, i, i % 3 == 0);
+  }
+  auto origins = b.finalize();
+  o2::aod::OrigintNGs o{origins};
+
+  TableBuilder w;
+  auto writer_w = w.cursor<o2::aod::ReferenceNGs>();
+  auto step = -1;
+  for (auto i = 0; i < 5 * 20; ++i) {
+    if (i % 5 == 0) {
+      ++step;
+    }
+    writer_w(0, step);
+  }
+  auto refs = w.finalize();
+  o2::aod::ReferenceNGs r{refs};
+
+  ArrowTableSlicingCache atscache({{o2::soa::getLabelFromTypeNG<o2::aod::ReferenceNGs>(), "fIndex" + o2::framework::cutString(o2::soa::getLabelFromTypeNG<o2::aod::OrigintNGs>())}});
+  auto s = atscache.updateCacheEntry(0, refs);
+  SliceCache cache{&atscache};
+
+  for (auto& oi : o) {
+    auto cachedSlice = r.sliceByCached(o2::aod::test::origintngId, oi.globalIndex(), cache);
+    REQUIRE(cachedSlice.size() == 5);
+    for (auto& ri : cachedSlice) {
+      REQUIRE(ri.origintngId() == oi.globalIndex());
     }
   }
 }
@@ -1844,6 +2301,57 @@ TEST_CASE("TestSliceByCachedMismatched")
   }
 }
 
+TEST_CASE("TestSliceByCachedMismatchedNG")
+{
+  TableBuilder b;
+  auto writer = b.cursor<o2::aod::OrigintNGs>();
+  for (auto i = 0; i < 20; ++i) {
+    writer(0, i, i % 3 == 0);
+  }
+  auto origins = b.finalize();
+  o2::aod::OrigintNGs o{origins};
+
+  TableBuilder w;
+  auto writer_w = w.cursor<o2::aod::ReferenceNGs>();
+  auto step = -1;
+  for (auto i = 0; i < 5 * 20; ++i) {
+    if (i % 5 == 0) {
+      ++step;
+    }
+    writer_w(0, step);
+  }
+  auto refs = w.finalize();
+  o2::aod::ReferenceNGs r{refs};
+
+  TableBuilder w2;
+  auto writer_w2 = w2.cursor<o2::aod::OtherReferenceNGs>();
+  step = -1;
+  for (auto i = 0; i < 5 * 20; ++i) {
+    if (i % 3 == 0) {
+      ++step;
+    }
+    writer_w2(0, step);
+  }
+  auto refs2 = w2.finalize();
+  o2::aod::OtherReferenceNGs r2{refs2};
+
+  using J = o2::soa::JoinNG<o2::aod::ReferenceNGs, o2::aod::OtherReferenceNGs>;
+  J rr{{refs, refs2}};
+
+  auto key = "fIndex" + o2::framework::cutString(o2::soa::getLabelFromTypeNG<o2::aod::OrigintNGs>()) + "_alt";
+  ArrowTableSlicingCache atscache({{o2::soa::getLabelFromTypeForKey<J>(key), key}});
+  auto s = atscache.updateCacheEntry(0, refs2);
+  SliceCache cache{&atscache};
+
+  for (auto& oi : o) {
+    auto cachedSlice = rr.sliceByCached(o2::aod::test::altOrigintngId, oi.globalIndex(), cache);
+    REQUIRE(cachedSlice.size() == 3);
+    for (auto& ri : cachedSlice) {
+      REQUIRE(ri.altOrigintngId() == oi.globalIndex());
+    }
+  }
+}
+
 TEST_CASE("TestIndexUnboundExceptions")
 {
   TableBuilder b;
@@ -1876,6 +2384,38 @@ TEST_CASE("TestIndexUnboundExceptions")
   }
 }
 
+TEST_CASE("TestIndexUnboundExceptionsNG")
+{
+  TableBuilder b;
+  auto prwriter = b.cursor<o2::aod::PointsRefFNG>();
+  auto a = std::array{0, 1};
+  auto aa = std::vector{2, 3, 4};
+  prwriter(0, 0, &a[0], aa);
+  a = {4, 10};
+  aa = {12, 2, 19};
+  prwriter(0, 1, &a[0], aa);
+  auto t = b.finalize();
+  auto prt = o2::aod::PointsRefFNG{t};
+
+  for (auto& row : prt) {
+    try {
+      [[maybe_unused]] auto sp = row.singlePointng();
+    } catch (RuntimeErrorRef ref) {
+      REQUIRE(std::string{error_from_ref(ref).what} == "Index pointing to Points3DNGs is not bound! Did you subscribe to the table?");
+    }
+    try {
+      auto ps = row.pointSlice();
+    } catch (RuntimeErrorRef ref) {
+      REQUIRE(std::string{error_from_ref(ref).what} == "Index pointing to Points3DNGs is not bound! Did you subscribe to the table?");
+    }
+    try {
+      auto pg = row.pointGroup();
+    } catch (RuntimeErrorRef ref) {
+      REQUIRE(std::string{error_from_ref(ref).what} == "Index pointing to Points3DNGs is not bound! Did you subscribe to the table?");
+    }
+  }
+}
+
 namespace o2::aod
 {
 namespace test
@@ -1885,6 +2425,7 @@ DECLARE_SOA_BITMAP_COLUMN(BoolArray, boolArray, 32);
 } // namespace test
 
 DECLARE_SOA_TABLE(BILists, "TEST", "BILISTS", o2::soa::Index<>, test::SmallIntArray, test::BoolArray);
+DECLARE_SOA_TABLE_NG(BIListNGs, "TEST", "BILISTS", o2::soa::Index<>, test::SmallIntArray, test::BoolArray);
 } // namespace o2::aod
 
 TEST_CASE("TestArrayColumns")
@@ -1917,6 +2458,36 @@ TEST_CASE("TestArrayColumns")
   }
 }
 
+TEST_CASE("TestArrayColumnsNG")
+{
+  TableBuilder b;
+  auto writer = b.cursor<o2::aod::BIListNGs>();
+  int8_t ii[32];
+  uint32_t bb;
+  for (auto i = 0; i < 20; ++i) {
+    bb = 0;
+    for (auto j = 0; j < 32; ++j) {
+      ii[j] = j;
+      if (j % 2 == 0) {
+        bb |= 1 << j;
+      }
+    }
+    writer(0, ii, bb);
+  }
+  auto t = b.finalize();
+
+  o2::aod::BIListNGs li{t};
+  for (auto const& row : li) {
+    auto iir = row.smallIntArray();
+    [[maybe_unused]] auto bbrr = row.boolArray_raw();
+    REQUIRE(std::is_same_v<std::decay_t<decltype(iir)>, int8_t const*>);
+    for (auto i = 0; i < 32; ++i) {
+      REQUIRE(iir[i] == i);
+      REQUIRE(row.boolArray_bit(i) == (i % 2 == 0));
+    }
+  }
+}
+
 namespace o2::aod
 {
 namespace table
@@ -1930,6 +2501,10 @@ DECLARE_SOA_DYNAMIC_COLUMN(Five, five, [](const int in[2]) -> float { return (fl
 DECLARE_SOA_TABLE(MixTest, "AOD", "MIXTST",
                   table::One, table::Two, table::Three, table::Four,
                   table::Five<table::Four>);
+
+DECLARE_SOA_TABLE_NG(MixTestNG, "AOD", "MIXTST",
+                     table::One, table::Two, table::Three, table::Four,
+                     table::Five<table::Four>);
 } // namespace o2::aod
 TEST_CASE("TestCombinedGetter")
 {
@@ -1967,17 +2542,10 @@ TEST_CASE("TestCombinedGetter")
   }
 }
 
-namespace o2::aod
-{
-DECLARE_SOA_TABLE_NG(TestR, "AOD", "TESTDESCRIPTION",
-        table::One, table::Two, table::Three, table::Four,
-        table::Five<table::Four>)
-}
-
-TEST_CASE("NewTables")
+TEST_CASE("TestCombinedGetterNG")
 {
   TableBuilder b;
-  auto writer = b.cursor<o2::aod::MixTest>();
+  auto writer = b.cursor<o2::aod::MixTestNG>();
   int f[2];
   for (auto i = 0; i < 20; ++i) {
     f[0] = i;
@@ -1985,9 +2553,9 @@ TEST_CASE("NewTables")
     writer(0, i, o2::constants::math::PI * i, o2::constants::math::Almost0 * i, f);
   }
   auto t = b.finalize();
-  o2::aod::TestR t1{t};
+  o2::aod::MixTestNG mt{t};
   auto count = 0;
-  for (auto const& row : t1) {
+  for (auto const& row : mt) {
     auto features1 = row.getValues<float, o2::aod::table::One, o2::aod::table::Three>();
     auto features2 = row.getValues<double, o2::aod::table::One, o2::aod::table::Two, o2::aod::table::Three>();
     auto features3 = row.getValues<float, o2::aod::table::Two, o2::aod::table::Five<o2::aod::table::Four>>();

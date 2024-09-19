@@ -37,6 +37,9 @@ DECLARE_SOA_COLUMN_FULL(Pos, pos, int[4], "pos");
 using TestTable = o2::soa::Table<o2::soa::OriginEnc{"AOD"}, test2::X, test2::Y>;
 using ArrayTable = o2::soa::Table<o2::soa::OriginEnc{"AOD"}, test2::Pos>;
 
+using TestTableNG = o2::soa::InPlaceTableNG<0, test2::X, test2::Y>;
+using ArrayTableNG = o2::soa::InPlaceTableNG<0, test2::Pos>;
+
 TEST_CASE("TestTableBuilder")
 {
   using namespace o2::framework;
@@ -71,6 +74,25 @@ TEST_CASE("TestTableBuilder")
   SECTION("Check")
   {
     for (auto const& row : readBack) {
+      REQUIRE(row.x() == i * 10);
+      REQUIRE(row.y() == i);
+      ++i;
+    }
+  }
+
+  auto readBackNG = TestTableNG{table};
+
+  auto readBackTableNG = readBackNG.asArrowTable();
+  REQUIRE(readBackTableNG->num_columns() == 2);
+  REQUIRE(readBackTableNG->num_rows() == 8);
+  REQUIRE(readBackTableNG->schema()->field(0)->name() == "x");
+  REQUIRE(readBackTableNG->schema()->field(1)->name() == "y");
+  REQUIRE(readBackTableNG->schema()->field(0)->type()->id() == arrow::uint64()->id());
+  REQUIRE(readBackTableNG->schema()->field(1)->type()->id() == arrow::uint64()->id());
+  i = 0;
+  SECTION("CheckNG")
+  {
+    for (auto const& row : readBackNG) {
       REQUIRE(row.x() == i * 10);
       REQUIRE(row.y() == i);
       ++i;
@@ -129,6 +151,26 @@ TEST_CASE("TestTableBuilderArray")
   REQUIRE(row.pos()[1] == 11);
   REQUIRE(row.pos()[2] == 123);
   REQUIRE(row.pos()[3] == 256);
+
+  auto readBackNG = ArrayTableNG{table};
+  auto rowNG = readBackNG.begin();
+
+  REQUIRE(rowNG.pos()[0] == 1);
+  REQUIRE(rowNG.pos()[1] == 10);
+  REQUIRE(rowNG.pos()[2] == 300);
+  REQUIRE(rowNG.pos()[3] == 350);
+
+  rowNG++;
+  REQUIRE(rowNG.pos()[0] == 0);
+  REQUIRE(rowNG.pos()[1] == 20);
+  REQUIRE(rowNG.pos()[2] == 30);
+  REQUIRE(rowNG.pos()[3] == 40);
+
+  rowNG++;
+  REQUIRE(rowNG.pos()[0] == 0);
+  REQUIRE(rowNG.pos()[1] == 11);
+  REQUIRE(rowNG.pos()[2] == 123);
+  REQUIRE(rowNG.pos()[3] == 256);
 }
 
 TEST_CASE("TestTableBuilderStruct")
@@ -184,7 +226,7 @@ TEST_CASE("TestTableBuilderBulk")
   REQUIRE(table->schema()->field(0)->type()->id() == arrow::int32()->id());
   REQUIRE(table->schema()->field(1)->type()->id() == arrow::int32()->id());
 
-  for (size_t i = 0; i < 8; ++i) {
+  for (int64_t i = 0; i < 8; ++i) {
     auto p = std::dynamic_pointer_cast<arrow::NumericArray<arrow::Int32Type>>(table->column(0)->chunk(0));
     REQUIRE(p->Value(i) == i);
   }
@@ -238,6 +280,27 @@ TEST_CASE("TestSoAIntegration")
   }
 }
 
+TEST_CASE("TestSoAIntegrationNG")
+{
+  TableBuilder builder;
+  auto rowWriter = builder.cursor<TestTableNG>();
+  rowWriter(0, 0, 0);
+  rowWriter(0, 10, 1);
+  rowWriter(0, 20, 2);
+  rowWriter(0, 30, 3);
+  rowWriter(0, 40, 4);
+  rowWriter(0, 50, 5);
+  auto table = builder.finalize();
+  auto readBack = TestTableNG{table};
+
+  size_t i = 0;
+  for (auto& row : readBack) {
+    REQUIRE(row.x() == i * 10);
+    REQUIRE(row.y() == i);
+    ++i;
+  }
+}
+
 TEST_CASE("TestDataAllocatorReturnType")
 {
   const Output output{"TST", "DUMMY", 0};
@@ -259,6 +322,31 @@ TEST_CASE("TestPodInjestion")
   rowWriter(0, A{50, 5});
   auto table = builder.finalize();
   auto readBack = TestTable{table};
+
+  size_t i = 0;
+  for (auto& row : readBack) {
+    REQUIRE(row.x() == i * 10);
+    REQUIRE(row.y() == i);
+    ++i;
+  }
+}
+
+TEST_CASE("TestPodInjestionNG")
+{
+  struct A {
+    uint64_t x;
+    uint64_t y;
+  };
+  TableBuilder builder;
+  auto rowWriter = builder.cursor<TestTableNG, A>();
+  rowWriter(0, A{0, 0});
+  rowWriter(0, A{10, 1});
+  rowWriter(0, A{20, 2});
+  rowWriter(0, A{30, 3});
+  rowWriter(0, A{40, 4});
+  rowWriter(0, A{50, 5});
+  auto table = builder.finalize();
+  auto readBack = TestTableNG{table};
 
   size_t i = 0;
   for (auto& row : readBack) {

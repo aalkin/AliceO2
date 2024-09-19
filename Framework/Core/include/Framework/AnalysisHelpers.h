@@ -26,6 +26,50 @@
 #include "Framework/ExpressionHelpers.h"
 
 #include <string>
+namespace o2::soa
+{
+template <TableRef R>
+constexpr auto tableRef2InputSpec()
+{
+  return framework::InputSpec{
+    o2::aod::Hash<R.label_hash>::str,
+    o2::aod::Hash<R.origin_hash>::str,
+    o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
+    R.version
+  };
+}
+
+template <TableRef R>
+constexpr auto tableRef2OutputSpec()
+{
+  return framework::OutputSpec{
+    framework::OutputLabel{o2::aod::Hash<R.label_hash>::str},
+    o2::aod::Hash<R.origin_hash>::str,
+    o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
+    R.version
+  };
+}
+
+template <TableRef R>
+constexpr auto tableRef2Output()
+{
+  return framework::Output{
+    o2::aod::Hash<R.origin_hash>::str,
+    o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
+    R.version
+  };
+}
+
+template <TableRef R>
+constexpr auto tableRef2OutputRef()
+{
+  return framework::OutputRef{
+    o2::aod::Hash<R.label_hash>::str,
+    R.version
+  };
+}
+}
+
 namespace o2::framework
 {
 class TableConsumer;
@@ -102,8 +146,76 @@ struct WritingCursor<soa::Table<ORIGIN, PC...>> {
   int64_t mCount = -1;
 };
 
+template <typename T>
+  requires o2::soa::WithOriginals<T>
+struct WritingCursorNG {
+ public:
+  using persistent_table_t = T;
+  using cursor_t = decltype(std::declval<TableBuilder>().cursor<T>());
+
+  template <typename... Ts>
+  void operator()(Ts... args)
+  {
+    static_assert(sizeof...(Ts) == framework::pack_size(typename T::persistent_columns_t{}), "Argument number mismatch");
+    ++mCount;
+    cursor(0, extract(args)...);
+  }
+
+  /// Last index inserted in the table
+  int64_t lastIndex()
+  {
+    return mCount;
+  }
+
+  bool resetCursor(LifetimeHolder<TableBuilder> builder)
+  {
+    mBuilder = std::move(builder);
+    cursor = std::move(FFL(mBuilder->cursor<persistent_table_t>()));
+    mCount = -1;
+    return true;
+  }
+
+  void setLabel(const char* label)
+  {
+    mBuilder->setLabel(label);
+  }
+
+  /// reserve @a size rows when filling, so that we do not
+  /// spend time reallocating the buffers.
+  void reserve(int64_t size)
+  {
+    mBuilder->reserve(typename T::column_types{}, size);
+  }
+
+  void release()
+  {
+    mBuilder.release();
+  }
+
+  decltype(FFL(std::declval<cursor_t>())) cursor;
+
+ private:
+  template <typename A>
+  static decltype(auto) extract(A const& arg)
+  {
+    if constexpr (soa::is_soa_iterator_v<T>) {
+      return arg.globalIndex();
+    } else {
+      static_assert(!framework::has_type<A>(typename T::persistent_columns_t{}), "Argument type mismatch");
+      return arg;
+    }
+  }
+
+  /// The table builder which actually performs the
+  /// construction of the table. We keep it around to be
+  /// able to do all-columns methods like reserve.
+  LifetimeHolder<TableBuilder> mBuilder = nullptr;
+  int64_t mCount = -1;
+};
+
 /// Helper to define output for a Table
 template <typename T>
+  requires soa::is_soa_table_like_v<T>
 struct OutputForTable {
   using table_t = T;
   using metadata = typename aod::MetadataTrait<table_t>::metadata;
@@ -119,17 +231,36 @@ struct OutputForTable {
   }
 };
 
+template <typename T>
+  requires o2::soa::WithOriginals<T>
+struct OutputForTableNG {
+  using table_t = T;
+  using metadata = aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
+
+  static OutputSpec const spec()
+  {
+    return OutputSpec{OutputLabel{o2::aod::Hash<T::ref.label_hash>::str}, o2::aod::Hash<T::ref.origin_hash>::str, o2::aod::description(o2::aod::Hash<T::ref.desc_hash>::str), T::ref::version};
+  }
+
+  static OutputRef ref()
+  {
+    return OutputRef{o2::aod::Hash<T::ref.label_hash>::str, T::ref::version};
+  }
+};
+
 /// This helper class allows you to declare things which will be created by a
 /// given analysis task. Notice how the actual cursor is implemented by the
 /// means of the WritingCursor helper class, from which produces actually
 /// derives.
 template <typename T>
-requires(!std::is_same_v<void, typename aod::MetadataTrait<T>::metadata>) struct Produces : WritingCursor<typename soa::PackToTable<aod::MetadataTrait<T>::metadata::origin(), typename T::table_t::persistent_columns_t>::table> {
-};
+requires(!std::is_same_v<void, typename aod::MetadataTrait<T>::metadata>)
+struct Produces : WritingCursor<typename soa::PackToTable<aod::MetadataTrait<T>::metadata::origin(), typename T::table_t::persistent_columns_t>::table>
+{};
 
-// template <template <OriginEnc, typename...> class T, soa::OriginEnc ORIGIN, typename... C>
-// struct Produces<T<ORIGIN, C...>> : WritingCursor<typename soa::PackToTable<ORIGIN, typename T<ORIGIN, C...>::table_t::persistent_columns_t>::table> {
-// };
+template <typename T>
+  requires(o2::soa::WithOriginals<T> && !std::is_same_v<void, typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata>)
+struct ProducesNG : WritingCursorNG<T>
+{};
 
 /// Use this to group together produces. Useful to separate them logically
 /// or simply to stay within the 100 elements per Task limit.
@@ -199,6 +330,42 @@ struct TableTransform {
   }
 };
 
+template <typename M, soa::TableRef Ref>
+  requires framework::is_base_of_template_v<aod::TableMetadataNG, M>
+struct TableTransformNG
+{
+  using metadata = M;
+  using M::sources;
+
+  template <soa::TableRef R>
+  static constexpr auto base_spec()
+  {
+    return tableRef2InputSpec<R>();
+  }
+
+  static auto base_specs()
+  {
+    return []<size_t... Is>(std::index_sequence<Is...>) -> std::vector<InputSpec> {
+      return {base_spec<sources[Is]>()...};
+    }(std::make_index_sequence<sources.size()>{});
+  }
+
+  constexpr auto spec() const
+  {
+    return tableRef2OutputSpec<Ref>();
+  }
+
+  constexpr auto output() const
+  {
+    return tableRef2Output<Ref>();
+  }
+
+  constexpr auto ref() const
+  {
+    return tableRef2OutputRef<Ref>();
+  }
+};
+
 /// This helper struct allows you to declare extended tables which should be
 /// created by the task (as opposed to those pre-defined by data model)
 template <typename T>
@@ -206,6 +373,36 @@ struct Spawns : TableTransform<typename aod::MetadataTrait<framework::pack_head_
   using extension_t = framework::pack_head_t<typename T::originals>;
   using base_table_t = typename aod::MetadataTrait<extension_t>::metadata::base_table_t;
   using expression_pack_t = typename aod::MetadataTrait<extension_t>::metadata::expression_pack_t;
+
+  constexpr auto pack()
+  {
+    return expression_pack_t{};
+  }
+
+  typename T::table_t* operator->()
+  {
+    return table.get();
+  }
+  typename T::table_t const& operator*() const
+  {
+    return *table;
+  }
+
+  auto asArrowTable()
+  {
+    return extension->asArrowTable();
+  }
+  std::shared_ptr<typename T::table_t> table = nullptr;
+  std::shared_ptr<extension_t> extension = nullptr;
+};
+
+template <typename T>
+struct SpawnsNG : TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>, T::ref>
+{
+  using metadata = TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>, T::ref>::metadata;
+  using extension_t = typename metadata::extension_table_t;
+  using base_table_t = typename metadata::base_table_t;
+  using expression_pack_t = typename metadata::expression_pack_t;
 
   constexpr auto pack()
   {

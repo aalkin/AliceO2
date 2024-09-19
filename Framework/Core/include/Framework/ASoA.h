@@ -236,7 +236,7 @@ static inline constexpr int version(const char* const str) {
     size_t len = 0;
     int res = 0;
     while (len < 15 && str[len] != '/') {
-        ++len;
+      ++len;
     }
     if (len >= 15) {
       return -1;
@@ -245,6 +245,14 @@ static inline constexpr int version(const char* const str) {
         res = res * 10 + (int)(str[i] - '0');
     }
     return res;
+}
+
+static inline constexpr std::string_view description(const char* const str) {
+  size_t len = 0;
+  while (len < 15 && str[len] != '/') {
+    ++len;
+  }
+  return std::string_view{str, len};
 }
 } // namespace o2::aod
 
@@ -1549,7 +1557,7 @@ static constexpr std::string getLabelFromTypeNG()
 }
 
 template <typename L, typename D, typename O, typename Key, typename H, typename... Ts>
-class IndexTableNG;
+struct IndexTableNG;
 
 template <typename T>
   requires framework::is_specialization_v<T, o2::soa::IndexTableNG>
@@ -1913,9 +1921,17 @@ auto doSliceByCachedUnsorted(T const* table, framework::expressions::BindingNode
 }
 
 template <typename T>
+requires soa::is_soa_table_like_v<T>
 auto select(T const& t, framework::expressions::Filter const& f)
 {
   return Filtered<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
+}
+
+template <typename T>
+requires WithOriginals<T>
+auto select(T const& t, framework::expressions::Filter const& f)
+{
+  return FilteredNG<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
 }
 
 arrow::ChunkedArray* getIndexFromLabel(arrow::Table* table, const char* label);
@@ -1982,6 +1998,8 @@ class TableNG
     }());
 
   using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_persistent_t, C...> {}(columns_t{}));
+  using column_types = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::type...> {}(persistent_columns_t{}));
+
   using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_external_index_t, C...> {}(columns_t{}));
   using internal_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_self_index_t, C...> {}(columns_t{}));
   template <typename IP>
@@ -2325,6 +2343,13 @@ class TableNG
   void copyIndexBindings(T& dest) const
   {
     doCopyIndexBindings(external_index_columns_t{}, dest);
+  }
+
+  auto select(framework::expressions::Filter const& f) const
+  {
+    auto t = o2::soa::select(*this, f);
+    copyIndexBindings(t);
+    return t;
   }
 
   auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
@@ -3683,25 +3708,26 @@ O2HASH("TEST/0");
     using metadata = _Name_##Metadata;                                                                \
   };
 
-#define DECLARE_SOA_EXTENDED_TABLE_NG_FULL(_Name_, _Label_, _OriginalTable_, _Origin_, _Desc_, _Version_, ...) \
-  O2HASH(_Label_);                                                                                             \
-  O2HASH(_Desc_ "/" #_Version_);                                                                               \
-  template <typename O>                                                                                        \
-  using _Name_##ExtensionFrom = TableNG<Hash<_Label_ ""_h>, Hash<_Desc "/" #_Version_ ""_h>, O>;               \
-  using _Name_ = _Name_##ExtensionFrom<Hash<_Origin_ ""_h>>;                                                   \
-  template <>                                                                                                  \
-  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                                   \
-    using metadata = _Name_##ExtensionMetadata;                                                                \
-  };                                                                                                           \
-  template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                         \
-  struct _Name_##ExtensionMetadata : TableMetadataNG<Hash<_Desc "/" #_Version_ ""_h>, __VA_ARGS__> {           \
-    using base_table_t = _Name_##ExtensionFrom<O>;                                                             \
-    using expression_pack_t = framework::pack<__VA_ARGS>;                                                      \
-    static constexpr auto sources = _OriginalTable_::originals;                                                \
-  };                                                                                                           \
-  template <typename O>                                                                                        \
-  using _Name_##From = o2::soa::JoinNG<_OriginalTable_, _Name_##ExtensionFrom<O>>;                             \
-  using _Name_ = _Name_##From < o2::aod::Hash<_Origin_ ""_h>;
+#define DECLARE_SOA_EXTENDED_TABLE_NG_FULL(_Name_, _Label_, _OriginalTable_, _Origin_, _Desc_, _Version_, ...)                    \
+  O2HASH(_Label_);                                                                                                                \
+  O2HASH(_Desc_ "/" #_Version_);                                                                                                  \
+  template <typename O>                                                                                                           \
+  using _Name_##ExtensionFrom = TableNG<Hash<_Label_ ""_h>, Hash<_Desc "/" #_Version_ ""_h>, O>;                                  \
+  using _Name_##Extension = _Name_##ExtensionFrom<Hash<_Origin_ ""_h>>;                                                           \
+  template <>                                                                                                                     \
+  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                                                      \
+    using metadata = _Name_##ExtensionMetadata;                                                                                   \
+  };                                                                                                                              \
+  template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                            \
+  struct _Name_##ExtensionMetadata : TableMetadataNG<Hash<_Desc "/" #_Version_ ""_h>, __VA_ARGS__> {                              \
+    using base_table_t = _OriginalTable_;                                                                                         \
+    using extension_table_t = _Name_##ExtensionFrom<O>;                                                                           \
+    using expression_pack_t = framework::pack<__VA_ARGS>;                                                                         \
+    static constexpr auto sources = _OriginalTable_::originals;                                                                   \
+  };                                                                                                                              \
+  template <typename O>                                                                                                           \
+  using _Name_##From = o2::soa::JoinNGD<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, _OriginalTable_, _Name_##ExtensionFrom<O>>;    \
+  using _Name_ = _Name_##From<o2::aod::Hash<_Origin_ ""_h>;
 
 #define DECLARE_SOA_TABLE_NG_FULL(_Name_, _Label_, _Origin_, _Desc_, ...)                             \
   DECLARE_SOA_TABLE_NG_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, 0, __VA_ARGS__)
@@ -3798,17 +3824,17 @@ namespace o2::soa
 template <typename T>
 class FilteredBase;
 
-template <typename... Ts>
-struct JoinNG : TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Ts...>
+template <typename L, typename D, typename O, typename... Ts>
+struct JoinNGFull : TableNG<L, D, O, Ts...>
 {
-  using base = TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Ts...>;
+  using base = TableNG<L, D, O, Ts...>;
 
-  JoinNG(std::shared_ptr<arrow::Table>&& table, uint64_t offset = 0)
+  JoinNGFull(std::shared_ptr<arrow::Table>&& table, uint64_t offset = 0)
     : base{std::move(table), offset}
   {
     bindInternalIndicesTo(this);
   }
-  JoinNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
+  JoinNGFull(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
     : base{ArrowHelpers::joinTables(std::move(tables)), offset}
   {
     bindInternalIndicesTo(this);
@@ -3816,7 +3842,7 @@ struct JoinNG : TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::
   using base::bindExternalIndices;
   using base::bindInternalIndicesTo;
 
-  using self_t = JoinNG<Ts...>;
+  using self_t = JoinNGFull<L, D, O, Ts...>;
   using table_t = base;
   using table_t::originals;
   using columns_t = typename table_t::columns_t;
@@ -3882,6 +3908,12 @@ struct JoinNG : TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::
     return std::find_if(originals.begin(), originals.end(), [](TableRef const& ref){ return ref.desc_hash == T::ref.desc_hash; }) != originals.end();
   }
 };
+
+template <typename... Ts>
+using JoinNG = JoinNGFull<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Ts...>;
+
+template <typename D, typename... Ts>
+using JoinNGD = JoinNGFull<o2::aod::Hash<"JOIN"_h>, D, o2::aod::Hash<"JOIN"_h>, Ts...>;
 
 template <typename... Ts>
 constexpr auto joinNG(Ts const&... t)

@@ -146,8 +146,7 @@ struct WritingCursor<soa::Table<ORIGIN, PC...>> {
   int64_t mCount = -1;
 };
 
-template <typename T>
-  requires o2::soa::WithOriginals<T>
+template <soa::ngTable T>
 struct WritingCursorNG {
  public:
   using persistent_table_t = T;
@@ -258,7 +257,7 @@ struct Produces : WritingCursor<typename soa::PackToTable<aod::MetadataTrait<T>:
 {};
 
 template <typename T>
-  requires(o2::soa::WithOriginals<T> && !std::is_same_v<void, typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata>)
+  requires(soa::ngTable<T> && !std::is_same_v<void, typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata>)
 struct ProducesNG : WritingCursorNG<T>
 {};
 

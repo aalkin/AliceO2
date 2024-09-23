@@ -265,6 +265,10 @@ struct is_hash<H<Arg>, H> : std::true_type {
 
 template <typename T>
 inline constexpr bool is_hash_v = is_hash<T, o2::aod::Hash>::value;
+
+template <typename T>
+concept aodHash = is_hash_v<T>;
+
 } // namespace o2::aod
 
 namespace o2::soa
@@ -326,6 +330,9 @@ inline constexpr bool is_type_with_metadata_v = false;
 
 template <typename T>
 inline constexpr bool is_type_with_metadata_v<T, std::void_t<decltype(sizeof(typename T::metadata))>> = true;
+
+template <typename T>
+concept withMetadata = is_type_with_metadata_v<T>;
 
 template <typename, typename = void>
 inline constexpr bool is_type_with_binding_v = false;
@@ -1020,6 +1027,9 @@ struct DefaultIndexPolicy : IndexPolicyBase {
 template <OriginEnc ORIGIN, typename... C>
 class Table;
 
+template <aod::aodHash L, aod::aodHash D, aod::aodHash O, typename... T>
+class TableNG;
+
 /// Similar to a pair but not a pair, to avoid
 /// exposing the second type everywhere.
 template <typename C>
@@ -1475,6 +1485,15 @@ constexpr bool are_bindings_compatible_v(framework::pack<Os...>&&)
 
 template <typename T>
 inline constexpr bool is_soa_table_like_v = soa::is_base_of_template_origin_v<soa::Table, T>;
+
+template <typename T>
+concept soaTable = is_soa_table_like_v<T>;
+
+template <typename T>
+inline constexpr bool is_ng_table_like_v = framework::is_base_of_template_v<soa::TableNG, T>;
+
+template <typename T>
+concept ngTable = is_ng_table_like_v<T>;
 
 /// special case for the template with origin
 template <typename T, template <OriginEnc, typename...> class Ref>
@@ -1972,7 +1991,7 @@ consteval auto originalsPack()
   return framework::pack<Ts...>{};
 }
 
-template <typename L, typename D, typename O, typename... Ts>
+template <aod::aodHash L, aod::aodHash D, aod::aodHash O, typename... Ts>
 class TableNG
 {
  public:

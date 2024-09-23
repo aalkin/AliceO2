@@ -568,6 +568,43 @@ struct Builds : TableTransform<typename aod::MetadataTrait<T>::metadata> {
   }
 };
 
+template <typename T>
+struct BuildsNG : TableTransformNG<aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>, T::ref> {
+  using metadata = TableTransformNG<aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>, T::ref>::metadata;
+  using IP = std::conditional_t<metadata::exclusive, IndexBuilder<Exclusive>, IndexBuilder<Sparse>>;
+  using Key = metadata::Key;
+  using H = typename T::first_t;
+  using Ts = typename T::rest_t;
+  using index_pack_t = metadata::index_pack_t;
+
+  T* operator->()
+  {
+    return table.get();
+  }
+  T const& operator*() const
+  {
+    return *table;
+  }
+
+  auto asArrowTable()
+  {
+    return table->asArrowTable();
+  }
+  std::shared_ptr<T> table = nullptr;
+
+  constexpr auto pack()
+  {
+    return index_pack_t{};
+  }
+
+  template <typename Key, typename... Cs, typename... Ts>
+  auto build(framework::pack<Cs...>, framework::pack<Ts...>, std::vector<std::shared_ptr<arrow::Table>>&& tables)
+  {
+    this->table = std::make_shared<T>(IP::template indexBuilder<Key>(o2::aod::Hash<T::ref.label_hash>::str, std::forward<std::vector<std::shared_ptr<arrow::Table>>>(tables), framework::pack<Cs...>{}, framework::pack<Ts...>{}));
+    return (this->table != nullptr);
+  }
+};
+
 /// This helper class allows you to declare things which will be created by a
 /// given analysis task. Currently wrapped objects are limited to be TNamed
 /// descendants. Objects will be written to a ROOT file at the end of the
@@ -781,6 +818,118 @@ struct Partition {
   using const_iterator = typename o2::soa::Filtered<T>::const_iterator;
   using filtered_iterator = typename o2::soa::Filtered<T>::iterator;
   using filtered_const_iterator = typename o2::soa::Filtered<T>::const_iterator;
+  inline filtered_iterator begin()
+  {
+    return mFiltered->begin();
+  }
+  inline o2::soa::RowViewSentinel end()
+  {
+    return mFiltered->end();
+  }
+  inline filtered_const_iterator begin() const
+  {
+    return mFiltered->begin();
+  }
+  inline o2::soa::RowViewSentinel end() const
+  {
+    return mFiltered->end();
+  }
+
+  int64_t size() const
+  {
+    return mFiltered->size();
+  }
+};
+
+template <typename T>
+struct PartitionNG {
+  PartitionNG(expressions::Node&& filter_) : filter{std::forward<expressions::Node>(filter_)}
+  {
+  }
+
+  PartitionNG(expressions::Node&& filter_, T const& table)
+    : filter{std::forward<expressions::Node>(filter_)}
+  {
+    setTable(table);
+  }
+
+  void intializeCaches(std::set<uint32_t> const& hashes, std::shared_ptr<arrow::Schema> const& schema)
+  {
+    initializePartitionCaches(hashes, schema, filter, tree, gfilter);
+  }
+
+  void bindTable(T const& table)
+  {
+    intializeCaches(T::table_t::hashes(), table.asArrowTable()->schema());
+    if (dataframeChanged) {
+      mFiltered = getTableFromFilter(table, soa::selectionToVector(framework::expressions::createSelection(table.asArrowTable(), gfilter)));
+      dataframeChanged = false;
+    }
+  }
+
+  template <typename... Ts>
+  void bindExternalIndices(Ts*... tables)
+  {
+    if (mFiltered != nullptr) {
+      mFiltered->bindExternalIndices(tables...);
+    }
+  }
+
+  template <typename E>
+  void bindInternalIndicesTo(E* ptr)
+  {
+    if (mFiltered != nullptr) {
+      mFiltered->bindInternalIndicesTo(ptr);
+    }
+  }
+
+  void updatePlaceholders(InitContext& context)
+  {
+    expressions::updatePlaceholders(filter, context);
+  }
+
+  [[nodiscard]] std::shared_ptr<arrow::Table> asArrowTable() const
+  {
+    return mFiltered->asArrowTable();
+  }
+
+  o2::soa::Filtered<T>* operator->()
+  {
+    return mFiltered.get();
+  }
+
+  template <typename T1>
+  [[nodiscard]] auto rawSliceBy(o2::framework::Preslice<T1> const& container, int value) const
+  {
+    return mFiltered->rawSliceBy(container, value);
+  }
+
+  [[nodiscard]] auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return mFiltered->sliceByCached(node, value, cache);
+  }
+
+  [[nodiscard]] auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return mFiltered->sliceByCachedUnsorted(node, value, cache);
+  }
+
+  template <typename T1, bool OPT, bool SORTED>
+  [[nodiscard]] auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
+  {
+    return mFiltered->sliceBy(container, value);
+  }
+
+  expressions::Filter filter;
+  std::unique_ptr<o2::soa::FilteredNG<T>> mFiltered = nullptr;
+  gandiva::NodePtr tree = nullptr;
+  gandiva::FilterPtr gfilter = nullptr;
+  bool dataframeChanged = true;
+
+  using iterator = typename o2::soa::FilteredNG<T>::iterator;
+  using const_iterator = typename o2::soa::FilteredNG<T>::const_iterator;
+  using filtered_iterator = typename o2::soa::FilteredNG<T>::iterator;
+  using filtered_const_iterator = typename o2::soa::FilteredNG<T>::const_iterator;
   inline filtered_iterator begin()
   {
     return mFiltered->begin();

@@ -130,6 +130,48 @@ struct PartitionManager<Partition<T>> {
   }
 };
 
+template <typename T>
+struct PartitionManager<PartitionNG<T>> {
+  template <typename T2>
+  static void doSetPartition(PartitionNG<T>& partition, T2& table)
+  {
+    if constexpr (std::is_same_v<T, T2>) {
+      partition.bindTable(table);
+    }
+  }
+
+  template <typename... T2s>
+  static void setPartition(PartitionNG<T>& partition, T2s&... tables)
+  {
+    (doSetPartition(partition, tables), ...);
+  }
+
+  template <typename... Ts>
+  static void bindExternalIndices(PartitionNG<T>& partition, Ts*... tables)
+  {
+    partition.bindExternalIndices(tables...);
+  }
+
+  template <typename E>
+  static void bindInternalIndices(PartitionNG<T>& partition, E* table)
+  {
+    if constexpr (o2::soa::is_binding_compatible_v<T, std::decay_t<E>>()) {
+      partition.bindInternalIndicesTo(table);
+    }
+  }
+
+  static void updatePlaceholders(PartitionNG<T>& partition, InitContext& context)
+  {
+    partition.updatePlaceholders(context);
+  }
+
+  static bool newDataframe(PartitionNG<T>& partition)
+  {
+    partition.dataframeChanged = true;
+    return true;
+  }
+};
+
 template <typename ANY>
 struct FilterManager {
   static bool createExpressionTrees(ANY&, std::vector<ExpressionInfo>&)
@@ -267,6 +309,30 @@ struct OutputManager<Produces<TABLE>> {
   }
 };
 
+template <typename TABLE>
+struct OutputManager<ProducesNG<TABLE>> {
+  static bool appendOutput(std::vector<OutputSpec>& outputs, ProducesNG<TABLE>& /*what*/, uint32_t)
+  {
+    outputs.emplace_back(OutputForTable<TABLE>::spec());
+    return true;
+  }
+  static bool prepare(ProcessingContext& context, ProducesNG<TABLE>& what)
+  {
+    what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTable<TABLE>::ref())));
+    return true;
+  }
+  static bool finalize(ProcessingContext&, ProducesNG<TABLE>& what)
+  {
+    what.setLabel(o2::aod::Hash<TABLE::ref.label_hash>::str);
+    what.release();
+    return true;
+  }
+  static bool postRun(EndOfStreamContext&, ProducesNG<TABLE>&)
+  {
+    return true;
+  }
+};
+
 /// HistogramRegistry specialization
 template <>
 struct OutputManager<HistogramRegistry> {
@@ -352,6 +418,48 @@ struct OutputManager<Spawns<T>> {
     }
 
     what.extension = std::make_shared<typename Spawns<T>::extension_t>(o2::framework::spawner<aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::origin()>(what.pack(), extractOriginals(what.sources_pack(), pc), aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel()));
+    what.table = std::make_shared<typename T::table_t>(soa::ArrowHelpers::joinTables({what.extension->asArrowTable(), originalTable}));
+    return true;
+  }
+
+  static bool finalize(ProcessingContext& pc, Spawns<T>& what)
+  {
+    pc.outputs().adopt(what.output(), what.asArrowTable());
+    return true;
+  }
+
+  static bool postRun(EndOfStreamContext&, Spawns<T>&)
+  {
+    return true;
+  }
+};
+
+template <size_t N, std::array<soa::TableRef, N> refs>
+static inline auto extractOriginals(ProcessingContext& pc)
+{
+  return [&]<size_t... Is>(std::index_sequence<Is...>) -> std::vector<std::shared_ptr<arrow::Table>> {
+    return {pc.inputs().get<TableConsumer>(o2::aod::Hash<refs[Is].label_hash>::str)->asArrowTable()...};
+  }(std::make_index_sequence<refs.size()>());
+}
+
+template <typename T>
+struct OutputManager<SpawnsNG<T>> {
+  static bool appendOutput(std::vector<OutputSpec>& outputs, SpawnsNG<T>& what, uint32_t)
+  {
+    outputs.emplace_back(what.spec());
+    return true;
+  }
+
+  static bool prepare(ProcessingContext& pc, SpawnsNG<T>& what)
+  {
+    using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
+    auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals<metadata::sources>(pc));
+    if (originalTable->schema()->fields().empty() == true) {
+      using base_table_t = typename Spawns<T>::base_table_t::table_t;
+      originalTable = makeEmptyTable<base_table_t>(o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str);
+    }
+
+    what.extension = std::make_shared<typename Spawns<T>::extension_t>(o2::framework::spawner<o2::aod::Hash<metadata::extension_t::ref.desc_hash>>(originalTable, o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str));
     what.table = std::make_shared<typename T::table_t>(soa::ArrowHelpers::joinTables({what.extension->asArrowTable(), originalTable}));
     return true;
   }

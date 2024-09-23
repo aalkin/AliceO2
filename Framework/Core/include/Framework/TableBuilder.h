@@ -858,6 +858,41 @@ std::shared_ptr<arrow::Table> spawnerHelper(std::shared_ptr<arrow::Table>& fullT
                                             expressions::Projector* projectors, std::vector<std::shared_ptr<arrow::Field>> const& fields, const char* name);
 
 /// Expression-based column generator to materialize columns
+template <typename D>
+  requires aod::is_hash_v<D>
+auto spawner(std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* name)
+{
+  auto fullTable = soa::ArrowHelpers::joinTables(std::move(tables));
+  if (fullTable->num_rows() == 0) {
+    return makeEmptyTable(name, typename o2::aod::MetadataTraitNG<D>::expression_pack_t{});
+  }
+  static auto fields = o2::soa::createFieldsFromColumns(typename o2::aod::MetadataTraitNG<D>::expression_pack_t{});
+  static auto new_schema = std::make_shared<arrow::Schema>(fields);
+  auto projectors = []<typename... C>() -> std::array<expressions::Projector, sizeof...(C)>
+  {
+    return {{std::move(C::Projector())...}};
+  }
+  (typename o2::aod::MetadataTraitNG<D>::expression_pack_t{}); //;
+  return spawnerHelper(fullTable, new_schema, framework::pack_size(typename o2::aod::MetadataTraitNG<D>::expression_pack_t{}), projectors.data(), fields, name);
+}
+
+template <typename D>
+  requires aod::is_hash_v<D>
+auto spawner(std::shared_ptr<arrow::Table> const& fullTable, const char* name)
+{
+  if (fullTable->num_rows() == 0) {
+    return makeEmptyTable(name, typename o2::aod::MetadataTraitNG<D>::expression_pack_t{});
+  }
+  static auto fields = o2::soa::createFieldsFromColumns(typename o2::aod::MetadataTraitNG<D>::expression_pack_t{});
+  static auto new_schema = std::make_shared<arrow::Schema>(fields);
+  auto projectors = []<typename... C>() -> std::array<expressions::Projector, sizeof...(C)>
+  {
+    return {{std::move(C::Projector())...}};
+  }
+  (typename o2::aod::MetadataTraitNG<D>::expression_pack_t{}); //;
+  return spawnerHelper(fullTable, new_schema, framework::pack_size(typename o2::aod::MetadataTraitNG<D>::expression_pack_t{}), projectors.data(), fields, name);
+}
+
 template <soa::OriginEnc ORIGIN, typename... C>
 auto spawner(framework::pack<C...> columns, std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* name)
 {

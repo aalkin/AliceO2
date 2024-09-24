@@ -526,6 +526,32 @@ struct OutputManager<Builds<T>> {
 };
 
 template <typename T>
+struct OutputManager<BuildsNG<T>> {
+  static bool appendOutput(std::vector<OutputSpec>& outputs, Builds<T>& what, uint32_t)
+  {
+    outputs.emplace_back(what.spec());
+    return true;
+  }
+
+  static bool prepare(ProcessingContext& pc, Builds<T>& what)
+  {
+    return what.template build<typename T::indexing_t>(what.pack(), what.originals_pack(),
+                                                       extractOriginalsVector(what.originals_pack(), pc));
+  }
+
+  static bool finalize(ProcessingContext& pc, Builds<T>& what)
+  {
+    pc.outputs().adopt(what.output(), what.asArrowTable());
+    return true;
+  }
+
+  static bool postRun(EndOfStreamContext&, Builds<T>&)
+  {
+    return true;
+  }
+};
+
+template <typename T>
 class has_instance
 {
   using one = char;
@@ -565,7 +591,7 @@ inline constexpr bool has_end_of_stream_v = has_end_of_stream<T>::value;
 template <typename T>
 struct ServiceManager {
   template <typename ANY>
-  static bool add(std::vector<ServiceSpec>& specs, ANY& any)
+  static bool add(std::vector<ServiceSpec>& /*specs*/, ANY& /*any*/)
   {
     return false;
   }
@@ -585,7 +611,7 @@ struct ServiceManager {
 
 template <typename T>
 struct ServiceManager<Service<T>> {
-  static bool add(std::vector<ServiceSpec>& specs, Service<T>& service)
+  static bool add(std::vector<ServiceSpec>& specs, Service<T>& /*service*/)
   {
     if constexpr (o2::framework::is_base_of_template_v<LoadableServicePlugin, T>) {
       T p = T{};
@@ -608,7 +634,7 @@ struct ServiceManager<Service<T>> {
   }
 
   /// If a service has a method endOfStream, it is called at the end of the stream.
-  static bool postRun(EndOfStreamContext& context, Service<T>& service)
+  static bool postRun(EndOfStreamContext& /*context*/, Service<T>& service)
   {
     // FIXME: for the moment we only need endOfStream to be
     // stateless. In the future we might want to pass it EndOfStreamContext
@@ -745,8 +771,21 @@ struct SpawnManager {
   static bool requestInputs(std::vector<InputSpec>&, T const&) { return false; }
 };
 
-template <typename TABLE>
+template <soa::soaTable TABLE>
 struct SpawnManager<Spawns<TABLE>> {
+  static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
+  {
+    auto base_specs = spawns.base_specs();
+    for (auto base_spec : base_specs) {
+      base_spec.metadata.push_back(ConfigParamSpec{std::string{"control:spawn"}, VariantType::Bool, true, {"\"\""}});
+      DataSpecUtils::updateInputList(inputs, std::forward<InputSpec>(base_spec));
+    }
+    return true;
+  }
+};
+
+template <soa::ngTable TABLE>
+struct SpawnManager<SpawnsNG<TABLE>> {
   static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
   {
     auto base_specs = spawns.base_specs();
@@ -766,6 +805,19 @@ struct IndexManager {
 
 template <typename IDX>
 struct IndexManager<Builds<IDX>> {
+  static bool requestInputs(std::vector<InputSpec>& inputs, Builds<IDX>& builds)
+  {
+    auto base_specs = builds.base_specs();
+    for (auto base_spec : base_specs) {
+      base_spec.metadata.push_back(ConfigParamSpec{std::string{"control:build"}, VariantType::Bool, true, {"\"\""}});
+      DataSpecUtils::updateInputList(inputs, std::forward<InputSpec>(base_spec));
+    }
+    return true;
+  }
+};
+
+template <typename IDX>
+struct IndexManager<BuildsNG<IDX>> {
   static bool requestInputs(std::vector<InputSpec>& inputs, Builds<IDX>& builds)
   {
     auto base_specs = builds.base_specs();

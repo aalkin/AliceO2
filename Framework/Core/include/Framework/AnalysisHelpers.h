@@ -68,6 +68,17 @@ constexpr auto tableRef2OutputRef()
     R.version
   };
 }
+
+template <TableRef R>
+constexpr auto tableRef2ConfigParamSpec()
+{
+  return o2::framework::ConfigParamSpec{
+    std::string{"iput:"} + o2::aod::Hash<R.label_hash>::str,
+    framework::VariantType::String,
+    aod::sourceSpec<R>(),
+    {"\"\""}
+  };
+}
 }
 
 namespace o2::framework
@@ -251,13 +262,11 @@ struct OutputForTableNG {
 /// given analysis task. Notice how the actual cursor is implemented by the
 /// means of the WritingCursor helper class, from which produces actually
 /// derives.
-template <typename T>
-requires(!std::is_same_v<void, typename aod::MetadataTrait<T>::metadata>)
+template <soa::hasMetadata T>
 struct Produces : WritingCursor<typename soa::PackToTable<aod::MetadataTrait<T>::metadata::origin(), typename T::table_t::persistent_columns_t>::table>
 {};
 
-template <typename T>
-  requires(soa::ngTable<T> && !std::is_same_v<void, typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata>)
+template <soa::hasngMetadata T>
 struct ProducesNG : WritingCursorNG<T>
 {};
 
@@ -329,8 +338,7 @@ struct TableTransform {
   }
 };
 
-template <typename M, soa::TableRef Ref>
-  requires framework::is_base_of_template_v<aod::TableMetadataNG, M>
+template <o2::aod::NGMetadata M, soa::TableRef Ref>
 struct TableTransformNG
 {
   using metadata = M;
@@ -474,6 +482,9 @@ template <typename Key, typename C>
 struct Reduction {
   using type = typename std::conditional<soa::is_binding_compatible_v<Key, typename C::binding_t>(), SelfIndexColumnBuilder, IndexColumnBuilder>::type;
 };
+
+template <typename Key, typename C>
+using reduced_t = Reduction<Key, C>::type;
 } // namespace
 
 template <typename Kind>

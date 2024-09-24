@@ -73,6 +73,12 @@ struct AnalysisDataProcessorBuilder {
     }
   }
 
+  template <soa::TableRef R>
+  static ConfigParamSpec getSpec()
+  {
+    return soa::tableRef2ConfigParamSpec<R>();
+  }
+
   template <typename... T>
   static inline std::vector<ConfigParamSpec> getInputSpecs(framework::pack<T...>)
   {
@@ -91,7 +97,29 @@ struct AnalysisDataProcessorBuilder {
     return getInputSpecs(typename aod::MetadataTrait<T>::metadata::sources{});
   }
 
+  template <soa::WithSources T>
+  static inline auto getSources()
+  {
+    return []<size_t N>(std::array<soa::TableRef, N> const& refs){
+      return [&refs]<size_t... Is>(std::index_sequence<Is...>){
+        return std::vector{soa::tableRef2ConfigParamSpec<refs[Is]>()...};
+      }(std::make_index_sequence<N>());
+    }(T::sources);
+  }
+
   template <typename T>
+  static auto getInputMetadata()
+  {
+    std::vector<ConfigParamSpec> inputMetadata;
+    auto inputSources = getSources<T>();
+    std::sort(inputSources.begin(), inputSources.end(), [](ConfigParamSpec const& a, ConfigParamSpec const& b) { return a.name < b.name; });
+    auto last = std::unique(inputSources.begin(), inputSources.end(), [](ConfigParamSpec const& a, ConfigParamSpec const& b) { return a.name == b.name; });
+    inputSources.erase(last, inputSources.end());
+    inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
+    return inputMetadata;
+  }
+
+  template <soa::WithSources T>
   static auto getInputMetadata()
   {
     std::vector<ConfigParamSpec> inputMetadata;
@@ -107,7 +135,12 @@ struct AnalysisDataProcessorBuilder {
   static void addGroupingCandidates(std::vector<StringPair>& bk, std::vector<StringPair>& bku)
   {
     [&bk, &bku]<typename... As>(framework::pack<As...>) mutable {
-      auto key = std::string{"fIndex"} + o2::framework::cutString(soa::getLabelFromType<std::decay_t<G>>());
+      std::string key;
+      if constexpr (soa::is_soa_iterator_v<std::decay_t<G>>) {
+        key = std::string{"fIndex"} + o2::framework::cutString(soa::getLabelFromType<std::decay_t<G>>());
+      } else if constexpr (soa::is_ng_iterator_v<std::decay_t<G>>) {
+        key = std::string{"fIndex"} + o2::framework::cutString(soa::getLabelFromTypeNG<std::decay_t<G>>());
+      }
       ([&bk, &bku, &key]() mutable {
         if constexpr (soa::relatedByIndex<std::decay_t<G>, std::decay_t<As>>()) {
           auto binding = soa::getLabelFromTypeForKey<std::decay_t<As>>(key);
@@ -135,11 +168,25 @@ struct AnalysisDataProcessorBuilder {
     DataSpecUtils::updateInputList(inputs, InputSpec{metadata::tableLabel(), metadata::origin(), metadata::description(), metadata::version(), Lifetime::Timeframe, inputMetadata});
   }
 
+  template <soa::TableRef R>
+  static void addOriginal(const char* name, bool value, std::vector<InputSpec>& inputs)
+  {
+    using metadata = typename aod::MetadataTraitNG<o2::aod::Hash<R.desc_hash>>::metadata;
+    std::vector<ConfigParamSpec> inputMetadata;
+    inputMetadata.emplace_back(ConfigParamSpec{std::string{"control:"} + name, VariantType::Bool, value, {"\"\""}});
+    if constexpr (requires { metadata::sources.size(); }) {
+      auto inputSources = getInputMetadata<metadata::sources>();
+      inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
+    }
+    DataSpecUtils::updateInputList(inputs, InputSpec{metadata::tableLabel(), metadata::origin(), metadata::description(), metadata::version(), Lifetime::Timeframe, inputMetadata});
+  }
+
   template <typename R, typename C, typename... Args>
   static void inputsFromArgs(R (C::*)(Args...), const char* name, bool value, std::vector<InputSpec>& inputs, std::vector<ExpressionInfo>& eInfos, std::vector<StringPair>& bk, std::vector<StringPair>& bku) requires(std::is_lvalue_reference_v<Args>&&...)
   {
     // update grouping cache
-    if constexpr (soa::is_soa_iterator_v<std::decay_t<framework::pack_element_t<0, framework::pack<Args...>>>>) {
+    using A0 = std::decay_t<framework::pack_head_t<framework::pack<Args...>>>;
+    if constexpr (soa::is_soa_iterator_v<A0> || soa::is_ng_iterator_v<A0>) {
       addGroupingCandidates<Args...>(bk, bku);
     }
 
@@ -163,9 +210,17 @@ struct AnalysisDataProcessorBuilder {
           eInfos.emplace_back(ai, hash, T::parent_t::hashes(), std::make_shared<arrow::Schema>(fields));
         }
         // add inputs from the originals
-        [&name, &value, &inputs]<typename... Os>(framework::pack<Os...>) mutable {
-          (addOriginal<Os>(name, value, inputs), ...);
-        }(soa::make_originals_from_type<T>());
+        if constexpr (soa::WithOriginals<T>) {
+          [&name, &value, &inputs]<size_t N>(std::array<soa::TableRef, N> const& refs) mutable {
+            [&name, &value, &inputs, &refs]<size_t... Is>(std::index_sequence<Is...>){
+              (addOriginal<refs[Is]>(name, value, inputs), ...);
+            }(std::make_index_sequence<N>());
+          }(T::originals);
+        } else {
+          [&name, &value, &inputs]<typename... Os>(framework::pack<Os...>) mutable {
+            (addOriginal<Os>(name, value, inputs), ...);
+          }(soa::make_originals_from_type<T>());
+        }
       }
       return true;
     }() &&

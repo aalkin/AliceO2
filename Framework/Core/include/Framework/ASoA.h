@@ -211,6 +211,9 @@ struct TableMetadataNG {
   using columns = framework::pack<Cs...>;
 };
 
+template <typename T>
+concept NGMetadata = framework::is_base_of_template_v<TableMetadataNG, T>;
+
 template <typename D>
 struct MetadataTraitNG {
   using metadata = void;
@@ -268,6 +271,12 @@ inline constexpr bool is_hash_v = is_hash<T, o2::aod::Hash>::value;
 
 template <typename T>
 concept aodHash = is_hash_v<T>;
+
+template <soa::TableRef R>
+static constexpr auto sourceSpec()
+{
+  return fmt::format("{}/{}/{}/{}", o2::aod::Hash<R.label_hash>::str, o2::aod::Hash<R.origin_hash>::str, description(o2::aod::Hash<R.desc_hash>::str), R.version);
+}
 
 } // namespace o2::aod
 
@@ -333,6 +342,12 @@ inline constexpr bool is_type_with_metadata_v<T, std::void_t<decltype(sizeof(typ
 
 template <typename T>
 concept withMetadata = is_type_with_metadata_v<T>;
+
+template <typename T>
+concept hasMetadata = !std::is_same_v<void, typename aod::MetadataTrait<T>::metadata>;
+
+template <typename T>
+concept hasngMetadata = !std::is_same_v<void, typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata>;
 
 template <typename, typename = void>
 inline constexpr bool is_type_with_binding_v = false;
@@ -1511,6 +1526,9 @@ inline constexpr bool is_specialization_origin_v = is_specialization_origin<T, R
 template <typename T>
 inline constexpr bool is_soa_iterator_v = soa::is_base_of_template_origin_v<RowViewCore, T> || soa::is_specialization_origin_v<T, RowViewCore>;
 
+template <typename T>
+inline constexpr bool is_ng_iterator_v = framework::is_base_of_template_v<TableIterator, T> || framework::is_specialization_v<T, TableIterator>;
+
 template <typename T, typename B>
   requires((o2::soa::is_soa_iterator_v<T> || o2::soa::is_soa_table_like_v<T>) && o2::soa::is_soa_table_like_v<B>)
 consteval bool is_binding_compatible_v()
@@ -1787,7 +1805,7 @@ namespace o2::soa
 template <typename T>
 inline consteval bool is_soa_filtered_iterator_v()
 {
-  if constexpr (!is_soa_iterator_v<T>) {
+  if constexpr (!is_soa_iterator_v<T> && !is_ng_iterator_v<T>) {
     return false;
   } else {
     if constexpr (std::is_same_v<typename T::policy_t, soa::FilteredIndexPolicy>) {

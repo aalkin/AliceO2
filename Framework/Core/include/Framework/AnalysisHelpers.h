@@ -456,7 +456,7 @@ struct ColumnTrait {
   static_assert(framework::is_base_of_template_v<o2::soa::Column, C>, "Not a column type!");
   using column_t = C;
 
-  static constexpr auto listSize()
+  static consteval auto listSize()
   {
     if constexpr (std::is_same_v<typename C::type, std::vector<int>>) {
       return -1;

@@ -202,6 +202,37 @@ struct fmt::formatter<o2::soa::OriginEnc> {
   }
 };
 
+namespace o2::soa
+{
+template <typename C>
+consteval auto is_persistent_column()
+{
+  if constexpr (requires {typename C::persistent{};}) {
+    return C::persistent::value;
+  } else {
+    return false;
+  }
+}
+
+template <typename C>
+using is_persistent_t = std::conditional_t<is_persistent_column<C>(), std::true_type, std::false_type>;
+
+template <typename T>
+concept not_void = requires{ !std::same_as<T, void>;};
+
+template <typename C>
+concept is_index_column = requires {not_void<typename C::binding_t>;};
+
+template <typename C>
+using is_external_index_t = typename std::conditional_t<is_index_column<C>, std::true_type, std::false_type>;
+
+template <typename C>
+concept is_self_index = requires{typename C::self_index_t{};};
+
+template <typename C>
+using is_self_index_t = typename std::conditional_t<is_self_index<C>, std::true_type, std::false_type>;
+}
+
 namespace o2::aod
 {
 DECLARE_SOA_METADATA();
@@ -209,6 +240,9 @@ DECLARE_SOA_METADATA();
 template <typename D, typename... Cs>
 struct TableMetadataNG {
   using columns = framework::pack<Cs...>;
+  using persistent_columns_t = framework::selected_pack<soa::is_persistent_t, Cs...>;
+  using external_index_columns_t = framework::selected_pack<soa::is_external_index_t, Cs...>;
+  using internal_index_columns_t = framework::selected_pack<soa::is_self_index_t, Cs...>;
 };
 
 template <typename T>
@@ -315,12 +349,6 @@ auto createFieldsFromColumns(framework::pack<C...>)
 }
 
 using SelectionVector = std::vector<int64_t>;
-
-template <typename, typename = void>
-inline constexpr bool is_index_column_v = false;
-
-template <typename T>
-inline constexpr bool is_index_column_v<T, std::void_t<decltype(sizeof(typename T::binding_t))>> = true;
 
 template <typename, typename = void>
 inline constexpr bool is_type_with_originals_v = false;
@@ -810,32 +838,26 @@ consteval bool is_soa_column_v()
 template <typename T>
 using is_dynamic_t = framework::is_specialization<typename T::base, DynamicColumn>;
 
-namespace persistent_type_helper
-{
-// This checks both for the existence of the ::persistent member in the class T as well as the value returned stored in it.
-// Hack: a pointer to any field of type int inside persistent. Both true_type and false_type do not have any int field, but anyways we pass nullptr.
-// The compiler picks the version with exact number of arguments when only it can, i.e., when T::persistent is defined.
-template <class T>
-typename T::persistent test(int T::persistent::*);
+// namespace persistent_type_helper
+// {
+// // This checks both for the existence of the ::persistent member in the class T as well as the value returned stored in it.
+// // Hack: a pointer to any field of type int inside persistent. Both true_type and false_type do not have any int field, but anyways we pass nullptr.
+// // The compiler picks the version with exact number of arguments when only it can, i.e., when T::persistent is defined.
+// template <class T>
+// typename T::persistent test(int T::persistent::*);
 
-template <class>
-std::false_type test(...);
-} // namespace persistent_type_helper
+// template <class>
+// std::false_type test(...);
+// } // namespace persistent_type_helper
+
+// template <typename T>
+// using is_persistent_t = decltype(persistent_type_helper::test<T>(nullptr));
 
 template <typename T>
-using is_persistent_t = decltype(persistent_type_helper::test<T>(nullptr));
-
-template <typename T>
-constexpr auto is_persistent_v = is_persistent_t<T>::value;
+constexpr auto is_persistent_v = soa::is_persistent_t<T>::value;
 
 template <typename T>
 constexpr auto is_dynamic_v = is_dynamic_t<T>::value;
-
-template <typename T>
-using is_external_index_t = typename std::conditional<is_index_column_v<T>, std::true_type, std::false_type>::type;
-
-template <typename T>
-using is_self_index_t = typename std::conditional<is_self_index_column_v<T>, std::true_type, std::false_type>::type;
 
 template <typename T, template <auto...> class Ref>
 struct is_index : std::false_type {
@@ -1064,11 +1086,11 @@ struct TableIterator : IP, C... {
   using self_t = TableIterator<D, O, IP, C...>;
   using policy_t = IP;
   using all_columns = framework::pack<C...>;
-  using persistent_columns_t = framework::selected_pack<is_persistent_t, C...>;
+  using persistent_columns_t = framework::selected_pack<soa::is_persistent_t, C...>;
   using index_columns_t = framework::selected_pack<is_index_t, C...>;
   constexpr inline static bool has_index_v = framework::pack_size(index_columns_t{}) > 0;
-  using external_index_columns_t = framework::selected_pack<is_external_index_t, C...>;
-  using internal_index_columns_t = framework::selected_pack<is_self_index_t, C...>;
+  using external_index_columns_t = framework::selected_pack<soa::is_external_index_t, C...>;
+  using internal_index_columns_t = framework::selected_pack<soa::is_self_index_t, C...>;
   using bindings_pack_t = decltype([]<typename... Cs>(framework::pack<Cs...>) -> framework::pack<typename Cs::binding_t...> {}(external_index_columns_t{})); // decltype(extractBindings(external_index_columns_t{}));
 
   TableIterator(arrow::ChunkedArray* columnData[sizeof...(C)], IP&& policy)
@@ -1273,11 +1295,11 @@ struct RowViewCore : public IP, C... {
   using policy_t = IP;
   using table_t = o2::soa::Table<ORIGIN, C...>;
   using all_columns = framework::pack<C...>;
-  using persistent_columns_t = framework::selected_pack<is_persistent_t, C...>;
+  using persistent_columns_t = framework::selected_pack<soa::is_persistent_t, C...>;
   using index_columns_t = framework::selected_pack<is_index_t, C...>;
   constexpr inline static bool has_index_v = framework::pack_size(index_columns_t{}) > 0;
-  using external_index_columns_t = framework::selected_pack<is_external_index_t, C...>;
-  using internal_index_columns_t = framework::selected_pack<is_self_index_t, C...>;
+  using external_index_columns_t = framework::selected_pack<soa::is_external_index_t, C...>;
+  using internal_index_columns_t = framework::selected_pack<soa::is_self_index_t, C...>;
 
   RowViewCore(arrow::ChunkedArray* columnData[sizeof...(C)], IP&& policy)
     : IP{policy},
@@ -2045,17 +2067,17 @@ class TableNG
       }
     }());
 
-  using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_persistent_t, C...> {}(columns_t{}));
+  using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_persistent_t, C...> {}(columns_t{}));
   using column_types = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::type...> {}(persistent_columns_t{}));
 
-  using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_external_index_t, C...> {}(columns_t{}));
-  using internal_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<is_self_index_t, C...> {}(columns_t{}));
+  using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_external_index_t, C...> {}(columns_t{}));
+  using internal_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_self_index_t, C...> {}(columns_t{}));
   template <typename IP>
   using base_iterator = decltype(base_iter<D, O, IP>(columns_t{}));
 
   template <typename IP, typename Parent, typename... T>
   struct TableIteratorBase : base_iterator<IP> {
-    using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::selected_pack<is_external_index_t, C...> {}(columns_t{}));
+    using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::selected_pack<soa::is_external_index_t, C...> {}(columns_t{}));
     using bindings_pack_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::binding_t...> {}(external_index_columns_t{}));
     static constexpr const std::array<TableRef, sizeof...(T)> originals{T::ref...};
     using policy_t = IP;
@@ -2459,9 +2481,9 @@ class Table
   using table_t = Table<ORIGIN, C...>;
   using columns = framework::pack<C...>;
   using column_types = framework::pack<typename C::type...>;
-  using persistent_columns_t = framework::selected_pack<is_persistent_t, C...>;
-  using external_index_columns_t = framework::selected_pack<is_external_index_t, C...>;
-  using internal_index_columns_t = framework::selected_pack<is_self_index_t, C...>;
+  using persistent_columns_t = framework::selected_pack<soa::is_persistent_t, C...>;
+  using external_index_columns_t = framework::selected_pack<soa::is_external_index_t, C...>;
+  using internal_index_columns_t = framework::selected_pack<soa::is_self_index_t, C...>;
 
   static constexpr auto hashes()
   {
@@ -2470,8 +2492,7 @@ class Table
 
   template <typename IP, typename Parent, typename... T>
   struct RowViewBase : public RowViewCore<ORIGIN, IP, C...> {
-
-    using external_index_columns_t = framework::selected_pack<is_external_index_t, C...>;
+    using external_index_columns_t = framework::selected_pack<soa::is_external_index_t, C...>;
     using bindings_pack_t = decltype(extractBindings(external_index_columns_t{}));
     using parent_t = Parent;
     using originals = originals_pack_t<T...>;

@@ -2292,8 +2292,8 @@ class TableNG
   inline arrow::ChunkedArray* getIndexToKey()
   {
     if constexpr (framework::has_type_conditional<is_binding_compatible, Key>(external_index_columns_t{})) {
-      using IC = framework::pack_element_t<framework::has_type_at_conditional<is_binding_compatible, Key>(external_index_columns_t{}), external_index_columns_t>;
-      return mColumnChunks[framework::has_type_at<IC>(persistent_columns_t{})];
+      using IC = framework::pack_element_t<framework::has_type_at_conditional_v<is_binding_compatible, Key>(external_index_columns_t{}), external_index_columns_t>;
+      return mColumnChunks[framework::has_type_at_v<IC>(persistent_columns_t{})];
     } else if constexpr (std::is_same_v<table_t, Key>) {
       return nullptr;
     } else {
@@ -2680,8 +2680,8 @@ class Table
   inline arrow::ChunkedArray* getIndexToKey()
   {
     if constexpr (framework::has_type_conditional<is_binding_compatible, Key>(external_index_columns_t{})) {
-      using IC = framework::pack_element_t<framework::has_type_at_conditional<is_binding_compatible, Key>(external_index_columns_t{}), external_index_columns_t>;
-      return mColumnChunks[framework::has_type_at<IC>(persistent_columns_t{})];
+      using IC = framework::pack_element_t<framework::has_type_at_conditional_v<is_binding_compatible, Key>(external_index_columns_t{}), external_index_columns_t>;
+      return mColumnChunks[framework::has_type_at_v<IC>(persistent_columns_t{})];
     } else if constexpr (std::is_same_v<table_t, Key>) {
       return nullptr;
     } else {

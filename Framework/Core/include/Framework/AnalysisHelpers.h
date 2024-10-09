@@ -495,7 +495,6 @@ struct IndexBuilder {
     auto pool = arrow::default_memory_pool();
     SelfIndexColumnBuilder self{C1::columnLabel(), pool};
     std::unique_ptr<ChunkedArrayIterator> keyIndex = nullptr;
-    int64_t counter = 0;
     if constexpr (!std::is_same_v<T1, Key>) {
       keyIndex = std::make_unique<ChunkedArrayIterator>(getIndexToKey<T1, Key>(tables[0].get()));
     }
@@ -505,7 +504,7 @@ struct IndexBuilder {
       pool)...};
     std::array<bool, sizeof...(Cs)> finds;
 
-    for (counter = 0; counter < tables[0]->num_rows(); ++counter) {
+    for (int64_t counter = 0; counter < tables[0]->num_rows(); ++counter) {
       auto idx = -1;
       if constexpr (std::is_same_v<T1, Key>) {
         idx = counter;
@@ -538,6 +537,85 @@ struct IndexBuilder {
                               std::make_tuple(std::decay_t<T1>{{std::get<T1>(tables)}}, std::decay_t<T>{{std::get<T>(tables)}}...))};
     t.bindExternalIndices(&key, &std::get<T1>(tables), &std::get<T>(tables)...);
     return t;
+  }
+};
+
+template <typename Kind>
+struct IndexBuilderNG {
+  template <typename Key, size_t N, std::array<soa::TableRef, N> refs, typename C1, typename... Cs>
+  static auto indexBuilder(const char* label, std::vector<std::shared_ptr<arrow::Table>>&& tables, framework::pack<C1, Cs...>)
+  {
+    auto pool = arrow::default_memory_pool();
+    SelfIndexColumnBuilder self{C1::columnLabel(), pool};
+    std::unique_ptr<ChunkedArrayIterator> keyIndex = nullptr;
+    if constexpr (!Key::template hasOriginal<refs[0]>()) {
+      keyIndex = std::make_unique<ChunkedArrayIterator>(tables[0]->column(o2::aod::MetadataTraitNG<o2::aod::Hash<refs[0].desc_hash>>::metadata::template getIndexPosToKey<Key>()));
+    }
+
+    auto sq = std::make_index_sequence<sizeof...(Cs)>();
+
+    auto columnBuilders = [&tables, &pool]<size_t... Is>(std::index_sequence<Is...>) -> std::array<std::shared_ptr<framework::SelfIndexColumnBuilder>, sizeof...(Cs)> {
+      return {[](arrow::Table* table, arrow::MemoryPool* pool) {
+        using T = framework::pack_element_t<Is, framework::pack<Cs...>>;
+        if constexpr (!Key::template hasOriginal<refs[Is + 1]>()) {
+          constexpr auto pos = o2::aod::MetadataTraitNG<o2::aod::Hash<refs[Is + 1].desc_hash>>::metadata::template getIndexPosToKey<Key>();
+          return std::make_shared<IndexColumnBuilder>(table->column(pos), T::columnLabel(), ColumnTrait<T>::listSize(), pool);
+        } else {
+          return std::make_shared<SelfIndexColumnBuilder>(T::columnLabel(), pool);
+        }
+      }(tables[Is + 1].get(), pool)...};
+    }(sq);
+
+    std::array<bool, sizeof...(Cs)> finds;
+
+    for (int64_t counter = 0; counter < tables[0]->num_rows(); ++counter) {
+      int64_t idx = -1;
+      if constexpr (Key::template hasOriginal<refs[0]>()) {
+        idx = counter;
+      } else {
+        idx = keyIndex->valueAt(counter);
+      }
+      finds = [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>){
+        return std::array{
+          [&idx, &columnBuilders](){
+            using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
+            return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template find<T>(idx);
+          }()
+          ...};
+      }(sq);
+      if constexpr (std::is_same_v<Kind, Sparse>) {
+        [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>){
+          ([&idx, &columnBuilders](){
+            using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
+            return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template fill<T>(idx);}()
+           , ...);
+        }(sq);
+        self.fill<C1>(counter);
+      } else if constexpr (std::is_same_v<Kind, Exclusive>) {
+        if (std::none_of(finds.begin(), finds.end(), [](bool const x) { return x == false; })) {
+          [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>){
+            ([&idx, &columnBuilders](){
+              using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
+              return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template fill<T>(idx);
+            }()
+             , ...);
+          }(sq);
+          self.fill<C1>(counter);
+        }
+      }
+    }
+
+    return [&label,&columnBuilders,&self]<size_t... Is>(std::index_sequence<Is...>){
+      return makeArrowTable(label,
+                            {self.template result<C1>(), [&columnBuilders](){
+                               using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
+                               return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template result<T>();
+                             }()...},
+                            {self.field(), [&columnBuilders](){
+                               using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
+                               return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->field();
+                             }()...});
+    }(sq);
   }
 };
 

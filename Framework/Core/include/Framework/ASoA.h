@@ -253,6 +253,35 @@ struct TableMetadataNG {
   using persistent_columns_t = framework::selected_pack<soa::is_persistent_t, Cs...>;
   using external_index_columns_t = framework::selected_pack<soa::is_external_index_t, Cs...>;
   using internal_index_columns_t = framework::selected_pack<soa::is_self_index_t, Cs...>;
+
+  template <typename Key, typename... PCs>
+  static consteval std::array<bool, sizeof...(PCs)> getMap(framework::pack<PCs...>)
+  {
+    return std::array<bool, sizeof...(PCs)>{[]() {
+        if constexpr (requires { PCs::index_targets.size(); }) {
+          return Key::template isIndexTargetOf<PCs::index_targets.size(), PCs::index_targets>();
+        } else {
+          return false;
+        }
+      }()...};
+  }
+
+  template <typename Key>
+  static consteval int getIndexPosToKey()
+  {
+    return getIndexPosToKey_impl<Key, framework::pack_size(persistent_columns_t{}), getMap<Key>(persistent_columns_t{})>();
+  }
+
+  template <typename Key, size_t N, std::array<bool, N> map>
+  static consteval int getIndexPosToKey_impl()
+  {
+    constexpr const auto pos = std::find(map.begin(), map.end(), true);
+    if constexpr (pos != map.end()) {
+      return std::distance(map.begin(), pos);
+    } else {
+      return -1;
+    }
+  }
 };
 
 template <typename T>
@@ -2069,7 +2098,7 @@ class TableNG
   }();
 
   template <size_t N, std::array<TableRef, N> bindings>
-  static constexpr auto isIndexTargetOf()
+  static consteval auto isIndexTargetOf()
   {
     if constexpr (std::same_as<O, o2::aod::Hash<"CONC"_h>>) {
       return false;
@@ -2080,6 +2109,12 @@ class TableNG
     } else {
       return std::find(bindings.begin(), bindings.end(), self_t::ref) != bindings.end();
     }
+  }
+
+  template <TableRef r>
+  static consteval bool hasOriginal()
+  {
+    return std::find_if(originals.begin(), originals.end(), [](TableRef const& o){ return o.desc_hash == r.desc_hash;}) != originals.end();
   }
 
   using columns_t = decltype(
@@ -2323,13 +2358,20 @@ class TableNG
   template <typename Key>
   inline arrow::ChunkedArray* getIndexToKey()
   {
-    if constexpr (framework::has_type_conditional<is_binding_compatible, Key>(external_index_columns_t{})) {
-      using IC = framework::pack_element_t<framework::has_type_at_conditional_v<is_binding_compatible, Key>(external_index_columns_t{}), external_index_columns_t>;
-      return mColumnChunks[framework::has_type_at_v<IC>(persistent_columns_t{})];
-    } else if constexpr (std::is_same_v<table_t, Key>) {
-      return nullptr;
+    constexpr auto map = []<typename... Cs>(framework::pack<Cs...>) {
+      return std::array<bool, sizeof...(Cs)>{[]() {
+        if constexpr (requires { Cs::index_targets.size(); }) {
+          return Key::template isIndexTargetOf<Cs::index_targets.size(), Cs::index_targets>();
+        } else {
+          return false;
+        }
+      }()...};
+    }(persistent_columns_t{});
+    constexpr auto pos = std::find(map.begin(), map.end(), true);
+    if constexpr (pos != map.end()) {
+      return mColumnChunks[std::distance(map.begin(), pos)];
     } else {
-      static_assert(framework::always_static_assert_v<Key>, "This table does not have an index to this type");
+      static_assert(framework::always_static_assert_v<Key>, "This table does not have an index to given Key");
     }
   }
 
@@ -3949,18 +3991,38 @@ consteval auto getIndexTargets()
   DECLARE_SOA_INDEX_TABLE_FULL(_Name_, _Key_, "AOD", _Description_, true, __VA_ARGS__)
 
 #define DECLARE_SOA_INDEX_TABLE_NG_FULL(_Name_, _Key_, _Origin_, _Version_, _Desc_, _Exclusive_, ...)                                        \
+  O2HASH(#_Name_);                                                                                                                           \
+  O2HASH(_Desc_ "/" #_Version_);                                                                                                             \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                                       \
   using _Name_##From = o2::soa::IndexTableNG<o2::aod::Hash<#_Name_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O, _Key_, __VA_ARGS__>; \
   using _Name_ = _Name_##From<o2::aod::Hash<_Origin_ ""_h>>;                                                                                 \
                                                                                                                                              \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                                       \
-  struct _Name_##Metadata : o2::soa::TableMetadataNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__> {                               \
+  struct _Name_##MetadataFrom : o2::aod::TableMetadataNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, Index<>, __VA_ARGS__> {                  \
     static constexpr bool exclusive = _Exclusive_;                                                                                           \
     using table_t = _Name_##From<O>;                                                                                                         \
     using Key = _Key_;                                                                                                                       \
     using index_pack_t = framework::pack<__VA_ARGS__>;                                                                                       \
-    static constexpr auto sources = table_t::soriginals;                                                                                     \
+    static constexpr auto sources = table_t::originals;                                                                                      \
+  };                                                                                                                                         \
+  using _Name_##Metadata = _Name_##MetadataFrom<o2::aod::Hash<_Origin_ ""_h>>;                                                               \
+                                                                                                                                             \
+  template <>                                                                                                                                \
+  struct MetadataTraitNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                                        \
+    using metadata = _Name_##Metadata;                                                                                                       \
   };
+
+#define DECLARE_SOA_INDEX_TABLE_NG(_Name_, _Key_, _Description_, ...) \
+  DECLARE_SOA_INDEX_TABLE_NG_FULL(_Name_, _Key_, "IDX", 0, _Description_, false, __VA_ARGS__)
+
+#define DECLARE_SOA_INDEX_TABLE_NG_EXCLUSIVE(_Name_, _Key_, _Description_, ...) \
+  DECLARE_SOA_INDEX_TABLE_NG_FULL(_Name_, _Key_, "IDX", 0, _Description_, true, __VA_ARGS__)
+
+#define DECLARE_SOA_INDEX_TABLE_NG_USER(_Name_, _Key_, _Description_, ...) \
+  DECLARE_SOA_INDEX_TABLE_NG_FULL(_Name_, _Key_, "AOD", 0, _Description_, false, __VA_ARGS__)
+
+#define DECLARE_SOA_INDEX_TABLE_NG_EXCLUSIVE_USER(_Name_, _Key_, _Description_, ...) \
+  DECLARE_SOA_INDEX_TABLE_NG_FULL(_Name_, _Key_, "AOD", 0, _Description_, true, __VA_ARGS__)
 
 namespace o2::soa
 {
@@ -5422,15 +5484,15 @@ class Filtered<Filtered<T>> : public FilteredBase<typename T::table_t>
 /// are index columns defined for the required tables.
 /// First index will be used by process() as the grouping
 template <typename L, typename D, typename O, typename Key, typename H, typename... Ts>
-struct IndexTableNG : TableNG<L, D, O, soa::Index<>, typename H::binding_t, typename Ts::binding_t...> {
+struct IndexTableNG : TableNG<L, D, O> {
   using self_t = IndexTableNG<L, D, O, Key, H, Ts...>;
-  using base_t = TableNG<L, D, O, soa::Index<>, typename H::binding_t, typename Ts::binding_t...>;
+  using base_t = TableNG<L, D, O>;
   using table_t = base_t;
-  using safe_base_t = TableNG<L, D, O, typename H::binding_t, typename Ts::binding_t...>;
+  using safe_base_t = TableNG<L, D, O>;
   using indexing_t = Key;
   using first_t = typename H::binding_t;
   using rest_t = framework::pack<typename Ts::binding_t...>;
-  using base_t::originals;
+  static constexpr const auto originals = o2::soa::mergeOriginals<typename H::binding_t, typename Ts::binding_t...>();
 
   IndexTableNG(std::shared_ptr<arrow::Table> table, uint64_t offset = 0)
     : base_t{table, offset}

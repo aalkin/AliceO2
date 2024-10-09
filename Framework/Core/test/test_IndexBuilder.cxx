@@ -16,9 +16,11 @@
 using namespace o2::framework;
 using namespace arrow;
 using namespace o2::soa;
+using namespace o2::aod;
 
-DECLARE_SOA_METADATA();
-DECLARE_SOA_VERSIONING();
+namespace o2::aod
+{
+O2HASH("TST");
 namespace coords
 {
 DECLARE_SOA_COLUMN_FULL(X, x, float, "x");
@@ -26,38 +28,53 @@ DECLARE_SOA_COLUMN_FULL(Y, y, float, "y");
 DECLARE_SOA_COLUMN_FULL(Z, z, float, "z");
 } // namespace coords
 DECLARE_SOA_TABLE(Points, "TST", "POINTS", Index<>, coords::X, coords::Y, coords::Z);
+DECLARE_SOA_TABLE_NG(PointNGs, "TST", "POINTS", Index<>, coords::X, coords::Y, coords::Z);
 
 namespace extra_1
 {
 DECLARE_SOA_INDEX_COLUMN(Point, point);
+DECLARE_SOA_INDEX_COLUMN(PointNG, pointng);
 DECLARE_SOA_COLUMN_FULL(D, d, float, "d");
 } // namespace extra_1
 DECLARE_SOA_TABLE(Distances, "TST", "DISTANCES", Index<>, extra_1::PointId, extra_1::D);
+DECLARE_SOA_TABLE_NG(DistanceNGs, "TST", "DISTANCES", Index<>, extra_1::PointNGId, extra_1::D);
 
 namespace extra_2
 {
 DECLARE_SOA_INDEX_COLUMN(Point, point);
+DECLARE_SOA_INDEX_COLUMN(PointNG, pointng);
 DECLARE_SOA_COLUMN_FULL(IsTrue, istrue, bool, "istrue");
 } // namespace extra_2
 DECLARE_SOA_TABLE(Flags, "TST", "Flags", Index<>, extra_2::PointId, extra_2::IsTrue);
+DECLARE_SOA_TABLE_NG(FlagNGs, "TST", "Flags", Index<>, extra_2::PointNGId, extra_2::IsTrue);
 
 namespace extra_3
 {
 DECLARE_SOA_INDEX_COLUMN(Point, point);
+DECLARE_SOA_INDEX_COLUMN(PointNG, pointng);
 DECLARE_SOA_COLUMN_FULL(Category, category, int32_t, "category");
 } // namespace extra_3
 DECLARE_SOA_TABLE(Categorys, "TST", "Categories", Index<>, extra_3::PointId, extra_3::Category);
+DECLARE_SOA_TABLE_NG(CategoryNGs, "TST", "Categories", Index<>, extra_3::PointNGId, extra_3::Category);
 
-namespace indices
+namespace test_indices
 {
 DECLARE_SOA_INDEX_COLUMN(Point, point);
+DECLARE_SOA_INDEX_COLUMN(PointNG, pointng);
 DECLARE_SOA_INDEX_COLUMN(Distance, distance);
+DECLARE_SOA_INDEX_COLUMN(DistanceNG, distanceng);
 DECLARE_SOA_INDEX_COLUMN(Flag, flag);
+DECLARE_SOA_INDEX_COLUMN(FlagNG, flagng);
 DECLARE_SOA_INDEX_COLUMN(Category, category);
+DECLARE_SOA_INDEX_COLUMN(CategoryNG, categoryng);
 } // namespace indices
 
-DECLARE_SOA_TABLE(IDXs, "TST", "Index", Index<>, indices::PointId, indices::DistanceId, indices::FlagId, indices::CategoryId);
-DECLARE_SOA_TABLE(IDX2s, "TST", "Index2", Index<>, indices::DistanceId, indices::PointId, indices::FlagId, indices::CategoryId);
+DECLARE_SOA_TABLE(IDXs, "TST", "Index", Index<>, test_indices::PointId, test_indices::DistanceId, test_indices::FlagId, test_indices::CategoryId);
+DECLARE_SOA_TABLE(IDX2s, "TST", "Index2", Index<>, test_indices::DistanceId, test_indices::PointId, test_indices::FlagId, test_indices::CategoryId);
+
+DECLARE_SOA_INDEX_TABLE_NG(IDXNGs, PointNGs, "Index1", test_indices::PointNGId, test_indices::DistanceNGId, test_indices::FlagNGId, test_indices::CategoryNGId);
+DECLARE_SOA_INDEX_TABLE_NG(IDX2NGs, PointNGs, "Index2", test_indices::DistanceNGId, test_indices::PointNGId, test_indices::FlagNGId, test_indices::CategoryNGId);
+} // namespace o2::aod
 
 TEST_CASE("TestIndexBuilder")
 {
@@ -131,22 +148,105 @@ TEST_CASE("TestIndexBuilder")
   }
 }
 
+TEST_CASE("TestIndexBuilderNG")
+{
+  TableBuilder b1;
+  auto w1 = b1.cursor<PointNGs>();
+  TableBuilder b2;
+  auto w2 = b2.cursor<DistanceNGs>();
+  TableBuilder b3;
+  auto w3 = b3.cursor<FlagNGs>();
+  TableBuilder b4;
+  auto w4 = b4.cursor<CategoryNGs>();
+
+  for (auto i = 0; i < 10; ++i) {
+    w1(0, i * 2., i * 3., i * 4.);
+  }
+
+  std::array<int, 7> d{0, 1, 2, 4, 7, 8, 9};
+  std::array<int, 5> f{0, 1, 2, 5, 8};
+  std::array<int, 7> c{0, 1, 2, 3, 5, 7, 8};
+
+  for (auto i : d) {
+    w2(0, i, i * 10.);
+  }
+
+  for (auto i : f) {
+    w3(0, i, static_cast<bool>(i % 2));
+  }
+
+  for (auto i : c) {
+    w4(0, i, i + 2);
+  }
+
+  auto t1 = b1.finalize();
+  PointNGs st1{t1};
+  auto t2 = b2.finalize();
+  DistanceNGs st2{t2};
+  auto t3 = b3.finalize();
+  FlagNGs st3{t3};
+  auto t4 = b4.finalize();
+  CategoryNGs st4{t4};
+
+  using m1 = MetadataTraitNG<o2::aod::Hash<"Index1/0"_h>>::metadata;
+  auto t5 = IndexBuilderNG<Exclusive>::indexBuilder<PointNGs, m1::sources.size(), m1::sources>("test1a", {t1, t2, t3, t4}, typename IDXNGs::persistent_columns_t{});
+  REQUIRE(t5->num_rows() == 4);
+  IDXNGs idxt{t5};
+  idxt.bindExternalIndices(&st1, &st2, &st3, &st4);
+  for (auto& row : idxt) {
+    REQUIRE(row.distanceng().pointngId() == row.pointngId());
+    REQUIRE(row.flagng().pointngId() == row.pointngId());
+    REQUIRE(row.categoryng().pointngId() == row.pointngId());
+  }
+
+  using m2 = MetadataTraitNG<o2::aod::Hash<"Index2/0"_h>>::metadata;
+  auto t6 = IndexBuilderNG<Sparse>::indexBuilder<PointNGs, m2::sources.size(), m2::sources>("test3", {t2, t1, t3, t4}, typename IDX2NGs::persistent_columns_t{});
+  REQUIRE(t6->num_rows() == st2.size());
+  IDX2NGs idxs{t6};
+  std::array<int, 7> fs{0, 1, 2, -1, -1, 4, -1};
+  std::array<int, 7> cs{0, 1, 2, -1, 5, 6, -1};
+  idxs.bindExternalIndices(&st1, &st2, &st3, &st4);
+  auto i = 0;
+  for (auto const& row : idxs) {
+    REQUIRE(row.has_distanceng());
+    REQUIRE(row.has_pointng());
+    if (row.has_flagng()) {
+      REQUIRE(row.flagng().pointngId() == row.pointngId());
+    }
+    if (row.has_categoryng()) {
+      REQUIRE(row.categoryng().pointngId() == row.pointngId());
+    }
+    REQUIRE(row.flagngId() == fs[i]);
+    REQUIRE(row.categoryngId() == cs[i]);
+    ++i;
+  }
+}
+
+namespace o2::aod
+{
 namespace extra_4
 {
 DECLARE_SOA_COLUMN_FULL(Bin, bin, int, "bin");
 DECLARE_SOA_COLUMN_FULL(Color, color, int, "color");
 } // namespace extra_4
 
-DECLARE_SOA_TABLE(BinnedPoints, "TST", "BinnedPoints", Index<>, extra_4::Bin, indices::PointId);
-DECLARE_SOA_TABLE(ColoredPoints, "TST", "ColoredPoints", Index<>, extra_4::Color, indices::PointId);
+DECLARE_SOA_TABLE(BinnedPoints, "TST", "BinnedPoints", Index<>, extra_4::Bin, test_indices::PointId);
+DECLARE_SOA_TABLE(ColoredPoints, "TST", "ColoredPoints", Index<>, extra_4::Color, test_indices::PointId);
 
-namespace indices
+DECLARE_SOA_TABLE_NG(BinnedPointNGs, "TST", "BinnedPoints", Index<>, extra_4::Bin, test_indices::PointNGId);
+DECLARE_SOA_TABLE_NG(ColoredPointNGs, "TST", "ColoredPoints", Index<>, extra_4::Color, test_indices::PointNGId);
+
+namespace test_indices
 {
 DECLARE_SOA_SLICE_INDEX_COLUMN(BinnedPoint, binsSlice);
 DECLARE_SOA_ARRAY_INDEX_COLUMN(ColoredPoint, colorsList);
+DECLARE_SOA_SLICE_INDEX_COLUMN(BinnedPointNG, binsSliceng);
+DECLARE_SOA_ARRAY_INDEX_COLUMN(ColoredPointNG, colorsListng);
 } // namespace indices
 
-DECLARE_SOA_TABLE(IDX3s, "TST", "Index3", Index<>, indices::PointId, indices::BinnedPointIdSlice, indices::ColoredPointIds);
+DECLARE_SOA_TABLE(IDX3s, "TST", "Index3", Index<>, test_indices::PointId, test_indices::BinnedPointIdSlice, test_indices::ColoredPointIds);
+DECLARE_SOA_INDEX_TABLE_NG(IDX3NGs, PointNGs, "Index3", test_indices::PointNGId, test_indices::BinnedPointNGIdSlice, test_indices::ColoredPointNGIds);
+} // namespace o2::aod
 
 TEST_CASE("AdvancedIndexTables")
 {
@@ -221,6 +321,86 @@ TEST_CASE("AdvancedIndexTables")
     auto colors = row.colorsList();
     REQUIRE(colors.size() == colorsizes[count]);
     for (auto j = 0; j < colors.size(); ++j) {
+      REQUIRE(colors[j].color() == colorvalues[count][j]);
+    }
+    ++count;
+  }
+}
+
+TEST_CASE("AdvancedIndexTablesNG")
+{
+  TableBuilder b1;
+  auto w1 = b1.cursor<PointNGs>();
+  for (auto i = 0; i < 10; ++i) {
+    w1(0, i * 2., i * 3., i * 4.);
+  }
+  auto t1 = b1.finalize();
+  PointNGs st1{t1};
+
+  TableBuilder b2;
+  auto w2 = b2.cursor<BinnedPointNGs>();
+  std::array<int, 3> skipPoints = {2, 6, 9};
+  std::array<int, 10> sizes = {5, 3, 0, 12, 4, 1, 0, 8, 2, 0};
+  auto count = 0;
+  for (auto i = 0; i < 10; ++i) {
+    if (i == skipPoints[count]) {
+      ++count;
+      continue;
+    }
+    for (auto j = 0; j < sizes[i]; ++j) {
+      w2(0, j + 1, i);
+    }
+  }
+  auto t2 = b2.finalize();
+  BinnedPointNGs st2{t2};
+
+  TableBuilder b3;
+  auto w3 = b3.cursor<ColoredPointNGs>();
+  std::array<int, 20> pointIds1 = {19, 2, 10, 5, 7, 17, 1, 3, 9, 12, 17, 6, 4, 13, 8, 5, 16, 15, 18, 0};
+  std::array<int, 20> pointIds2 = {3, 19, 2, 6, 4, 13, 11, 5, 7, 11, 1, 9, 12, 17, 8, 14, 16, 2, 18, 0};
+  std::array<int, 20> pointIds3 = {19, 2, 9, 15, 1, 3, 9, 12, 17, 18, 0, 10, 5, 7, 11, 6, 4, 13, 9, 14};
+  for (int i = 0; i < 20; ++i) {
+    w3(0, i, pointIds1[i]);
+  }
+  for (int i = 0; i < 20; ++i) {
+    w3(0, i + 20, pointIds2[i]);
+  }
+  for (int i = 0; i < 20; ++i) {
+    w3(0, i + 40, pointIds3[i]);
+  }
+  auto tc = b3.finalize();
+  ColoredPointNGs st3{tc};
+
+  std::array<int, 10> colorsizes = {3, 3, 4, 3, 3, 4, 3, 3, 2, 5};
+  std::array<std::vector<int>, 10> colorvalues = {{{19, 39, 50},
+                                                   {6, 30, 44},
+                                                   {1, 22, 37, 41},
+                                                   {7, 20, 45},
+                                                   {12, 24, 56},
+                                                   {3, 15, 27, 52},
+                                                   {11, 23, 55},
+                                                   {4, 28, 53},
+                                                   {14, 34},
+                                                   {8, 31, 42, 46, 58}}};
+
+  using m3 = MetadataTraitNG<o2::aod::Hash<"Index3/0"_h>>::metadata;
+  auto t3 = IndexBuilderNG<Sparse>::indexBuilder<PointNGs, m3::sources.size(), m3::sources>("test4", {t1, t2, tc}, typename IDX3NGs::persistent_columns_t{});
+  REQUIRE(t3->num_rows() == st1.size());
+  IDX3NGs idxs{t3};
+  idxs.bindExternalIndices(&st1, &st2, &st3);
+  count = 0;
+  for (auto const& row : idxs) {
+    REQUIRE(row.has_pointng());
+    if (row.has_binsSliceng()) {
+      auto slice = row.binsSliceng();
+      REQUIRE(slice.size() == sizes[count]);
+      for (auto const& bin : slice) {
+        REQUIRE(bin.pointngId() == row.pointngId());
+      }
+    }
+    auto colors = row.colorsListng();
+    REQUIRE(colors.size() == (size_t) colorsizes[count]);
+    for (auto j = 0U; j < colors.size(); ++j) {
       REQUIRE(colors[j].color() == colorvalues[count][j]);
     }
     ++count;

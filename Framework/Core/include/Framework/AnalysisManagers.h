@@ -24,12 +24,8 @@
 #include "Framework/ConfigurableHelpers.h"
 #include "Framework/Condition.h"
 #include "Framework/InitContext.h"
-#include "Framework/ConfigContext.h"
 #include "Framework/RootConfigParamHelpers.h"
-#include "Framework/ExpressionHelpers.h"
-#include "Framework/CommonServices.h"
 #include "Framework/PluginManager.h"
-#include "Framework/RootMessageContext.h"
 #include "Framework/DeviceSpec.h"
 
 namespace o2::framework
@@ -552,43 +548,6 @@ struct OutputManager<BuildsNG<T>> {
 };
 
 template <typename T>
-class has_instance
-{
-  using one = char;
-  struct two {
-    char x[2];
-  };
-
-  template <typename C>
-  static one test(decltype(&C::instance));
-  template <typename C>
-  static two test(...);
-
- public:
-  enum { value = sizeof(test<T>(nullptr)) == sizeof(char) };
-};
-
-template <typename T>
-class has_end_of_stream
-{
-  using one = char;
-  struct two {
-    char x[2];
-  };
-
-  template <typename C>
-  static one test(decltype(&C::endOfStream));
-  template <typename C>
-  static two test(...);
-
- public:
-  enum { value = sizeof(test<T>(nullptr)) == sizeof(char) };
-};
-
-template <typename T>
-inline constexpr bool has_end_of_stream_v = has_end_of_stream<T>::value;
-
-template <typename T>
 struct ServiceManager {
   template <typename ANY>
   static bool add(std::vector<ServiceSpec>& /*specs*/, ANY& /*any*/)
@@ -623,7 +582,7 @@ struct ServiceManager<Service<T>> {
 
   static bool prepare(InitContext& context, Service<T>& service)
   {
-    if constexpr (has_instance<T>::value) {
+    if constexpr (requires {T::instance();}) {
       service.service = &(T::instance()); // Sigh...
       return true;
     } else {
@@ -638,7 +597,7 @@ struct ServiceManager<Service<T>> {
   {
     // FIXME: for the moment we only need endOfStream to be
     // stateless. In the future we might want to pass it EndOfStreamContext
-    if constexpr (has_end_of_stream_v<T>) {
+    if constexpr (requires {T::endOfStream();}) {
       service.service->endOfStream();
       return true;
     }

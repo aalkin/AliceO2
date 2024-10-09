@@ -3925,28 +3925,29 @@ consteval auto getIndexTargets()
   O2HASH(_Label_);                                                                                                                \
   O2HASH(_Desc_ "/" #_Version_);                                                                                                  \
   template <typename O>                                                                                                           \
-  using _Name_##ExtensionFrom = TableNG<Hash<_Label_ ""_h>, Hash<_Desc "/" #_Version_ ""_h>, O>;                                  \
-  using _Name_##Extension = _Name_##ExtensionFrom<Hash<_Origin_ ""_h>>;                                                           \
-  template <>                                                                                                                     \
-  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                                                      \
-    using metadata = _Name_##ExtensionMetadata;                                                                                   \
-  };                                                                                                                              \
+  using _Name_##ExtensionFrom = TableNG<o2::aod::Hash<_Label_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O>;               \
+  using _Name_##Extension = _Name_##ExtensionFrom<o2::aod::Hash<_Origin_ ""_h>>;                                                  \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                            \
-  struct _Name_##ExtensionMetadata : TableMetadataNG<Hash<_Desc "/" #_Version_ ""_h>, __VA_ARGS__> {                              \
+  struct _Name_##ExtensionMetadataFrom : TableMetadataNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__> {                \
     using base_table_t = _OriginalTable_;                                                                                         \
     using extension_table_t = _Name_##ExtensionFrom<O>;                                                                           \
-    using expression_pack_t = framework::pack<__VA_ARGS>;                                                                         \
+    using expression_pack_t = framework::pack<__VA_ARGS__>;                                                                       \
     static constexpr auto sources = _OriginalTable_::originals;                                                                   \
+  };                                                                                                                              \
+  using _Name_##ExtensionMetadata = _Name_##ExtensionMetadataFrom<o2::aod::Hash<_Origin_ ""_h>>;                                  \
+  template <>                                                                                                                     \
+  struct MetadataTraitNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                             \
+    using metadata = _Name_##ExtensionMetadata;                                                                                   \
   };                                                                                                                              \
   template <typename O>                                                                                                           \
   using _Name_##From = o2::soa::JoinNGFull<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, _OriginalTable_, _Name_##ExtensionFrom<O>>; \
-  using _Name_ = _Name_##From < o2::aod::Hash<_Origin_ ""_h>;
+  using _Name_ = _Name_##From<o2::aod::Hash<_Origin_ ""_h>>;
 
 #define DECLARE_SOA_EXTENDED_TABLE_NG(_Name_, _Table_, _Description_, ...) \
-  DECLARE_SOA_EXTENDED_TABLE_NG_FULL(_Name_, _Table_, "DYN", _Description_, __VA_ARGS__)
+  DECLARE_SOA_EXTENDED_TABLE_NG_FULL(_Name_, #_Name_, _Table_, "DYN", _Description_, 0, __VA_ARGS__)
 
 #define DECLARE_SOA_EXTENDED_TABLE_NG_USER(_Name_, _Table_, _Description_, ...) \
-  DECLARE_SOA_EXTENDED_TABLE_NG_FULL(_Name_, _Table_, "AOD", _Description_, __VA_ARGS__)
+  DECLARE_SOA_EXTENDED_TABLE_NG_FULL(_Name_, #_Name_, _Table_, "AOD", _Description_, 0, __VA_ARGS__)
 
 #define DECLARE_SOA_INDEX_TABLE_FULL(_Name_, _Key_, _Origin_, _Description_, _Exclusive_, ...)                                                 \
   template <o2::soa::OriginEnc ORIGIN = o2::soa::OriginEnc{_Origin_}>                                                                          \

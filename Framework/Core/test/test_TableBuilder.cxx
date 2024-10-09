@@ -11,17 +11,13 @@
 
 #include <catch_amalgamated.hpp>
 
-#include "Framework/Logger.h"
 #include "Framework/TableBuilder.h"
-#include "Framework/TableConsumer.h"
-#include "Framework/DataAllocator.h"
-#include "Framework/OutputRoute.h"
+#include "Framework/Output.h"
 #include <arrow/table.h>
 #include <arrow/ipc/writer.h>
 #include <arrow/io/memory.h>
 #include <arrow/ipc/writer.h>
 #include <arrow/ipc/reader.h>
-#include "../src/ArrowDebugHelpers.h"
 
 using namespace o2::framework;
 

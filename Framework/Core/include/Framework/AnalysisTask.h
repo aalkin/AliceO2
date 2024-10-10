@@ -178,7 +178,7 @@ struct AnalysisDataProcessorBuilder {
       auto inputSources = getInputMetadata<metadata::sources>();
       inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
     }
-    DataSpecUtils::updateInputList(inputs, InputSpec{metadata::tableLabel(), metadata::origin(), metadata::description(), metadata::version(), Lifetime::Timeframe, inputMetadata});
+    DataSpecUtils::updateInputList(inputs, InputSpec{o2::aod::Hash<R.label_hash>::str, o2::aod::Hash<R.origin_hash>::str, aod::description(o2::aod::Hash<R.desc_hash>::str), aod::version(o2::aod::Hash<R.desc_hash>::str), Lifetime::Timeframe, inputMetadata});
   }
 
   template <typename R, typename C, typename... Args>

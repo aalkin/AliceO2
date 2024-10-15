@@ -305,6 +305,14 @@ struct Hash {
     static constexpr char const* const str{_Str_}; \
   };
 
+#define O2ORIGIN(_Str_)                                   \
+  template <>                                             \
+  struct Hash<_Str_ ""_h> {                               \
+    static constexpr header::DataOrigin origin{_Str_};    \
+    static constexpr uint32_t hash = _Str_ ""_h;          \
+    static constexpr char const* const str{_Str_};        \
+  };
+
 static inline constexpr int version(const char* const str) {
     if (str[0] == '\0') {
       return -1;
@@ -323,12 +331,25 @@ static inline constexpr int version(const char* const str) {
     return res;
 }
 
-static inline constexpr std::string_view description(const char* const str) {
+static inline constexpr std::string_view description_str(const char* const str) {
   size_t len = 0;
   while (len < 15 && str[len] != '/') {
     ++len;
   }
   return std::string_view{str, len};
+}
+
+static inline constexpr header::DataDescription description(const char* const str) {
+  size_t len = 0;
+  while (len < 15 && str[len] != '/') {
+    ++len;
+  }
+  char out[16];
+  for (auto i = 0; i < 16; ++i) {
+    out[i] = 0;
+  }
+  std::memcpy(out, str, len);
+  return {out};
 }
 
 template <typename T, template <uint32_t> class H>
@@ -1595,13 +1616,32 @@ template <typename T>
 inline constexpr bool is_soa_iterator_v = soa::is_base_of_template_origin_v<RowViewCore, T> || soa::is_specialization_origin_v<T, RowViewCore>;
 
 template <typename T>
+concept soaIterator = is_soa_iterator_v<T>;
+
+template <typename T>
 inline constexpr bool is_ng_iterator_v = framework::is_base_of_template_v<TableIterator, T> || framework::is_specialization_v<T, TableIterator>;
+
+template <typename T>
+concept ngIterator = is_ng_iterator_v<T>;
 
 template <typename T, typename B>
   requires((o2::soa::is_soa_iterator_v<T> || o2::soa::is_soa_table_like_v<T>) && o2::soa::is_soa_table_like_v<B>)
 consteval bool is_binding_compatible_v()
 {
   return are_bindings_compatible_v<T>(originals_pack_t<B>{});
+}
+
+template <typename T, soa::ngTable B>
+  requires((o2::soa::is_soa_iterator_v<T> || o2::soa::is_soa_table_like_v<T>))
+consteval bool is_binding_compatible_v()
+{
+  return false;
+}
+
+template <soa::ngTable T, soa::soaTable B>
+consteval bool is_binding_compatible_v()
+{
+  return false;
 }
 
 template <typename A>
@@ -1614,8 +1654,7 @@ concept WithSources = requires() {
   o2::aod::MetadataTraitNG<T>::metadata::sources.size();
 };
 
-template <typename T, typename B>
-  requires WithOriginals<T> && WithOriginals<B>
+template <WithOriginals T, WithOriginals B>
 consteval bool is_binding_compatible_v()
 {
   return std::ranges::count_if(B::originals.begin(), B::originals.end(), [&](TableRef const& a) { return std::any_of(T::originals.begin(), T::originals.end(), [&](TableRef const& e) { return e.desc_hash == a.desc_hash; }); }) != 0;
@@ -1658,15 +1697,14 @@ static constexpr std::string getLabelFromType()
   }
 }
 
-template <typename T>
-  requires WithOriginals<T>
+template <soa::ngTable T>
+  requires soa::is_ng_table_like_v<T>
 static constexpr std::string getLabelFromTypeNG()
 {
   return std::string{o2::aod::Hash<std::decay_t<T>::originals[0].label_hash>::str};
 }
 
-template <typename T>
-  requires framework::is_base_of_template_v<TableIterator, std::decay_t<T>>
+template <soa::ngIterator T>
 static constexpr std::string getLabelFromTypeNG()
 {
   return getLabelFromTypeNG<typename std::decay_t<T>::parent_t>();
@@ -1899,6 +1937,27 @@ class FilteredNG;
 
 template <typename T>
 inline constexpr bool is_soa_filtered_v = framework::is_base_of_template_v<soa::FilteredBase, T> || framework::is_base_of_template_v<soa::FilteredBaseNG, T>;
+
+template <typename T>
+concept hasFilteredPolicy = std::same_as<typename T::policy_t, soa::FilteredIndexPolicy>;
+
+template <typename T>
+concept soaFilteredIterator = soaIterator<T> && hasFilteredPolicy<T>;
+
+template <typename T>
+concept ngFilteredIterator = ngIterator<T> && hasFilteredPolicy<T>;
+
+template <typename T>
+concept soaFilteredTable = framework::is_base_of_template_v<soa::FilteredBase, T>;
+
+template <typename T>
+concept ngFilteredTable = framework::is_base_of_template_v<soa::FilteredBaseNG, T>;
+
+template <typename T>
+concept soaFiltered = soaFilteredTable<T> || soaFilteredIterator<T>;
+
+template <typename T>
+concept ngFiltered = ngFilteredTable<T> || ngFilteredIterator<T>;
 
 /// Helper function to extract bound indices
 template <typename... Is>
@@ -2320,7 +2379,7 @@ class TableNG
   using const_iterator = iterator;
   using unfiltered_const_iterator = unfiltered_iterator;
 
-  static consteval auto hashes()
+  static constexpr auto hashes()
   {
     return []<typename... C>(framework::pack<C...>) { return std::set{{o2::framework::TypeIdHelpers::uniqueId<C>()...}}; }(columns_t{});
   }
@@ -3057,11 +3116,16 @@ std::tuple<typename Cs::type...> getRowData(arrow::Table* table, T rowIterator, 
 namespace o2::aod
 {
 DECLARE_SOA_ITERATOR_METADATA();
-O2HASH("JOIN");
+O2ORIGIN("AOD");
+O2ORIGIN("AOD1");
+O2ORIGIN("AOD2");
+O2ORIGIN("DYN");
+O2ORIGIN("IDX");
+O2ORIGIN("JOIN");
 O2HASH("JOIN/0");
-O2HASH("CONC");
+O2ORIGIN("CONC");
 O2HASH("CONC/0");
-O2HASH("TEST");
+O2ORIGIN("TEST");
 O2HASH("TEST/0");
 }
 
@@ -3866,7 +3930,7 @@ consteval auto getIndexTargets()
   O2HASH(_Desc_ "/" #_Version_);                                                                      \
   using _Name_##Metadata = TableMetadataNG<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
   template <typename O>                                                                               \
-  using _Name_##From = TableNG<Hash<_Label_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;              \
+  using _Name_##From = o2::soa::TableNG<Hash<_Label_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;     \
   using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;                                                   \
   template <>                                                                                         \
   struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                          \
@@ -5551,6 +5615,19 @@ struct SmallGroupsBase : public Filtered<T> {
     : Filtered<T>(std::move(tables), selection, offset) {}
 };
 
+template <typename T, bool APPLY>
+struct SmallGroupsBaseNG : public FilteredNG<T> {
+    static constexpr bool applyFilters = APPLY;
+    SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
+      : Filtered<T>(std::move(tables), selection, offset) {}
+
+    SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
+      : Filtered<T>(std::move(tables), std::forward<SelectionVector>(selection), offset) {}
+
+    SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
+      : Filtered<T>(std::move(tables), selection, offset) {}
+};
+
 template <typename T>
 using SmallGroups = SmallGroupsBase<T, true>;
 
@@ -5569,6 +5646,25 @@ struct is_smallgroups_t<SmallGroupsBase<T, F>> {
 
 template <typename T>
 constexpr bool is_smallgroups_v = is_smallgroups_t<T>::value;
+
+template <typename T>
+using SmallGroupsNG = SmallGroupsBaseNG<T, true>;
+
+template <typename T>
+using SmallGroupsNGUnfiltered = SmallGroupsBaseNG<T, false>;
+
+template <typename T>
+struct is_smallgroups_ng_t {
+  static constexpr bool value = false;
+};
+
+template <typename T, bool F>
+struct is_smallgroups_ng_t<SmallGroupsBaseNG<T, F>> {
+  static constexpr bool value = true;
+};
+
+template <typename T>
+constexpr bool is_smallgroups_ng_v = is_smallgroups_ng_t<T>::value;
 } // namespace o2::soa
 
 namespace o2::framework

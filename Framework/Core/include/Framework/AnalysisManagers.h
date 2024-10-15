@@ -309,12 +309,12 @@ template <typename TABLE>
 struct OutputManager<ProducesNG<TABLE>> {
   static bool appendOutput(std::vector<OutputSpec>& outputs, ProducesNG<TABLE>& /*what*/, uint32_t)
   {
-    outputs.emplace_back(OutputForTable<TABLE>::spec());
+    outputs.emplace_back(OutputForTableNG<TABLE>::spec());
     return true;
   }
   static bool prepare(ProcessingContext& context, ProducesNG<TABLE>& what)
   {
-    what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTable<TABLE>::ref())));
+    what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTableNG<TABLE>::ref())));
     return true;
   }
   static bool finalize(ProcessingContext&, ProducesNG<TABLE>& what)

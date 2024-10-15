@@ -249,12 +249,12 @@ struct OutputForTableNG {
 
   static OutputSpec const spec()
   {
-    return OutputSpec{OutputLabel{o2::aod::Hash<T::ref.label_hash>::str}, o2::aod::Hash<T::ref.origin_hash>::str, o2::aod::description(o2::aod::Hash<T::ref.desc_hash>::str), T::ref::version};
+    return OutputSpec{OutputLabel{o2::aod::Hash<T::ref.label_hash>::str}, o2::aod::Hash<T::ref.origin_hash>::origin, o2::aod::description(o2::aod::Hash<T::ref.desc_hash>::str), T::ref.version};
   }
 
   static OutputRef ref()
   {
-    return OutputRef{o2::aod::Hash<T::ref.label_hash>::str, T::ref::version};
+    return OutputRef{o2::aod::Hash<T::ref.label_hash>::str, T::ref.version};
   }
 };
 

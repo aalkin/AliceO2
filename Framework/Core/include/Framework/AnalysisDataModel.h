@@ -16,7 +16,6 @@
 #include <cmath>
 #include <bitset>
 #include <numeric>
-#include <utility> // std::move
 
 #include "Framework/DataTypes.h"
 #include "CommonConstants/MathConstants.h"

@@ -42,6 +42,20 @@ DECLARE_SOA_TABLE(XYZ, "AOD", "XYZ",
                   test::X, test::Y, test::Z);
 DECLARE_SOA_TABLE(Events, "AOD", "EVENTS",
                   test::EventProperty);
+
+DECLARE_SOA_TABLE_NG(FooNGs, "AOD", "FOO",
+                  test::Foo);
+DECLARE_SOA_TABLE_NG(BarNGs, "AOD", "BAR",
+                  test::Bar);
+DECLARE_SOA_TABLE_NG(FooBarNGs, "AOD", "FOOBAR",
+                  test::Foo, test::Bar,
+                  test::Sum<test::Foo, test::Bar>);
+DECLARE_SOA_TABLE_NG(XYZNG, "AOD", "XYZ",
+                  test::X, test::Y, test::Z);
+DECLARE_SOA_TABLE_NG(EventNGs, "AOD", "EVENTS",
+                  test::EventProperty);
+
+
 } // namespace o2::aod
 
 struct ATask {
@@ -49,7 +63,16 @@ struct ATask {
 
   void process(o2::aod::Track const&)
   {
-    foobars(0.01102005, 0.27092016); // dummy value for phi for now...
+    foobars(0.01102005, 0.27092016);
+  }
+};
+
+struct ATaskNG {
+  ProducesNG<aod::FooBarNGs> foobars;
+
+  void process(o2::aod::Track const&)
+  {
+
   }
 };
 
@@ -86,8 +109,27 @@ struct FTask {
   }
 };
 
+struct FTaskNG {
+  expressions::Filter fooFilter = aod::test::foo > 1.;
+  void process(soa::FilteredNG<o2::aod::FooBarNGs>::iterator const& foobar)
+  {
+    foobar.sum();
+  }
+};
+
 struct GTask {
   void process(o2::soa::Join<o2::aod::Foos, o2::aod::Bars, o2::aod::XYZ> const& foobars)
+  {
+    for (auto foobar : foobars) {
+      foobar.x();
+      foobar.foo();
+      foobar.bar();
+    }
+  }
+};
+
+struct GTaskNG {
+  void process(o2::soa::JoinNG<o2::aod::FooNGs, o2::aod::BarNGs, o2::aod::XYZNG> const& foobars)
   {
     for (auto foobar : foobars) {
       foobar.x();
@@ -106,9 +148,30 @@ struct HTask {
   }
 };
 
+struct HTaskNG {
+  void process(o2::soa::JoinNG<o2::aod::FooNGs, o2::aod::BarNGs, o2::aod::XYZNG>::iterator const& foobar)
+  {
+    foobar.x();
+    foobar.foo();
+    foobar.bar();
+  }
+};
+
 struct ITask {
   expressions::Filter flt = aod::test::bar > 0.;
   void process(o2::aod::Collision const&, o2::soa::Filtered<o2::soa::Join<o2::aod::Foos, o2::aod::Bars, o2::aod::XYZ>> const& foobars)
+  {
+    for (auto foobar : foobars) {
+      foobar.x();
+      foobar.foo();
+      foobar.bar();
+    }
+  }
+};
+
+struct ITaskNG {
+  expressions::Filter flt = aod::test::bar > 0.;
+  void process(o2::aod::Collision const&, o2::soa::FilteredNG<o2::soa::JoinNG<o2::aod::FooNGs, o2::aod::BarNGs, o2::aod::XYZNG>> const& foobars)
   {
     for (auto foobar : foobars) {
       foobar.x();
@@ -166,6 +229,14 @@ TEST_CASE("AdaptorCompilation")
   REQUIRE(task1.inputs[0].binding == std::string("TracksExtension"));
   REQUIRE(task1.outputs[0].binding.value == std::string("FooBars"));
 
+  REQUIRE(brace_constructible_size<ATaskNG>() == 1);
+  auto task1ng = adaptAnalysisTask<ATaskNG>(*cfgc, TaskName{"test1"});
+  REQUIRE(task1ng.inputs.size() == 2);
+  REQUIRE(task1ng.outputs.size() == 1);
+  REQUIRE(task1ng.inputs[1].binding == std::string("Tracks"));
+  REQUIRE(task1ng.inputs[0].binding == std::string("TracksExtension"));
+  REQUIRE(task1ng.outputs[0].binding.value == std::string("FooBarNGs"));
+
   auto task2 = adaptAnalysisTask<BTask>(*cfgc, TaskName{"test2"});
   REQUIRE(task2.inputs.size() == 10);
   REQUIRE(task2.inputs[1].binding == "TracksExtension");
@@ -198,14 +269,30 @@ TEST_CASE("AdaptorCompilation")
   REQUIRE(task6.inputs.size() == 1);
   REQUIRE(task6.inputs[0].binding == "FooBars");
 
+  auto task6ng = adaptAnalysisTask<FTaskNG>(*cfgc, TaskName{"test6"});
+  REQUIRE(task6ng.inputs.size() == 1);
+  REQUIRE(task6ng.inputs[0].binding == "FooBarNGs");
+
   auto task7 = adaptAnalysisTask<GTask>(*cfgc, TaskName{"test7"});
   REQUIRE(task7.inputs.size() == 3);
+
+  auto task7ng = adaptAnalysisTask<GTaskNG>(*cfgc, TaskName{"test7"});
+  REQUIRE(task7ng.inputs.size() == 3);
+  REQUIRE(task7ng.inputs[0].binding == "FooNGs");
+  REQUIRE(task7ng.inputs[1].binding == "BarNGs");
+  REQUIRE(task7ng.inputs[2].binding == "XYZNG");
 
   auto task8 = adaptAnalysisTask<HTask>(*cfgc, TaskName{"test8"});
   REQUIRE(task8.inputs.size() == 3);
 
+  auto task8ng = adaptAnalysisTask<HTaskNG>(*cfgc, TaskName{"test8"});
+  REQUIRE(task8ng.inputs.size() == 3);
+
   auto task9 = adaptAnalysisTask<ITask>(*cfgc, TaskName{"test9"});
   REQUIRE(task9.inputs.size() == 4);
+
+  auto task9ng = adaptAnalysisTask<ITaskNG>(*cfgc, TaskName{"test9"});
+  REQUIRE(task9ng.inputs.size() == 4);
 
   auto task10 = adaptAnalysisTask<JTask>(*cfgc, TaskName{"test10"});
   REQUIRE(task10.inputs.size() == 1);

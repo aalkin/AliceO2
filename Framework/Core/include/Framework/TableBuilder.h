@@ -845,6 +845,15 @@ auto makeEmptyTable(const char* name)
   return b.finalize();
 }
 
+template <soa::TableRef R>
+auto makeEmptyTable()
+{
+  TableBuilder b;
+  [[maybe_unused]] auto writer = b.cursor(typename aod::MetadataTraitNG<aod::Hash<R.desc_hash>>::metadata::columns{});
+  b.setLabel(aod::Hash<R.label_hash>::str);
+  return b.finalize();
+}
+
 template <typename... Cs>
 auto makeEmptyTable(const char* name, framework::pack<Cs...> p)
 {

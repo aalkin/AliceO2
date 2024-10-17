@@ -605,7 +605,7 @@ struct IndexBuilderNG {
       }
     }
 
-    return [&label,&columnBuilders,&self]<size_t... Is>(std::index_sequence<Is...>){
+    return [&label, &columnBuilders, &self]<size_t... Is>(std::index_sequence<Is...>){
       return makeArrowTable(label,
                             {self.template result<C1>(), [&columnBuilders](){
                                using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;

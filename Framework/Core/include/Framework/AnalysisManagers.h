@@ -449,13 +449,13 @@ struct OutputManager<SpawnsNG<T>> {
   static bool prepare(ProcessingContext& pc, SpawnsNG<T>& what)
   {
     using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
-    auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals<metadata::sources>(pc));
+    auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals<metadata::sources.size(), metadata::sources>(pc));
     if (originalTable->schema()->fields().empty() == true) {
       using base_table_t = typename SpawnsNG<T>::base_table_t::table_t;
       originalTable = makeEmptyTable<base_table_t>(o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str);
     }
 
-    what.extension = std::make_shared<typename SpawnsNG<T>::extension_t>(o2::framework::spawner<o2::aod::Hash<metadata::extension_t::ref.desc_hash>>(originalTable, o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str));
+    what.extension = std::make_shared<typename SpawnsNG<T>::extension_t>(o2::framework::spawner<o2::aod::Hash<metadata::extension_table_t::ref.desc_hash>>(originalTable, o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str));
     what.table = std::make_shared<typename T::table_t>(soa::ArrowHelpers::joinTables({what.extension->asArrowTable(), originalTable}));
     return true;
   }
@@ -523,25 +523,25 @@ struct OutputManager<Builds<T>> {
 
 template <typename T>
 struct OutputManager<BuildsNG<T>> {
-  static bool appendOutput(std::vector<OutputSpec>& outputs, Builds<T>& what, uint32_t)
+  static bool appendOutput(std::vector<OutputSpec>& outputs, BuildsNG<T>& what, uint32_t)
   {
     outputs.emplace_back(what.spec());
     return true;
   }
 
-  static bool prepare(ProcessingContext& pc, Builds<T>& what)
+  static bool prepare(ProcessingContext& pc, BuildsNG<T>& what)
   {
-    return what.template build<typename T::indexing_t>(what.pack(), what.originals_pack(),
-                                                       extractOriginalsVector(what.originals_pack(), pc));
+    using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
+    return what.template build<typename T::indexing_t>(what.pack(), extractOriginals<metadata::sources.size(), metadata::sources>(pc));
   }
 
-  static bool finalize(ProcessingContext& pc, Builds<T>& what)
+  static bool finalize(ProcessingContext& pc, BuildsNG<T>& what)
   {
     pc.outputs().adopt(what.output(), what.asArrowTable());
     return true;
   }
 
-  static bool postRun(EndOfStreamContext&, Builds<T>&)
+  static bool postRun(EndOfStreamContext&, BuildsNG<T>&)
   {
     return true;
   }
@@ -745,7 +745,7 @@ struct SpawnManager<Spawns<TABLE>> {
 
 template <soa::ngTable TABLE>
 struct SpawnManager<SpawnsNG<TABLE>> {
-  static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
+  static bool requestInputs(std::vector<InputSpec>& inputs, SpawnsNG<TABLE>& spawns)
   {
     auto base_specs = spawns.base_specs();
     for (auto base_spec : base_specs) {
@@ -777,7 +777,7 @@ struct IndexManager<Builds<IDX>> {
 
 template <typename IDX>
 struct IndexManager<BuildsNG<IDX>> {
-  static bool requestInputs(std::vector<InputSpec>& inputs, Builds<IDX>& builds)
+  static bool requestInputs(std::vector<InputSpec>& inputs, BuildsNG<IDX>& builds)
   {
     auto base_specs = builds.base_specs();
     for (auto base_spec : base_specs) {

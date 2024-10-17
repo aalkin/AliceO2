@@ -30,6 +30,7 @@ DECLARE_SOA_COLUMN(Foo, foo, float);
 DECLARE_SOA_COLUMN(Bar, bar, float);
 DECLARE_SOA_COLUMN(EventProperty, eventProperty, float);
 DECLARE_SOA_DYNAMIC_COLUMN(Sum, sum, [](float x, float y) { return x + y; });
+DECLARE_SOA_EXPRESSION_COLUMN(Sqfoo, sqfoo, float, nsqrt(test::foo));
 } // namespace test
 DECLARE_SOA_TABLE(Foos, "AOD", "FOO",
                   test::Foo);
@@ -45,6 +46,7 @@ DECLARE_SOA_TABLE(Events, "AOD", "EVENTS",
 
 DECLARE_SOA_TABLE_NG(FooNGs, "AOD", "FOO",
                   test::Foo);
+DECLARE_SOA_EXTENDED_TABLE_NG(FooNGss, FooNGs, "FOOS", test::Sqfoo);
 DECLARE_SOA_TABLE_NG(BarNGs, "AOD", "BAR",
                   test::Bar);
 DECLARE_SOA_TABLE_NG(FooBarNGs, "AOD", "FOOBAR",
@@ -55,6 +57,23 @@ DECLARE_SOA_TABLE_NG(XYZNG, "AOD", "XYZ",
 DECLARE_SOA_TABLE_NG(EventNGs, "AOD", "EVENTS",
                   test::EventProperty);
 
+DECLARE_SOA_TABLE_NG(Roots, "AOD", "ROOTS", test::Foo);
+
+namespace idx {
+DECLARE_SOA_INDEX_COLUMN(Root, root);
+}
+
+DECLARE_SOA_TABLE_NG(B1s, "AOD", "B1", idx::RootId, test::X);
+DECLARE_SOA_TABLE_NG(B2s, "AOD", "B2", idx::RootId, test::Y);
+DECLARE_SOA_TABLE_NG(B3s, "AOD", "B3", idx::RootId, test::Z);
+
+namespace idx {
+DECLARE_SOA_INDEX_COLUMN(B1, b1);
+DECLARE_SOA_INDEX_COLUMN(B2, b2);
+DECLARE_SOA_INDEX_COLUMN(B3, b3);
+}
+
+DECLARE_SOA_INDEX_TABLE_NG(Bs, Roots, "BS", idx::RootId, idx::B1Id, idx::B2Id, idx::B3Id);
 
 } // namespace o2::aod
 
@@ -74,6 +93,13 @@ struct ATaskNG {
   {
 
   }
+};
+
+struct ATaskNGconsumer {
+  SpawnsNG<aod::FooNGss> foos;
+  BuildsNG<aod::Bs> bs;
+
+  void init(InitContext&) {}
 };
 
 struct BTask {
@@ -236,6 +262,14 @@ TEST_CASE("AdaptorCompilation")
   REQUIRE(task1ng.inputs[1].binding == std::string("Tracks"));
   REQUIRE(task1ng.inputs[0].binding == std::string("TracksExtension"));
   REQUIRE(task1ng.outputs[0].binding.value == std::string("FooBarNGs"));
+
+  auto task1ngc = adaptAnalysisTask<ATaskNGconsumer>(*cfgc);
+  REQUIRE(task1ngc.inputs.size() == 5);
+  REQUIRE(task1ngc.inputs[0].binding == "FooNGs");
+  REQUIRE(task1ngc.inputs[1].binding == "Roots");
+  REQUIRE(task1ngc.inputs[2].binding == "B1s");
+  REQUIRE(task1ngc.inputs[3].binding == "B2s");
+  REQUIRE(task1ngc.inputs[4].binding == "B3s");
 
   auto task2 = adaptAnalysisTask<BTask>(*cfgc, TaskName{"test2"});
   REQUIRE(task2.inputs.size() == 10);

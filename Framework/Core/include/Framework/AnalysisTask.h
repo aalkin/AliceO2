@@ -58,6 +58,9 @@ static constexpr bool is_enumeration_v = false;
 template <int64_t BEGIN, int64_t END, int64_t STEP>
 static constexpr bool is_enumeration_v<Enumeration<BEGIN, END, STEP>> = true;
 
+template <typename T>
+concept isEnumeration = is_enumeration_v<T>;
+
 // Helper struct which builds a DataProcessorSpec from
 // the contents of an AnalysisTask...
 namespace {
@@ -186,7 +189,7 @@ struct AnalysisDataProcessorBuilder {
   {
     // update grouping cache
     using A0 = std::decay_t<framework::pack_head_t<framework::pack<Args...>>>;
-    if constexpr (soa::is_soa_iterator_v<A0> || soa::is_ng_iterator_v<A0>) {
+    if constexpr (soa::soaIterator<A0> || soa::ngIterator<A0>) {
       addGroupingCandidates<Args...>(bk, bku);
     }
 
@@ -196,7 +199,7 @@ struct AnalysisDataProcessorBuilder {
     ([&name, &value, &eInfos, &inputs, &hash, &ai]() mutable {
       ++ai;
       using T = std::decay_t<Args>;
-      if constexpr (is_enumeration_v<T>) {
+      if constexpr (isEnumeration<T>) {
         std::vector<ConfigParamSpec> inputMetadata;
         // FIXME: for the moment we do not support begin, end and step.
         DataSpecUtils::updateInputList(inputs, InputSpec{"enumeration", "DPL", "ENUM", 0, Lifetime::Enumeration, inputMetadata});
@@ -210,18 +213,13 @@ struct AnalysisDataProcessorBuilder {
           eInfos.emplace_back(ai, hash, T::parent_t::hashes(), std::make_shared<arrow::Schema>(fields));
         }
         // add inputs from the originals
+        auto adder = [&name, &value, &inputs]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) mutable {
+          (addOriginalRef<refs[Is]>(name, value, inputs), ...);
+        };
         if constexpr (soa::ngTable<T> || soa::ngFilteredTable<T>) {
-          [&name, &value, &inputs]<size_t N, std::array<soa::TableRef, N> refs>() mutable {
-            [&name, &value, &inputs]<size_t... Is>(std::index_sequence<Is...>){
-              (addOriginalRef<refs[Is]>(name, value, inputs), ...);
-            }(std::make_index_sequence<N>());
-          }.template operator()<T::originals.size(), T::originals>();
+          adder.template operator()<T::originals.size(), T::originals>(std::make_index_sequence<T::originals.size()>());
         } else if constexpr(soa::ngIterator<T> || soa::ngFilteredIterator<T>) {
-          [&name, &value, &inputs]<size_t N, std::array<soa::TableRef, N> refs>() mutable {
-            [&name, &value, &inputs]<size_t... Is>(std::index_sequence<Is...>){
-              (addOriginalRef<refs[Is]>(name, value, inputs), ...);
-            }(std::make_index_sequence<N>());
-          }.template operator()<T::parent_t::originals.size(), T::parent_t::originals>();
+          adder.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>());
         } else {
           [&name, &value, &inputs]<typename... Os>(framework::pack<Os...>) mutable {
             (addOriginal<Os>(name, value, inputs), ...);
@@ -304,10 +302,11 @@ struct AnalysisDataProcessorBuilder {
   static auto extractFilteredFromRecord(InputRecord& record, ExpressionInfo& info)
   {
     std::shared_ptr<arrow::Table> table = nullptr;
+    auto joiner = [&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>){ return std::vector{extractTableFromRecord<refs[Is]>(record)...}; };
     if constexpr (soa::is_ng_iterator_v<T>) {
-      table = o2::soa::ArrowHelpers::joinTables([&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>){ return std::vector{extractTableFromRecord<refs[Is]>(record)...}; }.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>()));
+      table = o2::soa::ArrowHelpers::joinTables(joiner.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>()));
     } else {
-      table = o2::soa::ArrowHelpers::joinTables([&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>){ return std::vector{extractTableFromRecord<refs[Is]>(record)...}; }.template operator()<T::originals.size(), T::originals>(std::make_index_sequence<T::originals.size()>()));
+      table = o2::soa::ArrowHelpers::joinTables(joiner.template operator()<T::originals.size(), T::originals>(std::make_index_sequence<T::originals.size()>()));
     }
     expressions::updateFilterInfo(info, table);
     if constexpr (!o2::soa::is_smallgroups_ng_v<std::decay_t<T>>) {

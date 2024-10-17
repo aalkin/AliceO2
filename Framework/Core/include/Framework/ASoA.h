@@ -100,6 +100,27 @@ consteval auto merge()
   return out;
 }
 
+template <size_t N1, size_t N2, std::array<TableRef, N1> ar1, std::array<TableRef, N2> ar2, typename L>
+consteval auto merge_if(L l)
+{
+  constexpr const int to_remove = std::ranges::count_if(ar1.begin(), ar1.end(), [&](TableRef const& a){ return !l(a); });
+  constexpr const int duplicates = std::ranges::count_if(ar2.begin(), ar2.end(), [&](TableRef const& a) { return std::any_of(ar1.begin(), ar1.end(), [&](TableRef const& e) { return e == a; }) || !l(a); });
+  std::array<TableRef, N1 + N2 - duplicates - to_remove> out;
+
+  auto pos = std::copy_if(ar1.begin(), ar1.end(), out.begin(), [&](TableRef const& a){ return l(a); });
+  std::copy_if(ar2.begin(), ar2.end(), pos, [&](TableRef const& a) { return std::none_of(ar1.begin(), ar1.end(), [&](TableRef const& e) { return e == a; }) && l(a); });
+  return out;
+}
+
+template <size_t N, std::array<TableRef, N> ar, typename L>
+consteval auto remove_if(L l)
+{
+    constexpr const int to_remove = std::ranges::count_if(ar.begin(), ar.end(), [&l](TableRef const& e){ return l(e);});
+    std::array<TableRef, N - to_remove> out;
+    std::copy_if(ar.begin(), ar.end(), out.begin(), [&l](TableRef const& e){ return !l(e); });
+    return out;
+}
+
 template <size_t N1, size_t N2, std::array<TableRef, N1> ar1, std::array<TableRef, N2> ar2>
 consteval auto intersect()
 {
@@ -297,6 +318,18 @@ struct Hash {
   static constexpr uint32_t hash = H;
   static constexpr char const* const str{""};
 };
+
+template <size_t N, std::array<soa::TableRef, N> ar, typename Key>
+consteval auto filterForKey()
+{
+  constexpr std::array<bool, N> test = []<size_t... Is>(std::index_sequence<Is...>) {
+    return std::array<bool, N>{(Key::template hasOriginal<ar[Is]>() || (o2::aod::MetadataTraitNG<o2::aod::Hash<ar[Is].desc_hash>>::metadata::template getIndexPosToKey<Key>() >= 0))...};
+  }(std::make_index_sequence<N>());
+  constexpr int correct = std::ranges::count(test.begin(), test.end(), true);
+  std::array<soa::TableRef, correct> out;
+  std::ranges::copy_if(ar.begin(), ar.end(), out.begin(), [&test](soa::TableRef const& r){ return test[std::distance(ar.begin(), std::find(ar.begin(), ar.end(), r))]; });
+  return out;
+}
 
 #define O2HASH(_Str_)                              \
   template <>                                      \
@@ -2176,6 +2209,11 @@ class TableNG
     return std::find_if(originals.begin(), originals.end(), [](TableRef const& o){ return o.desc_hash == r.desc_hash;}) != originals.end();
   }
 
+  static consteval bool hasOriginal_alt(TableRef const& r)
+  {
+    return std::ranges::find_if(originals.begin(), originals.end(), [&](TableRef const& o){ return o.desc_hash == r.desc_hash;}) != originals.end();
+  }
+
   using columns_t = decltype(
     []() {
       if constexpr (sizeof...(Ts) == 0) {
@@ -3989,7 +4027,7 @@ consteval auto getIndexTargets()
   O2HASH(_Label_);                                                                                                                \
   O2HASH(_Desc_ "/" #_Version_);                                                                                                  \
   template <typename O>                                                                                                           \
-  using _Name_##ExtensionFrom = TableNG<o2::aod::Hash<_Label_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O>;               \
+  using _Name_##ExtensionFrom = soa::TableNG<o2::aod::Hash<_Label_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O>;          \
   using _Name_##Extension = _Name_##ExtensionFrom<o2::aod::Hash<_Origin_ ""_h>>;                                                  \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                            \
   struct _Name_##ExtensionMetadataFrom : TableMetadataNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__> {                \
@@ -4059,18 +4097,20 @@ consteval auto getIndexTargets()
   O2HASH(#_Name_);                                                                                                                           \
   O2HASH(_Desc_ "/" #_Version_);                                                                                                             \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                                       \
-  using _Name_##From = o2::soa::IndexTableNG<o2::aod::Hash<#_Name_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O, _Key_, __VA_ARGS__>; \
-  using _Name_ = _Name_##From<o2::aod::Hash<_Origin_ ""_h>>;                                                                                 \
-                                                                                                                                             \
-  template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                                       \
-  struct _Name_##MetadataFrom : o2::aod::TableMetadataNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, Index<>, __VA_ARGS__> {                  \
+  struct _Name_##MetadataFrom : o2::aod::TableMetadataNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, soa::Index<>, __VA_ARGS__> {             \
     static constexpr bool exclusive = _Exclusive_;                                                                                           \
-    using table_t = _Name_##From<O>;                                                                                                         \
     using Key = _Key_;                                                                                                                       \
     using index_pack_t = framework::pack<__VA_ARGS__>;                                                                                       \
-    static constexpr auto sources = table_t::originals;                                                                                      \
+    static constexpr const auto sources = []<typename... Cs>(framework::pack<Cs...>){                                                        \
+        constexpr auto a = o2::soa::mergeOriginals<typename Cs::binding_t...>();                                                             \
+        return o2::aod::filterForKey<a.size(), a, Key>();                                                                                    \
+    }(framework::pack<__VA_ARGS__>{});                                                                                                       \
   };                                                                                                                                         \
   using _Name_##Metadata = _Name_##MetadataFrom<o2::aod::Hash<_Origin_ ""_h>>;                                                               \
+                                                                                                                                             \
+  template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                                       \
+  using _Name_##From = o2::soa::IndexTableNG<o2::aod::Hash<#_Name_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O, _Key_, __VA_ARGS__>; \
+  using _Name_ = _Name_##From<o2::aod::Hash<_Origin_ ""_h>>;                                                                                 \
                                                                                                                                              \
   template <>                                                                                                                                \
   struct MetadataTraitNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                                        \
@@ -5557,7 +5597,6 @@ struct IndexTableNG : TableNG<L, D, O> {
   using indexing_t = Key;
   using first_t = typename H::binding_t;
   using rest_t = framework::pack<typename Ts::binding_t...>;
-  static constexpr const auto originals = o2::soa::mergeOriginals<typename H::binding_t, typename Ts::binding_t...>();
 
   IndexTableNG(std::shared_ptr<arrow::Table> table, uint64_t offset = 0)
     : base_t{table, offset}

@@ -33,7 +33,7 @@ constexpr auto tableRef2InputSpec()
 {
   return framework::InputSpec{
     o2::aod::Hash<R.label_hash>::str,
-    o2::aod::Hash<R.origin_hash>::str,
+    o2::aod::Hash<R.origin_hash>::origin,
     o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
     R.version
   };
@@ -44,7 +44,7 @@ constexpr auto tableRef2OutputSpec()
 {
   return framework::OutputSpec{
     framework::OutputLabel{o2::aod::Hash<R.label_hash>::str},
-    o2::aod::Hash<R.origin_hash>::str,
+    o2::aod::Hash<R.origin_hash>::origin,
     o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
     R.version
   };
@@ -54,7 +54,7 @@ template <TableRef R>
 constexpr auto tableRef2Output()
 {
   return framework::Output{
-    o2::aod::Hash<R.origin_hash>::str,
+    o2::aod::Hash<R.origin_hash>::origin,
     o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
     R.version
   };
@@ -342,12 +342,12 @@ template <o2::aod::NGMetadata M, soa::TableRef Ref>
 struct TableTransformNG
 {
   using metadata = M;
-  using M::sources;
+  constexpr static auto sources = M::sources;
 
   template <soa::TableRef R>
   static constexpr auto base_spec()
   {
-    return tableRef2InputSpec<R>();
+    return soa::tableRef2InputSpec<R>();
   }
 
   static auto base_specs()
@@ -359,17 +359,17 @@ struct TableTransformNG
 
   constexpr auto spec() const
   {
-    return tableRef2OutputSpec<Ref>();
+    return soa::tableRef2OutputSpec<Ref>();
   }
 
   constexpr auto output() const
   {
-    return tableRef2Output<Ref>();
+    return soa::tableRef2Output<Ref>();
   }
 
   constexpr auto ref() const
   {
-    return tableRef2OutputRef<Ref>();
+    return soa::tableRef2OutputRef<Ref>();
   }
 };
 
@@ -404,9 +404,9 @@ struct Spawns : TableTransform<typename aod::MetadataTrait<framework::pack_head_
 };
 
 template <typename T>
-struct SpawnsNG : TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>, T::ref>
+struct SpawnsNG : TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref>
 {
-  using metadata = TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>, T::ref>::metadata;
+  using metadata = TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
   using extension_t = typename metadata::extension_table_t;
   using base_table_t = typename metadata::base_table_t;
   using expression_pack_t = typename metadata::expression_pack_t;
@@ -657,9 +657,9 @@ struct Builds : TableTransform<typename aod::MetadataTrait<T>::metadata> {
 };
 
 template <typename T>
-struct BuildsNG : TableTransformNG<aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>, T::ref> {
-  using metadata = TableTransformNG<aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>, T::ref>::metadata;
-  using IP = std::conditional_t<metadata::exclusive, IndexBuilder<Exclusive>, IndexBuilder<Sparse>>;
+struct BuildsNG : TableTransformNG<typename aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
+  using metadata = TableTransformNG<typename aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
+  using IP = std::conditional_t<metadata::exclusive, IndexBuilderNG<Exclusive>, IndexBuilderNG<Sparse>>;
   using Key = metadata::Key;
   using H = typename T::first_t;
   using Ts = typename T::rest_t;
@@ -685,10 +685,10 @@ struct BuildsNG : TableTransformNG<aod::MetadataTraitNG<aod::Hash<T::ref.desc_ha
     return index_pack_t{};
   }
 
-  template <typename Key, typename... Cs, typename... Ts>
-  auto build(framework::pack<Cs...>, framework::pack<Ts...>, std::vector<std::shared_ptr<arrow::Table>>&& tables)
+  template <typename Key, typename... Cs>
+  auto build(framework::pack<Cs...>, std::vector<std::shared_ptr<arrow::Table>>&& tables)
   {
-    this->table = std::make_shared<T>(IP::template indexBuilder<Key>(o2::aod::Hash<T::ref.label_hash>::str, std::forward<std::vector<std::shared_ptr<arrow::Table>>>(tables), framework::pack<Cs...>{}, framework::pack<Ts...>{}));
+    this->table = std::make_shared<T>(IP::template indexBuilder<Key, metadata::sources.size(), metadata::sources>(o2::aod::Hash<T::ref.label_hash>::str, std::forward<std::vector<std::shared_ptr<arrow::Table>>>(tables), framework::pack<Cs...>{}));
     return (this->table != nullptr);
   }
 };

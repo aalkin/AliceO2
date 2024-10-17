@@ -21,6 +21,7 @@ using namespace o2::framework;
 
 namespace o2::aod
 {
+O2HASH("TestA/0");
 namespace test
 {
 DECLARE_SOA_COLUMN(X, x, float);
@@ -359,6 +360,72 @@ TEST_CASE("TestPartitionIteration")
   using PartitionTest = Partition<TestA>;
   using PartitionFilteredTest = Partition<o2::soa::Filtered<TestA>>;
   using PartitionNestedFilteredTest = Partition<o2::soa::Filtered<o2::soa::Filtered<TestA>>>;
+  using namespace o2::framework;
+
+  TestA testA{tableA};
+
+  PartitionTest p1 = aod::test::x < 4.0f;
+  p1.bindTable(testA);
+  REQUIRE(4 == p1.size());
+  REQUIRE(p1.begin() != p1.end());
+  auto i = 0;
+  for (auto& p : p1) {
+    REQUIRE(i == p.x());
+    REQUIRE(i + 8 == p.y());
+    REQUIRE(i == p.index());
+    i++;
+  }
+  REQUIRE(i == 4);
+
+  expressions::Filter f1 = aod::test::x < 4.0f;
+  auto selection = expressions::createSelection(testA.asArrowTable(), f1);
+  FilteredTest filtered{{testA.asArrowTable()}, o2::soa::selectionToVector(selection)};
+  PartitionFilteredTest p2 = aod::test::y > 9.0f;
+  p2.bindTable(filtered);
+
+  REQUIRE(2 == p2.size());
+  i = 0;
+  for (auto& p : p2) {
+    REQUIRE(i + 2 == p.x());
+    REQUIRE(i + 10 == p.y());
+    REQUIRE(i + 2 == p.index());
+    i++;
+  }
+  REQUIRE(i == 2);
+
+  PartitionNestedFilteredTest p3 = aod::test::x < 3.0f;
+  p3.bindTable(*(p2.mFiltered));
+  REQUIRE(1 == p3.size());
+  i = 0;
+  for (auto& p : p3) {
+    REQUIRE(i + 2 == p.x());
+    REQUIRE(i + 10 == p.y());
+    REQUIRE(i + 2 == p.index());
+    i++;
+  }
+  REQUIRE(i == 1);
+}
+
+TEST_CASE("TestPartitionIterationNG")
+{
+  TableBuilder builderA;
+  auto rowWriterA = builderA.persist<float, float>({"fX", "fY"});
+  rowWriterA(0, 0.0f, 8.0f);
+  rowWriterA(0, 1.0f, 9.0f);
+  rowWriterA(0, 2.0f, 10.0f);
+  rowWriterA(0, 3.0f, 11.0f);
+  rowWriterA(0, 4.0f, 12.0f);
+  rowWriterA(0, 5.0f, 13.0f);
+  rowWriterA(0, 6.0f, 14.0f);
+  rowWriterA(0, 7.0f, 15.0f);
+  auto tableA = builderA.finalize();
+  REQUIRE(tableA->num_rows() == 8);
+
+  using TestA = soa::InPlaceTableNG<"TestA/0"_h, o2::soa::Index<>, aod::test::X, aod::test::Y>;
+  using FilteredTest = o2::soa::FilteredNG<TestA>;
+  using PartitionTest = PartitionNG<TestA>;
+  using PartitionFilteredTest = PartitionNG<o2::soa::FilteredNG<TestA>>;
+  using PartitionNestedFilteredTest = PartitionNG<o2::soa::FilteredNG<o2::soa::FilteredNG<TestA>>>;
   using namespace o2::framework;
 
   TestA testA{tableA};

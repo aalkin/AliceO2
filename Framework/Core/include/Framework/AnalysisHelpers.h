@@ -805,14 +805,28 @@ struct Service {
   }
 };
 
-template <typename T>
+template <soa::soaFilteredTable T>
 auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
 {
-  if constexpr (soa::is_soa_filtered_v<std::decay_t<T>>) {
-    return std::make_unique<o2::soa::Filtered<T>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
-  } else {
-    return std::make_unique<o2::soa::Filtered<T>>(std::vector{table.asArrowTable()}, std::forward<soa::SelectionVector>(selection));
-  }
+  return std::make_unique<o2::soa::Filtered<T>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
+}
+
+template <soa::soaTable T> requires (!soa::soaFilteredTable<T>)
+auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
+{
+  return std::make_unique<o2::soa::Filtered<T>>(std::vector{table.asArrowTable()}, std::forward<soa::SelectionVector>(selection));
+}
+
+template <soa::ngFilteredTable T>
+auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
+{
+  return std::make_unique<o2::soa::FilteredNG<T>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
+}
+
+template <soa::ngTable T> requires (!soa::ngFilteredTable<T>)
+auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
+{
+  return std::make_unique<o2::soa::FilteredNG<T>>(std::vector{table.asArrowTable()}, std::forward<soa::SelectionVector>(selection));
 }
 
 void initializePartitionCaches(std::set<uint32_t> const& hashes, std::shared_ptr<arrow::Schema> const& schema, expressions::Filter const& filter, gandiva::NodePtr& tree, gandiva::FilterPtr& gfilter);

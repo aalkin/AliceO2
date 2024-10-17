@@ -67,7 +67,7 @@ DECLARE_SOA_INDEX_COLUMN(Flag, flag);
 DECLARE_SOA_INDEX_COLUMN(FlagNG, flagng);
 DECLARE_SOA_INDEX_COLUMN(Category, category);
 DECLARE_SOA_INDEX_COLUMN(CategoryNG, categoryng);
-} // namespace indices
+} // namespace test_indices
 
 DECLARE_SOA_TABLE(IDXs, "TST", "Index", Index<>, test_indices::PointId, test_indices::DistanceId, test_indices::FlagId, test_indices::CategoryId);
 DECLARE_SOA_TABLE(IDX2s, "TST", "Index2", Index<>, test_indices::DistanceId, test_indices::PointId, test_indices::FlagId, test_indices::CategoryId);
@@ -242,7 +242,7 @@ DECLARE_SOA_SLICE_INDEX_COLUMN(BinnedPoint, binsSlice);
 DECLARE_SOA_ARRAY_INDEX_COLUMN(ColoredPoint, colorsList);
 DECLARE_SOA_SLICE_INDEX_COLUMN(BinnedPointNG, binsSliceng);
 DECLARE_SOA_ARRAY_INDEX_COLUMN(ColoredPointNG, colorsListng);
-} // namespace indices
+} // namespace test_indices
 
 DECLARE_SOA_TABLE(IDX3s, "TST", "Index3", Index<>, test_indices::PointId, test_indices::BinnedPointIdSlice, test_indices::ColoredPointIds);
 DECLARE_SOA_INDEX_TABLE_NG(IDX3NGs, PointNGs, "Index3", test_indices::PointNGId, test_indices::BinnedPointNGIdSlice, test_indices::ColoredPointNGIds);
@@ -399,7 +399,7 @@ TEST_CASE("AdvancedIndexTablesNG")
       }
     }
     auto colors = row.colorsListng();
-    REQUIRE(colors.size() == (size_t) colorsizes[count]);
+    REQUIRE(colors.size() == (size_t)colorsizes[count]);
     for (auto j = 0U; j < colors.size(); ++j) {
       REQUIRE(colors[j].color() == colorvalues[count][j]);
     }

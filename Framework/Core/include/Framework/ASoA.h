@@ -39,7 +39,8 @@
 
 #define DECLARE_SOA_ITERATOR_METADATA()                                       \
   template <typename IT>                                                      \
-  requires(o2::soa::is_soa_iterator_v<IT>) struct MetadataTrait<IT> {         \
+    requires(o2::soa::is_soa_iterator_v<IT>)                                  \
+  struct MetadataTrait<IT> {                                                  \
     using metadata = typename MetadataTrait<typename IT::parent_t>::metadata; \
   };
 
@@ -103,11 +104,11 @@ consteval auto merge()
 template <size_t N1, size_t N2, std::array<TableRef, N1> ar1, std::array<TableRef, N2> ar2, typename L>
 consteval auto merge_if(L l)
 {
-  constexpr const int to_remove = std::ranges::count_if(ar1.begin(), ar1.end(), [&](TableRef const& a){ return !l(a); });
+  constexpr const int to_remove = std::ranges::count_if(ar1.begin(), ar1.end(), [&](TableRef const& a) { return !l(a); });
   constexpr const int duplicates = std::ranges::count_if(ar2.begin(), ar2.end(), [&](TableRef const& a) { return std::any_of(ar1.begin(), ar1.end(), [&](TableRef const& e) { return e == a; }) || !l(a); });
   std::array<TableRef, N1 + N2 - duplicates - to_remove> out;
 
-  auto pos = std::copy_if(ar1.begin(), ar1.end(), out.begin(), [&](TableRef const& a){ return l(a); });
+  auto pos = std::copy_if(ar1.begin(), ar1.end(), out.begin(), [&](TableRef const& a) { return l(a); });
   std::copy_if(ar2.begin(), ar2.end(), pos, [&](TableRef const& a) { return std::none_of(ar1.begin(), ar1.end(), [&](TableRef const& e) { return e == a; }) && l(a); });
   return out;
 }
@@ -115,18 +116,18 @@ consteval auto merge_if(L l)
 template <size_t N, std::array<TableRef, N> ar, typename L>
 consteval auto remove_if(L l)
 {
-    constexpr const int to_remove = std::ranges::count_if(ar.begin(), ar.end(), [&l](TableRef const& e){ return l(e);});
-    std::array<TableRef, N - to_remove> out;
-    std::copy_if(ar.begin(), ar.end(), out.begin(), [&l](TableRef const& e){ return !l(e); });
-    return out;
+  constexpr const int to_remove = std::ranges::count_if(ar.begin(), ar.end(), [&l](TableRef const& e) { return l(e); });
+  std::array<TableRef, N - to_remove> out;
+  std::copy_if(ar.begin(), ar.end(), out.begin(), [&l](TableRef const& e) { return !l(e); });
+  return out;
 }
 
 template <size_t N1, size_t N2, std::array<TableRef, N1> ar1, std::array<TableRef, N2> ar2>
 consteval auto intersect()
 {
-  constexpr const int duplicates = std::ranges::count_if(ar2.begin(), ar2.end(), [&](TableRef const& a){ return std::any_of(ar1.begin(), ar1.end(), [&](TableRef const& e){ return e == a;}); });
+  constexpr const int duplicates = std::ranges::count_if(ar2.begin(), ar2.end(), [&](TableRef const& a) { return std::any_of(ar1.begin(), ar1.end(), [&](TableRef const& e) { return e == a; }); });
   std::array<TableRef, duplicates> out;
-  std::copy_if(ar1.begin(), ar1.end(), out.begin(), [](TableRef const& a){ return std::find(ar2.begin(), ar2.end(), a) != ar2.end(); });
+  std::copy_if(ar1.begin(), ar1.end(), out.begin(), [](TableRef const& a) { return std::find(ar2.begin(), ar2.end(), a) != ar2.end(); });
   return out;
 }
 
@@ -162,7 +163,7 @@ struct OriginEnc {
   {
   }
 #if defined(__clang__)
-  consteval OriginEnc(std::string_view in) noexcept : value { 0 }
+  consteval OriginEnc(std::string_view in) noexcept : value{0}
 #elif defined(__GNUC__) || defined(__GNUG__)
   constexpr OriginEnc(std::string_view in) noexcept : value{0}
 #endif
@@ -238,7 +239,7 @@ namespace o2::soa
 template <typename C>
 consteval auto is_persistent_column()
 {
-  if constexpr (requires {typename C::persistent{};}) {
+  if constexpr (requires { typename C::persistent{}; }) {
     return C::persistent::value;
   } else {
     return false;
@@ -249,20 +250,20 @@ template <typename C>
 using is_persistent_t = std::conditional_t<is_persistent_column<C>(), std::true_type, std::false_type>;
 
 template <typename T>
-concept not_void = requires{ !std::same_as<T, void>;};
+concept not_void = requires { !std::same_as<T, void>; };
 
 template <typename C>
-concept is_index_column = requires {not_void<typename C::binding_t>;};
+concept is_index_column = requires { not_void<typename C::binding_t>; };
 
 template <typename C>
 using is_external_index_t = typename std::conditional_t<is_index_column<C>, std::true_type, std::false_type>;
 
 template <typename C>
-concept is_self_index = requires{typename C::self_index_t{};};
+concept is_self_index = requires { typename C::self_index_t{}; };
 
 template <typename C>
 using is_self_index_t = typename std::conditional_t<is_self_index<C>, std::true_type, std::false_type>;
-}
+} // namespace o2::soa
 
 namespace o2::aod
 {
@@ -279,12 +280,12 @@ struct TableMetadataNG {
   static consteval std::array<bool, sizeof...(PCs)> getMap(framework::pack<PCs...>)
   {
     return std::array<bool, sizeof...(PCs)>{[]() {
-        if constexpr (requires { PCs::index_targets.size(); }) {
-          return Key::template isIndexTargetOf<PCs::index_targets.size(), PCs::index_targets>();
-        } else {
-          return false;
-        }
-      }()...};
+      if constexpr (requires { PCs::index_targets.size(); }) {
+        return Key::template isIndexTargetOf<PCs::index_targets.size(), PCs::index_targets>();
+      } else {
+        return false;
+      }
+    }()...};
   }
 
   template <typename Key>
@@ -327,7 +328,7 @@ consteval auto filterForKey()
   }(std::make_index_sequence<N>());
   constexpr int correct = std::ranges::count(test.begin(), test.end(), true);
   std::array<soa::TableRef, correct> out;
-  std::ranges::copy_if(ar.begin(), ar.end(), out.begin(), [&test](soa::TableRef const& r){ return test[std::distance(ar.begin(), std::find(ar.begin(), ar.end(), r))]; });
+  std::ranges::copy_if(ar.begin(), ar.end(), out.begin(), [&test](soa::TableRef const& r) { return test[std::distance(ar.begin(), std::find(ar.begin(), ar.end(), r))]; });
   return out;
 }
 
@@ -338,33 +339,35 @@ consteval auto filterForKey()
     static constexpr char const* const str{_Str_}; \
   };
 
-#define O2ORIGIN(_Str_)                                   \
-  template <>                                             \
-  struct Hash<_Str_ ""_h> {                               \
-    static constexpr header::DataOrigin origin{_Str_};    \
-    static constexpr uint32_t hash = _Str_ ""_h;          \
-    static constexpr char const* const str{_Str_};        \
+#define O2ORIGIN(_Str_)                                \
+  template <>                                          \
+  struct Hash<_Str_ ""_h> {                            \
+    static constexpr header::DataOrigin origin{_Str_}; \
+    static constexpr uint32_t hash = _Str_ ""_h;       \
+    static constexpr char const* const str{_Str_};     \
   };
 
-static inline constexpr int version(const char* const str) {
-    if (str[0] == '\0') {
-      return -1;
-    }
-    size_t len = 0;
-    int res = 0;
-    while (len < 15 && str[len] != '/') {
-      ++len;
-    }
-    if (len >= 15) {
-      return -1;
-    }
-    for (auto i = len + 1; str[i] != '\0'; ++i) {
-        res = res * 10 + (int)(str[i] - '0');
-    }
-    return res;
+static inline constexpr int version(const char* const str)
+{
+  if (str[0] == '\0') {
+    return -1;
+  }
+  size_t len = 0;
+  int res = 0;
+  while (len < 15 && str[len] != '/') {
+    ++len;
+  }
+  if (len >= 15) {
+    return -1;
+  }
+  for (auto i = len + 1; str[i] != '\0'; ++i) {
+    res = res * 10 + (int)(str[i] - '0');
+  }
+  return res;
 }
 
-static inline constexpr std::string_view description_str(const char* const str) {
+static inline constexpr std::string_view description_str(const char* const str)
+{
   size_t len = 0;
   while (len < 15 && str[len] != '/') {
     ++len;
@@ -372,7 +375,8 @@ static inline constexpr std::string_view description_str(const char* const str) 
   return std::string_view{str, len};
 }
 
-static inline constexpr header::DataDescription description(const char* const str) {
+static inline constexpr header::DataDescription description(const char* const str)
+{
   size_t len = 0;
   while (len < 15 && str[len] != '/') {
     ++len;
@@ -1257,7 +1261,7 @@ struct TableIterator : IP, C... {
     return copy;
   }
 
-         /// Allow incrementing by more than one the iterator
+  /// Allow incrementing by more than one the iterator
   TableIterator operator+(int64_t inc) const
   {
     TableIterator copy = *this;
@@ -1350,11 +1354,15 @@ struct TableIterator : IP, C... {
   void bind()
   {
     using namespace o2::soa;
-    auto f = framework::overloaded  {
-                                   [this]<typename T>(T*) -> void requires is_persistent_v<T> { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
-                                              [this]<typename T>(T*) -> void requires is_dynamic_v<T> { bindDynamicColumn<T>(typename T::bindings_t{});},
-                                   [this]<typename T>(T*) -> void {},
-                                   };
+    auto f = framework::overloaded{
+      [this]<typename T>(T*) -> void
+        requires is_persistent_v<T>
+                 { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
+                 [this]<typename T>(T*) -> void
+                   requires is_dynamic_v<T>
+      { bindDynamicColumn<T>(typename T::bindings_t{}); },
+      [this]<typename T>(T*) -> void {},
+      };
     (f(static_cast<C*>(nullptr)), ...);
     if constexpr (has_index_v) {
       this->setIndices(this->getIndices());
@@ -1379,7 +1387,7 @@ struct TableIterator : IP, C... {
   {
     static_assert(std::is_same_v<decltype(&(static_cast<B*>(this)->mColumnIterator)), std::decay_t<decltype(B::mColumnIterator)>*>, "foo");
     return &(static_cast<B*>(this)->mColumnIterator);
-    //return static_cast<std::decay_t<decltype(B::mColumnIterator)>*>(nullptr);
+    // return static_cast<std::decay_t<decltype(B::mColumnIterator)>*>(nullptr);
   }
 
   template <typename B>
@@ -1431,7 +1439,8 @@ struct RowViewCore : public IP, C... {
     return *this;
   }
 
-  RowViewCore(RowViewCore<ORIGIN, FilteredIndexPolicy, C...> const& other) requires std::is_same_v<IP, DefaultIndexPolicy>
+  RowViewCore(RowViewCore<ORIGIN, FilteredIndexPolicy, C...> const& other)
+    requires std::is_same_v<IP, DefaultIndexPolicy>
     : IP{static_cast<IP const&>(other)},
       C(static_cast<C const&>(other))...
   {
@@ -1557,11 +1566,15 @@ struct RowViewCore : public IP, C... {
   void bind()
   {
     using namespace o2::soa;
-    auto f = framework::overloaded  {
-      [this]<typename T>(T*) -> void requires is_persistent_v<T> { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
-      [this]<typename T>(T*) -> void requires is_dynamic_v<T> { bindDynamicColumn<T>(typename T::bindings_t{});},
+    auto f = framework::overloaded{
+      [this]<typename T>(T*) -> void
+        requires is_persistent_v<T>
+                 { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
+                 [this]<typename T>(T*) -> void
+                   requires is_dynamic_v<T>
+      { bindDynamicColumn<T>(typename T::bindings_t{}); },
       [this]<typename T>(T*) -> void {},
-};
+      };
     (f(static_cast<C*>(nullptr)), ...);
     if constexpr (has_index_v) {
       this->setIndices(this->getIndices());
@@ -1586,7 +1599,7 @@ struct RowViewCore : public IP, C... {
   {
     static_assert(std::is_same_v<decltype(&(static_cast<B*>(this)->mColumnIterator)), std::decay_t<decltype(B::mColumnIterator)>*>, "foo");
     return &(static_cast<B*>(this)->mColumnIterator);
-    //return static_cast<std::decay_t<decltype(B::mColumnIterator)>*>(nullptr);
+    // return static_cast<std::decay_t<decltype(B::mColumnIterator)>*>(nullptr);
   }
 
   template <typename B>
@@ -2129,14 +2142,14 @@ auto doSliceByCachedUnsorted(T const* table, framework::expressions::BindingNode
 }
 
 template <typename T>
-requires soa::is_soa_table_like_v<T>
+  requires soa::is_soa_table_like_v<T>
 auto select(T const& t, framework::expressions::Filter const& f)
 {
   return Filtered<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
 }
 
 template <typename T>
-requires WithOriginals<T>
+  requires WithOriginals<T>
 auto select(T const& t, framework::expressions::Filter const& f)
 {
   return FilteredNG<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
@@ -2206,30 +2219,29 @@ class TableNG
   template <TableRef r>
   static consteval bool hasOriginal()
   {
-    return std::find_if(originals.begin(), originals.end(), [](TableRef const& o){ return o.desc_hash == r.desc_hash;}) != originals.end();
+    return std::find_if(originals.begin(), originals.end(), [](TableRef const& o) { return o.desc_hash == r.desc_hash; }) != originals.end();
   }
 
   static consteval bool hasOriginal_alt(TableRef const& r)
   {
-    return std::ranges::find_if(originals.begin(), originals.end(), [&](TableRef const& o){ return o.desc_hash == r.desc_hash;}) != originals.end();
+    return std::ranges::find_if(originals.begin(), originals.end(), [&](TableRef const& o) { return o.desc_hash == r.desc_hash; }) != originals.end();
   }
 
-  using columns_t = decltype(
-    []() {
-      if constexpr (sizeof...(Ts) == 0) {
-        return getColumns<originals[0]>();
+  using columns_t = decltype([]() {
+    if constexpr (sizeof...(Ts) == 0) {
+      return getColumns<originals[0]>();
+    } else {
+      if constexpr ((o2::soa::is_soa_column_v<Ts>() && ...)) {
+        return framework::pack<Ts...>{};
       } else {
-        if constexpr ((o2::soa::is_soa_column_v<Ts>() && ...)) {
-          return framework::pack<Ts...>{};
+        if constexpr (std::same_as<O, o2::aod::Hash<"CONC"_h>>) {
+          return framework::full_intersected_pack_t<typename Ts::columns_t...>{};
         } else {
-          if constexpr (std::same_as<O, o2::aod::Hash<"CONC"_h>>) {
-            return framework::full_intersected_pack_t<typename Ts::columns_t...>{};
-          } else {
-            return framework::concatenated_pack_unique_t<typename Ts::columns_t...>{};
-          }
+          return framework::concatenated_pack_unique_t<typename Ts::columns_t...>{};
         }
       }
-    }());
+    }
+  }());
 
   using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_persistent_t, C...> {}(columns_t{}));
   using column_types = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::type...> {}(persistent_columns_t{}));
@@ -2442,12 +2454,14 @@ class TableNG
     }
   }
 
-  TableNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0) requires (!std::is_same_v<O, o2::aod::Hash<"CONC"_h>>)
+  TableNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
+    requires(!std::is_same_v<O, o2::aod::Hash<"CONC"_h>>)
     : TableNG(ArrowHelpers::joinTables(std::move(tables)), offset)
   {
   }
 
-  TableNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0) requires (std::is_same_v<O, o2::aod::Hash<"CONC"_h>>)
+  TableNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
+    requires(std::is_same_v<O, o2::aod::Hash<"CONC"_h>>)
     : TableNG(ArrowHelpers::concatTables(std::move(tables)), offset)
   {
   }
@@ -2618,6 +2632,7 @@ class TableNG
   {
     return self_t{mTable->Slice(0, 0), 0};
   }
+
  private:
   template <typename T>
   arrow::ChunkedArray* lookupColumn()
@@ -2638,7 +2653,7 @@ class TableNG
 };
 
 template <uint32_t D, typename... C>
-  requires ((soa::is_soa_column_v<C>() && ...))
+  requires((soa::is_soa_column_v<C>() && ...))
 using InPlaceTableNG = TableNG<o2::aod::Hash<"TEST"_h>, o2::aod::Hash<D>, o2::aod::Hash<"TEST"_h>, C...>;
 
 /// A Table class which observes an arrow::Table and provides
@@ -2677,7 +2692,8 @@ class Table
     }
 
     template <typename P, typename... O>
-    RowViewBase& operator=(RowViewBase<IP, P, O...> other) requires std::is_same_v<typename P::table_t, typename Parent::table_t>
+    RowViewBase& operator=(RowViewBase<IP, P, O...> other)
+      requires std::is_same_v<typename P::table_t, typename Parent::table_t>
     {
       static_cast<RowViewCore<ORIGIN, IP, C...>&>(*this) = static_cast<RowViewCore<ORIGIN, IP, C...>>(other);
       return *this;
@@ -2691,20 +2707,23 @@ class Table
     }
 
     template <typename P>
-    RowViewBase& operator=(RowViewBase<FilteredIndexPolicy, P, T...> other) requires std::is_same_v<IP, DefaultIndexPolicy>
+    RowViewBase& operator=(RowViewBase<FilteredIndexPolicy, P, T...> other)
+      requires std::is_same_v<IP, DefaultIndexPolicy>
     {
       static_cast<RowViewCore<ORIGIN, IP, C...>&>(*this) = static_cast<RowViewCore<ORIGIN, FilteredIndexPolicy, C...>>(other);
       return *this;
     }
 
     template <typename P, typename... O>
-    RowViewBase(RowViewBase<IP, P, O...> const& other) requires std::is_same_v<typename P::table_t, typename Parent::table_t>
+    RowViewBase(RowViewBase<IP, P, O...> const& other)
+      requires std::is_same_v<typename P::table_t, typename Parent::table_t>
     {
       *this = other;
     }
 
     template <typename P, typename... O>
-    RowViewBase(RowViewBase<IP, P, O...>&& other) noexcept requires std::is_same_v<typename P::table_t, typename Parent::table_t>
+    RowViewBase(RowViewBase<IP, P, O...>&& other) noexcept
+      requires std::is_same_v<typename P::table_t, typename Parent::table_t>
     {
       *this = other;
     }
@@ -2722,7 +2741,8 @@ class Table
     }
 
     template <typename P>
-    RowViewBase(RowViewBase<FilteredIndexPolicy, P, T...> other) requires std::is_same_v<IP, DefaultIndexPolicy>
+    RowViewBase(RowViewBase<FilteredIndexPolicy, P, T...> other)
+      requires std::is_same_v<IP, DefaultIndexPolicy>
     {
       *this = other;
     }
@@ -2740,7 +2760,8 @@ class Table
     }
 
     template <typename P, typename... O>
-    void matchTo(RowViewBase<IP, P, O...> const& other) requires std::is_same_v<typename P::table_t, typename Parent::table_t>
+    void matchTo(RowViewBase<IP, P, O...> const& other)
+      requires std::is_same_v<typename P::table_t, typename Parent::table_t>
     {
       this->mRowIndex = other.mRowIndex;
     }
@@ -3165,7 +3186,7 @@ O2ORIGIN("CONC");
 O2HASH("CONC/0");
 O2ORIGIN("TEST");
 O2HASH("TEST/0");
-}
+} // namespace o2::aod
 
 #define DECLARE_SOA_VERSIONING()                                                                    \
   template <typename T>                                                                             \
@@ -3975,13 +3996,13 @@ consteval auto getIndexTargets()
     using metadata = _Name_##Metadata;                                                                \
   };
 
-#define DECLARE_SOA_TABLE_NG_FULL(_Name_, _Label_, _Origin_, _Desc_, ...)                             \
+#define DECLARE_SOA_TABLE_NG_FULL(_Name_, _Label_, _Origin_, _Desc_, ...) \
   DECLARE_SOA_TABLE_NG_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, 0, __VA_ARGS__)
 
-#define DECLARE_SOA_TABLE_NG(_Name_, _Origin_, _Desc_, ...)                                           \
+#define DECLARE_SOA_TABLE_NG(_Name_, _Origin_, _Desc_, ...) \
   DECLARE_SOA_TABLE_NG_FULL(_Name_, #_Name_, _Origin_, _Desc_, __VA_ARGS__)
 
-#define DECLARE_SOA_TABLE_NG_VERSIONED(_Name_, _Origin_, _Desc_, _Version_, ...)                      \
+#define DECLARE_SOA_TABLE_NG_VERSIONED(_Name_, _Origin_, _Desc_, _Version_, ...) \
   DECLARE_SOA_TABLE_NG_FULL_VERSIONED(_Name_, #_Name_, _Origin_, _Desc_, _Version_, __VA_ARGS__)
 
 #define DECLARE_SOA_EXTENDED_TABLE_FULL(_Name_, _Table_, _Origin_, _Description_, ...)                                                      \
@@ -4101,9 +4122,9 @@ consteval auto getIndexTargets()
     static constexpr bool exclusive = _Exclusive_;                                                                                           \
     using Key = _Key_;                                                                                                                       \
     using index_pack_t = framework::pack<__VA_ARGS__>;                                                                                       \
-    static constexpr const auto sources = []<typename... Cs>(framework::pack<Cs...>){                                                        \
-        constexpr auto a = o2::soa::mergeOriginals<typename Cs::binding_t...>();                                                             \
-        return o2::aod::filterForKey<a.size(), a, Key>();                                                                                    \
+    static constexpr const auto sources = []<typename... Cs>(framework::pack<Cs...>) {                                                       \
+      constexpr auto a = o2::soa::mergeOriginals<typename Cs::binding_t...>();                                                               \
+      return o2::aod::filterForKey<a.size(), a, Key>();                                                                                      \
     }(framework::pack<__VA_ARGS__>{});                                                                                                       \
   };                                                                                                                                         \
   using _Name_##Metadata = _Name_##MetadataFrom<o2::aod::Hash<_Origin_ ""_h>>;                                                               \
@@ -4214,7 +4235,7 @@ struct JoinNGFull : TableNG<o2::aod::Hash<"JOIN"_h>, D, o2::aod::Hash<"JOIN"_h>,
   template <typename T>
   static consteval bool contains()
   {
-    return std::find_if(originals.begin(), originals.end(), [](TableRef const& ref){ return ref.desc_hash == T::ref.desc_hash; }) != originals.end();
+    return std::find_if(originals.begin(), originals.end(), [](TableRef const& ref) { return ref.desc_hash == T::ref.desc_hash; }) != originals.end();
   }
 };
 
@@ -4228,8 +4249,7 @@ constexpr auto joinNG(Ts const&... t)
 }
 
 template <typename... Ts>
-struct ConcatNG : TableNG<o2::aod::Hash<"CONC"_h>, o2::aod::Hash<"CONC/0"_h>, o2::aod::Hash<"CONC"_h>, Ts...>
-{
+struct ConcatNG : TableNG<o2::aod::Hash<"CONC"_h>, o2::aod::Hash<"CONC/0"_h>, o2::aod::Hash<"CONC"_h>, Ts...> {
   using base = TableNG<o2::aod::Hash<"CONC"_h>, o2::aod::Hash<"CONC/0"_h>, o2::aod::Hash<"CONC"_h>, Ts...>;
   using self_t = ConcatNG<Ts...>;
   ConcatNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, uint64_t offset = 0)
@@ -4398,432 +4418,432 @@ inline constexpr bool is_soa_concat_v = is_soa_concat_t<T>::value;
 template <typename T>
 class FilteredBaseNG : public T
 {
-  public:
-    using self_t = FilteredBaseNG<T>;
-    using table_t = typename T::table_t;
-    using T::originals;
-    using columns_t = typename T::columns_t;
-    using persistent_columns_t = typename T::persistent_columns_t;
-    using external_index_columns_t = typename T::external_index_columns_t;
+ public:
+  using self_t = FilteredBaseNG<T>;
+  using table_t = typename T::table_t;
+  using T::originals;
+  using columns_t = typename T::columns_t;
+  using persistent_columns_t = typename T::persistent_columns_t;
+  using external_index_columns_t = typename T::external_index_columns_t;
 
-    using iterator = T::template iterator_template_o<FilteredIndexPolicy, self_t>;
-    using unfiltered_iterator = T::template iterator_template_o<DefaultIndexPolicy, self_t>;
-    using const_iterator = iterator;
+  using iterator = T::template iterator_template_o<FilteredIndexPolicy, self_t>;
+  using unfiltered_iterator = T::template iterator_template_o<DefaultIndexPolicy, self_t>;
+  using const_iterator = iterator;
 
-    FilteredBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
-      : T{std::move(tables), offset},
-        mSelectedRows{getSpan(selection)}
-    {
-      if (this->tableSize() != 0) {
-        mFilteredBegin = table_t::filtered_begin(mSelectedRows);
-      }
-      resetRanges();
-      mFilteredBegin.bindInternalIndices(this);
+  FilteredBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
+    : T{std::move(tables), offset},
+      mSelectedRows{getSpan(selection)}
+  {
+    if (this->tableSize() != 0) {
+      mFilteredBegin = table_t::filtered_begin(mSelectedRows);
     }
+    resetRanges();
+    mFilteredBegin.bindInternalIndices(this);
+  }
 
-    FilteredBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
-      : T{std::move(tables), offset},
-        mSelectedRowsCache{std::move(selection)},
-        mCached{true}
-    {
+  FilteredBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
+    : T{std::move(tables), offset},
+      mSelectedRowsCache{std::move(selection)},
+      mCached{true}
+  {
+    mSelectedRows = gsl::span{mSelectedRowsCache};
+    if (this->tableSize() != 0) {
+      mFilteredBegin = table_t::filtered_begin(mSelectedRows);
+    }
+    resetRanges();
+    mFilteredBegin.bindInternalIndices(this);
+  }
+
+  FilteredBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
+    : T{std::move(tables), offset},
+      mSelectedRows{selection}
+  {
+    if (this->tableSize() != 0) {
+      mFilteredBegin = table_t::filtered_begin(mSelectedRows);
+    }
+    resetRanges();
+    mFilteredBegin.bindInternalIndices(this);
+  }
+
+  iterator begin()
+  {
+    return iterator(mFilteredBegin);
+  }
+
+  const_iterator begin() const
+  {
+    return const_iterator(mFilteredBegin);
+  }
+
+  unfiltered_iterator rawIteratorAt(uint64_t i) const
+  {
+    auto it = unfiltered_iterator{mFilteredBegin};
+    it.setCursor(i);
+    return it;
+  }
+
+  [[nodiscard]] RowViewSentinel end() const
+  {
+    return RowViewSentinel{*mFilteredEnd};
+  }
+
+  auto& cached_begin()
+  {
+    return mFilteredBegin;
+  }
+
+  auto const& cached_begin() const
+  {
+    return mFilteredBegin;
+  }
+
+  iterator iteratorAt(uint64_t i) const
+  {
+    return mFilteredBegin + i;
+  }
+
+  [[nodiscard]] int64_t size() const
+  {
+    return mSelectedRows.size();
+  }
+
+  [[nodiscard]] int64_t tableSize() const
+  {
+    return table_t::asArrowTable()->num_rows();
+  }
+
+  auto const& getSelectedRows() const
+  {
+    return mSelectedRows;
+  }
+
+  auto rawSlice(uint64_t start, uint64_t end) const
+  {
+    SelectionVector newSelection;
+    newSelection.resize(static_cast<int64_t>(end - start + 1));
+    std::iota(newSelection.begin(), newSelection.end(), start);
+    return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
+  }
+
+  auto emptySlice() const
+  {
+    return self_t{{this->asArrowTable()}, SelectionVector{}, 0};
+  }
+
+  static inline auto getSpan(gandiva::Selection const& sel)
+  {
+    if (sel == nullptr) {
+      return gsl::span<int64_t const>{};
+    }
+    auto array = std::static_pointer_cast<arrow::Int64Array>(sel->ToArray());
+    auto start = array->raw_values();
+    auto stop = start + array->length();
+    return gsl::span{start, stop};
+  }
+
+  /// Bind the columns which refer to other tables
+  /// to the associated tables.
+  template <typename... TA>
+  void bindExternalIndices(TA*... current)
+  {
+    table_t::bindExternalIndices(current...);
+    mFilteredBegin.bindExternalIndices(current...);
+  }
+
+  void bindExternalIndicesRaw(std::vector<o2::soa::Binding>&& ptrs)
+  {
+    mFilteredBegin.bindExternalIndicesRaw(std::forward<std::vector<o2::soa::Binding>>(ptrs));
+  }
+
+  template <typename I>
+  void bindInternalIndicesTo(I const* ptr)
+  {
+    mFilteredBegin.bindInternalIndices(ptr);
+  }
+
+  template <typename T1, typename... Cs>
+  void doCopyIndexBindings(framework::pack<Cs...>, T1& dest) const
+  {
+    dest.bindExternalIndicesRaw(mFilteredBegin.getIndexBindings());
+  }
+
+  template <typename T1>
+  void copyIndexBindings(T1& dest) const
+  {
+    doCopyIndexBindings(external_index_columns_t{}, dest);
+  }
+
+  template <typename T1>
+  auto rawSliceBy(o2::framework::Preslice<T1> const& container, int value) const
+  {
+    return (table_t)this->sliceBy(container, value);
+  }
+
+  auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doFilteredSliceByCached(this, node, value, cache);
+  }
+
+  auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doSliceByCachedUnsorted(this, node, value, cache);
+  }
+
+  template <typename T1, bool OPT, bool SORTED>
+  auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
+  {
+    if constexpr (SORTED) {
+      return doFilteredSliceBy(this, container, value);
+    } else {
+      return doSliceBy(this, container, value);
+    }
+  }
+
+  auto select(framework::expressions::Filter const& f) const
+  {
+    auto t = o2::soa::select(*this, f);
+    copyIndexBindings(t);
+    return t;
+  }
+
+  int isInSelectedRows(int i) const
+  {
+    auto locate = std::find(mSelectedRows.begin(), mSelectedRows.end(), i);
+    if (locate == mSelectedRows.end()) {
+      return -1;
+    }
+    return static_cast<int>(std::distance(mSelectedRows.begin(), locate));
+  }
+
+  void sumWithSelection(SelectionVector const& selection)
+  {
+    mCached = true;
+    SelectionVector rowsUnion;
+    std::set_union(mSelectedRows.begin(), mSelectedRows.end(), selection.begin(), selection.end(), std::back_inserter(rowsUnion));
+    mSelectedRowsCache.clear();
+    mSelectedRowsCache = rowsUnion;
+    resetRanges();
+  }
+
+  void intersectWithSelection(SelectionVector const& selection)
+  {
+    mCached = true;
+    SelectionVector intersection;
+    std::set_intersection(mSelectedRows.begin(), mSelectedRows.end(), selection.begin(), selection.end(), std::back_inserter(intersection));
+    mSelectedRowsCache.clear();
+    mSelectedRowsCache = intersection;
+    resetRanges();
+  }
+
+  void sumWithSelection(gsl::span<int64_t const> const& selection)
+  {
+    mCached = true;
+    SelectionVector rowsUnion;
+    std::set_union(mSelectedRows.begin(), mSelectedRows.end(), selection.begin(), selection.end(), std::back_inserter(rowsUnion));
+    mSelectedRowsCache.clear();
+    mSelectedRowsCache = rowsUnion;
+    resetRanges();
+  }
+
+  void intersectWithSelection(gsl::span<int64_t const> const& selection)
+  {
+    mCached = true;
+    SelectionVector intersection;
+    std::set_intersection(mSelectedRows.begin(), mSelectedRows.end(), selection.begin(), selection.end(), std::back_inserter(intersection));
+    mSelectedRowsCache.clear();
+    mSelectedRowsCache = intersection;
+    resetRanges();
+  }
+
+  bool isCached() const
+  {
+    return mCached;
+  }
+
+ private:
+  void resetRanges()
+  {
+    if (mCached) {
       mSelectedRows = gsl::span{mSelectedRowsCache};
-      if (this->tableSize() != 0) {
-        mFilteredBegin = table_t::filtered_begin(mSelectedRows);
-      }
-      resetRanges();
-      mFilteredBegin.bindInternalIndices(this);
     }
-
-    FilteredBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
-      : T{std::move(tables), offset},
-        mSelectedRows{selection}
-    {
-      if (this->tableSize() != 0) {
-        mFilteredBegin = table_t::filtered_begin(mSelectedRows);
-      }
-      resetRanges();
-      mFilteredBegin.bindInternalIndices(this);
+    mFilteredEnd.reset(new RowViewSentinel{static_cast<int64_t>(mSelectedRows.size())});
+    if (tableSize() == 0) {
+      mFilteredBegin = *mFilteredEnd;
+    } else {
+      mFilteredBegin.resetSelection(mSelectedRows);
     }
+  }
 
-    iterator begin()
-    {
-      return iterator(mFilteredBegin);
-    }
-
-    const_iterator begin() const
-    {
-      return const_iterator(mFilteredBegin);
-    }
-
-    unfiltered_iterator rawIteratorAt(uint64_t i) const
-    {
-      auto it = unfiltered_iterator{mFilteredBegin};
-      it.setCursor(i);
-      return it;
-    }
-
-    [[nodiscard]] RowViewSentinel end() const
-    {
-      return RowViewSentinel{*mFilteredEnd};
-    }
-
-    auto& cached_begin()
-    {
-      return mFilteredBegin;
-    }
-
-    auto const& cached_begin() const
-    {
-      return mFilteredBegin;
-    }
-
-    iterator iteratorAt(uint64_t i) const
-    {
-      return mFilteredBegin + i;
-    }
-
-    [[nodiscard]] int64_t size() const
-    {
-      return mSelectedRows.size();
-    }
-
-    [[nodiscard]] int64_t tableSize() const
-    {
-      return table_t::asArrowTable()->num_rows();
-    }
-
-    auto const& getSelectedRows() const
-    {
-      return mSelectedRows;
-    }
-
-    auto rawSlice(uint64_t start, uint64_t end) const
-    {
-      SelectionVector newSelection;
-      newSelection.resize(static_cast<int64_t>(end - start + 1));
-      std::iota(newSelection.begin(), newSelection.end(), start);
-      return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
-    }
-
-    auto emptySlice() const
-    {
-      return self_t{{this->asArrowTable()}, SelectionVector{}, 0};
-    }
-
-    static inline auto getSpan(gandiva::Selection const& sel)
-    {
-      if (sel == nullptr) {
-        return gsl::span<int64_t const>{};
-      }
-      auto array = std::static_pointer_cast<arrow::Int64Array>(sel->ToArray());
-      auto start = array->raw_values();
-      auto stop = start + array->length();
-      return gsl::span{start, stop};
-    }
-
-    /// Bind the columns which refer to other tables
-    /// to the associated tables.
-    template <typename... TA>
-    void bindExternalIndices(TA*... current)
-    {
-      table_t::bindExternalIndices(current...);
-      mFilteredBegin.bindExternalIndices(current...);
-    }
-
-    void bindExternalIndicesRaw(std::vector<o2::soa::Binding>&& ptrs)
-    {
-      mFilteredBegin.bindExternalIndicesRaw(std::forward<std::vector<o2::soa::Binding>>(ptrs));
-    }
-
-    template <typename I>
-    void bindInternalIndicesTo(I const* ptr)
-    {
-      mFilteredBegin.bindInternalIndices(ptr);
-    }
-
-    template <typename T1, typename... Cs>
-    void doCopyIndexBindings(framework::pack<Cs...>, T1& dest) const
-    {
-      dest.bindExternalIndicesRaw(mFilteredBegin.getIndexBindings());
-    }
-
-    template <typename T1>
-    void copyIndexBindings(T1& dest) const
-    {
-      doCopyIndexBindings(external_index_columns_t{}, dest);
-    }
-
-    template <typename T1>
-    auto rawSliceBy(o2::framework::Preslice<T1> const& container, int value) const
-    {
-      return (table_t)this->sliceBy(container, value);
-    }
-
-    auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
-    {
-      return doFilteredSliceByCached(this, node, value, cache);
-    }
-
-    auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
-    {
-      return doSliceByCachedUnsorted(this, node, value, cache);
-    }
-
-    template <typename T1, bool OPT, bool SORTED>
-    auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
-    {
-      if constexpr (SORTED) {
-        return doFilteredSliceBy(this, container, value);
-      } else {
-        return doSliceBy(this, container, value);
-      }
-    }
-
-    auto select(framework::expressions::Filter const& f) const
-    {
-      auto t = o2::soa::select(*this, f);
-      copyIndexBindings(t);
-      return t;
-    }
-
-    int isInSelectedRows(int i) const
-    {
-      auto locate = std::find(mSelectedRows.begin(), mSelectedRows.end(), i);
-      if (locate == mSelectedRows.end()) {
-        return -1;
-      }
-      return static_cast<int>(std::distance(mSelectedRows.begin(), locate));
-    }
-
-    void sumWithSelection(SelectionVector const& selection)
-    {
-      mCached = true;
-      SelectionVector rowsUnion;
-      std::set_union(mSelectedRows.begin(), mSelectedRows.end(), selection.begin(), selection.end(), std::back_inserter(rowsUnion));
-      mSelectedRowsCache.clear();
-      mSelectedRowsCache = rowsUnion;
-      resetRanges();
-    }
-
-    void intersectWithSelection(SelectionVector const& selection)
-    {
-      mCached = true;
-      SelectionVector intersection;
-      std::set_intersection(mSelectedRows.begin(), mSelectedRows.end(), selection.begin(), selection.end(), std::back_inserter(intersection));
-      mSelectedRowsCache.clear();
-      mSelectedRowsCache = intersection;
-      resetRanges();
-    }
-
-    void sumWithSelection(gsl::span<int64_t const> const& selection)
-    {
-      mCached = true;
-      SelectionVector rowsUnion;
-      std::set_union(mSelectedRows.begin(), mSelectedRows.end(), selection.begin(), selection.end(), std::back_inserter(rowsUnion));
-      mSelectedRowsCache.clear();
-      mSelectedRowsCache = rowsUnion;
-      resetRanges();
-    }
-
-    void intersectWithSelection(gsl::span<int64_t const> const& selection)
-    {
-      mCached = true;
-      SelectionVector intersection;
-      std::set_intersection(mSelectedRows.begin(), mSelectedRows.end(), selection.begin(), selection.end(), std::back_inserter(intersection));
-      mSelectedRowsCache.clear();
-      mSelectedRowsCache = intersection;
-      resetRanges();
-    }
-
-    bool isCached() const
-    {
-      return mCached;
-    }
-
-   private:
-    void resetRanges()
-    {
-      if (mCached) {
-        mSelectedRows = gsl::span{mSelectedRowsCache};
-      }
-      mFilteredEnd.reset(new RowViewSentinel{static_cast<int64_t>(mSelectedRows.size())});
-      if (tableSize() == 0) {
-        mFilteredBegin = *mFilteredEnd;
-      } else {
-        mFilteredBegin.resetSelection(mSelectedRows);
-      }
-    }
-
-    gsl::span<int64_t const> mSelectedRows;
-    SelectionVector mSelectedRowsCache;
-    bool mCached = false;
-    iterator mFilteredBegin;
-    std::shared_ptr<RowViewSentinel> mFilteredEnd;
+  gsl::span<int64_t const> mSelectedRows;
+  SelectionVector mSelectedRowsCache;
+  bool mCached = false;
+  iterator mFilteredBegin;
+  std::shared_ptr<RowViewSentinel> mFilteredEnd;
 };
 
 template <typename T>
 class FilteredNG : public FilteredBaseNG<T>
 {
-  public:
-   using base_t = T;
-   using self_t = FilteredNG<T>;
-   using table_t = typename FilteredBaseNG<T>::table_t;
+ public:
+  using base_t = T;
+  using self_t = FilteredNG<T>;
+  using table_t = typename FilteredBaseNG<T>::table_t;
 
-   using iterator = T::template iterator_template_o<FilteredIndexPolicy, self_t>;
-   using unfiltered_iterator = T::template iterator_template_o<DefaultIndexPolicy, self_t>;
-   using const_iterator = iterator;
+  using iterator = T::template iterator_template_o<FilteredIndexPolicy, self_t>;
+  using unfiltered_iterator = T::template iterator_template_o<DefaultIndexPolicy, self_t>;
+  using const_iterator = iterator;
 
-    iterator begin()
-    {
-      return iterator(this->cached_begin());
+  iterator begin()
+  {
+    return iterator(this->cached_begin());
+  }
+
+  const_iterator begin() const
+  {
+    return const_iterator(this->cached_begin());
+  }
+
+  FilteredNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
+    : FilteredBaseNG<T>(std::move(tables), selection, offset) {}
+
+  FilteredNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
+    : FilteredBaseNG<T>(std::move(tables), std::forward<SelectionVector>(selection), offset) {}
+
+  FilteredNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
+    : FilteredBaseNG<T>(std::move(tables), selection, offset) {}
+
+  FilteredNG<T> operator+(SelectionVector const& selection)
+  {
+    FilteredNG<T> copy(*this);
+    copy.sumWithSelection(selection);
+    return copy;
+  }
+
+  FilteredNG<T> operator+(gsl::span<int64_t const> const& selection)
+  {
+    FilteredNG<T> copy(*this);
+    copy.sumWithSelection(selection);
+    return copy;
+  }
+
+  FilteredNG<T> operator+(FilteredNG<T> const& other)
+  {
+    return operator+(other.getSelectedRows());
+  }
+
+  FilteredNG<T> operator+=(SelectionVector const& selection)
+  {
+    this->sumWithSelection(selection);
+    return *this;
+  }
+
+  FilteredNG<T> operator+=(gsl::span<int64_t const> const& selection)
+  {
+    this->sumWithSelection(selection);
+    return *this;
+  }
+
+  FilteredNG<T> operator+=(FilteredNG<T> const& other)
+  {
+    return operator+=(other.getSelectedRows());
+  }
+
+  FilteredNG<T> operator*(SelectionVector const& selection)
+  {
+    FilteredNG<T> copy(*this);
+    copy.intersectWithSelection(selection);
+    return copy;
+  }
+
+  FilteredNG<T> operator*(gsl::span<int64_t const> const& selection)
+  {
+    FilteredNG<T> copy(*this);
+    copy.intersectWithSelection(selection);
+    return copy;
+  }
+
+  FilteredNG<T> operator*(FilteredNG<T> const& other)
+  {
+    return operator*(other.getSelectedRows());
+  }
+
+  FilteredNG<T> operator*=(SelectionVector const& selection)
+  {
+    this->intersectWithSelection(selection);
+    return *this;
+  }
+
+  FilteredNG<T> operator*=(gsl::span<int64_t const> const& selection)
+  {
+    this->intersectWithSelection(selection);
+    return *this;
+  }
+
+  FilteredNG<T> operator*=(FilteredNG<T> const& other)
+  {
+    return operator*=(other.getSelectedRows());
+  }
+
+  unfiltered_iterator rawIteratorAt(uint64_t i) const
+  {
+    auto it = unfiltered_iterator{this->cached_begin()};
+    it.setCursor(i);
+    return it;
+  }
+
+  using FilteredBaseNG<T>::getSelectedRows;
+
+  auto rawSlice(uint64_t start, uint64_t end) const
+  {
+    SelectionVector newSelection;
+    newSelection.resize(static_cast<int64_t>(end - start + 1));
+    std::iota(newSelection.begin(), newSelection.end(), start);
+    return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
+  }
+
+  auto emptySlice() const
+  {
+    return self_t{{this->asArrowTable()}, SelectionVector{}, 0};
+  }
+
+  template <typename T1>
+  auto rawSliceBy(o2::framework::Preslice<T1> const& container, int value) const
+  {
+    return (table_t)this->sliceBy(container, value);
+  }
+
+  auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doFilteredSliceByCached(this, node, value, cache);
+  }
+
+  auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doSliceByCachedUnsorted(this, node, value, cache);
+  }
+
+  template <typename T1, bool OPT, bool SORTED>
+  auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
+  {
+    if constexpr (SORTED) {
+      return doFilteredSliceBy(this, container, value);
+    } else {
+      return doSliceBy(this, container, value);
     }
+  }
 
-    const_iterator begin() const
-    {
-      return const_iterator(this->cached_begin());
-    }
-
-    FilteredNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
-      : FilteredBaseNG<T>(std::move(tables), selection, offset) {}
-
-    FilteredNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
-      : FilteredBaseNG<T>(std::move(tables), std::forward<SelectionVector>(selection), offset) {}
-
-    FilteredNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
-      : FilteredBaseNG<T>(std::move(tables), selection, offset) {}
-
-    FilteredNG<T> operator+(SelectionVector const& selection)
-    {
-      FilteredNG<T> copy(*this);
-      copy.sumWithSelection(selection);
-      return copy;
-    }
-
-    FilteredNG<T> operator+(gsl::span<int64_t const> const& selection)
-    {
-      FilteredNG<T> copy(*this);
-      copy.sumWithSelection(selection);
-      return copy;
-    }
-
-    FilteredNG<T> operator+(FilteredNG<T> const& other)
-    {
-      return operator+(other.getSelectedRows());
-    }
-
-    FilteredNG<T> operator+=(SelectionVector const& selection)
-    {
-      this->sumWithSelection(selection);
-      return *this;
-    }
-
-    FilteredNG<T> operator+=(gsl::span<int64_t const> const& selection)
-    {
-      this->sumWithSelection(selection);
-      return *this;
-    }
-
-    FilteredNG<T> operator+=(FilteredNG<T> const& other)
-    {
-      return operator+=(other.getSelectedRows());
-    }
-
-    FilteredNG<T> operator*(SelectionVector const& selection)
-    {
-      FilteredNG<T> copy(*this);
-      copy.intersectWithSelection(selection);
-      return copy;
-    }
-
-    FilteredNG<T> operator*(gsl::span<int64_t const> const& selection)
-    {
-      FilteredNG<T> copy(*this);
-      copy.intersectWithSelection(selection);
-      return copy;
-    }
-
-    FilteredNG<T> operator*(FilteredNG<T> const& other)
-    {
-      return operator*(other.getSelectedRows());
-    }
-
-    FilteredNG<T> operator*=(SelectionVector const& selection)
-    {
-      this->intersectWithSelection(selection);
-      return *this;
-    }
-
-    FilteredNG<T> operator*=(gsl::span<int64_t const> const& selection)
-    {
-      this->intersectWithSelection(selection);
-      return *this;
-    }
-
-    FilteredNG<T> operator*=(FilteredNG<T> const& other)
-    {
-      return operator*=(other.getSelectedRows());
-    }
-
-    unfiltered_iterator rawIteratorAt(uint64_t i) const
-    {
-      auto it = unfiltered_iterator{this->cached_begin()};
-      it.setCursor(i);
-      return it;
-    }
-
-    using FilteredBaseNG<T>::getSelectedRows;
-
-    auto rawSlice(uint64_t start, uint64_t end) const
-    {
-      SelectionVector newSelection;
-      newSelection.resize(static_cast<int64_t>(end - start + 1));
-      std::iota(newSelection.begin(), newSelection.end(), start);
-      return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
-    }
-
-    auto emptySlice() const
-    {
-      return self_t{{this->asArrowTable()}, SelectionVector{}, 0};
-    }
-
-    template <typename T1>
-    auto rawSliceBy(o2::framework::Preslice<T1> const& container, int value) const
-    {
-      return (table_t)this->sliceBy(container, value);
-    }
-
-    auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
-    {
-      return doFilteredSliceByCached(this, node, value, cache);
-    }
-
-    auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
-    {
-      return doSliceByCachedUnsorted(this, node, value, cache);
-    }
-
-    template <typename T1, bool OPT, bool SORTED>
-    auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
-    {
-      if constexpr (SORTED) {
-        return doFilteredSliceBy(this, container, value);
-      } else {
-        return doSliceBy(this, container, value);
-      }
-    }
-
-    auto select(framework::expressions::Filter const& f) const
-    {
-      auto t = o2::soa::select(*this, f);
-      copyIndexBindings(t);
-      return t;
-    }
+  auto select(framework::expressions::Filter const& f) const
+  {
+    auto t = o2::soa::select(*this, f);
+    copyIndexBindings(t);
+    return t;
+  }
 };
 
 template <typename T>
 class FilteredNG<FilteredNG<T>> : public FilteredBaseNG<typename T::table_t>
 {
-public:
+ public:
   using self_t = FilteredNG<FilteredNG<T>>;
   using base_t = T;
   using table_t = typename FilteredBaseNG<typename T::table_t>::table_t;
@@ -4832,161 +4852,161 @@ public:
   using unfiltered_iterator = FilteredBaseNG<typename T::table_t>::unfiltered_iterator;
   using const_iterator = iterator;
 
-    iterator begin()
-    {
-      return iterator(this->cached_begin());
-    }
+  iterator begin()
+  {
+    return iterator(this->cached_begin());
+  }
 
-    const_iterator begin() const
-    {
-      return const_iterator(this->cached_begin());
-    }
+  const_iterator begin() const
+  {
+    return const_iterator(this->cached_begin());
+  }
 
-    FilteredNG(std::vector<FilteredNG<T>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
-      : FilteredBaseNG<typename T::table_t>(std::move(extractTablesFromFiltered(tables)), selection, offset)
-    {
-      for (auto& table : tables) {
-        *this *= table;
-      }
+  FilteredNG(std::vector<FilteredNG<T>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
+    : FilteredBaseNG<typename T::table_t>(std::move(extractTablesFromFiltered(tables)), selection, offset)
+  {
+    for (auto& table : tables) {
+      *this *= table;
     }
+  }
 
-    FilteredNG(std::vector<FilteredNG<T>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
-      : FilteredBaseNG<typename T::table_t>(std::move(extractTablesFromFiltered(tables)), std::forward<SelectionVector>(selection), offset)
-    {
-      for (auto& table : tables) {
-        *this *= table;
-      }
+  FilteredNG(std::vector<FilteredNG<T>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
+    : FilteredBaseNG<typename T::table_t>(std::move(extractTablesFromFiltered(tables)), std::forward<SelectionVector>(selection), offset)
+  {
+    for (auto& table : tables) {
+      *this *= table;
     }
+  }
 
-    FilteredNG(std::vector<FilteredNG<T>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
-      : FilteredBaseNG<typename T::table_t>(std::move(extractTablesFromFiltered(tables)), selection, offset)
-    {
-      for (auto& table : tables) {
-        *this *= table;
-      }
+  FilteredNG(std::vector<FilteredNG<T>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
+    : FilteredBaseNG<typename T::table_t>(std::move(extractTablesFromFiltered(tables)), selection, offset)
+  {
+    for (auto& table : tables) {
+      *this *= table;
     }
+  }
 
-    FilteredNG<FilteredNG<T>> operator+(SelectionVector const& selection)
-    {
-      FilteredNG<FilteredNG<T>> copy(*this);
-      copy.sumWithSelection(selection);
-      return copy;
-    }
+  FilteredNG<FilteredNG<T>> operator+(SelectionVector const& selection)
+  {
+    FilteredNG<FilteredNG<T>> copy(*this);
+    copy.sumWithSelection(selection);
+    return copy;
+  }
 
-    FilteredNG<FilteredNG<T>> operator+(gsl::span<int64_t const> const& selection)
-    {
-      FilteredNG<FilteredNG<T>> copy(*this);
-      copy.sumWithSelection(selection);
-      return copy;
-    }
+  FilteredNG<FilteredNG<T>> operator+(gsl::span<int64_t const> const& selection)
+  {
+    FilteredNG<FilteredNG<T>> copy(*this);
+    copy.sumWithSelection(selection);
+    return copy;
+  }
 
-    FilteredNG<FilteredNG<T>> operator+(FilteredNG<T> const& other)
-    {
-      return operator+(other.getSelectedRows());
-    }
+  FilteredNG<FilteredNG<T>> operator+(FilteredNG<T> const& other)
+  {
+    return operator+(other.getSelectedRows());
+  }
 
-    FilteredNG<FilteredNG<T>> operator+=(SelectionVector const& selection)
-    {
-      this->sumWithSelection(selection);
-      return *this;
-    }
+  FilteredNG<FilteredNG<T>> operator+=(SelectionVector const& selection)
+  {
+    this->sumWithSelection(selection);
+    return *this;
+  }
 
-    FilteredNG<FilteredNG<T>> operator+=(gsl::span<int64_t const> const& selection)
-    {
-      this->sumWithSelection(selection);
-      return *this;
-    }
+  FilteredNG<FilteredNG<T>> operator+=(gsl::span<int64_t const> const& selection)
+  {
+    this->sumWithSelection(selection);
+    return *this;
+  }
 
-    FilteredNG<FilteredNG<T>> operator+=(FilteredNG<T> const& other)
-    {
-      return operator+=(other.getSelectedRows());
-    }
+  FilteredNG<FilteredNG<T>> operator+=(FilteredNG<T> const& other)
+  {
+    return operator+=(other.getSelectedRows());
+  }
 
-    FilteredNG<FilteredNG<T>> operator*(SelectionVector const& selection)
-    {
-      FilteredNG<FilteredNG<T>> copy(*this);
-      copy.intersectionWithSelection(selection);
-      return copy;
-    }
+  FilteredNG<FilteredNG<T>> operator*(SelectionVector const& selection)
+  {
+    FilteredNG<FilteredNG<T>> copy(*this);
+    copy.intersectionWithSelection(selection);
+    return copy;
+  }
 
-    FilteredNG<FilteredNG<T>> operator*(gsl::span<int64_t const> const& selection)
-    {
-      FilteredNG<FilteredNG<T>> copy(*this);
-      copy.intersectionWithSelection(selection);
-      return copy;
-    }
+  FilteredNG<FilteredNG<T>> operator*(gsl::span<int64_t const> const& selection)
+  {
+    FilteredNG<FilteredNG<T>> copy(*this);
+    copy.intersectionWithSelection(selection);
+    return copy;
+  }
 
-    FilteredNG<FilteredNG<T>> operator*(FilteredNG<T> const& other)
-    {
-      return operator*(other.getSelectedRows());
-    }
+  FilteredNG<FilteredNG<T>> operator*(FilteredNG<T> const& other)
+  {
+    return operator*(other.getSelectedRows());
+  }
 
-    FilteredNG<FilteredNG<T>> operator*=(SelectionVector const& selection)
-    {
-      this->intersectWithSelection(selection);
-      return *this;
-    }
+  FilteredNG<FilteredNG<T>> operator*=(SelectionVector const& selection)
+  {
+    this->intersectWithSelection(selection);
+    return *this;
+  }
 
-    FilteredNG<FilteredNG<T>> operator*=(gsl::span<int64_t const> const& selection)
-    {
-      this->intersectWithSelection(selection);
-      return *this;
-    }
+  FilteredNG<FilteredNG<T>> operator*=(gsl::span<int64_t const> const& selection)
+  {
+    this->intersectWithSelection(selection);
+    return *this;
+  }
 
-    FilteredNG<FilteredNG<T>> operator*=(FilteredNG<T> const& other)
-    {
-      return operator*=(other.getSelectedRows());
-    }
+  FilteredNG<FilteredNG<T>> operator*=(FilteredNG<T> const& other)
+  {
+    return operator*=(other.getSelectedRows());
+  }
 
-    unfiltered_iterator rawIteratorAt(uint64_t i) const
-    {
-      auto it = unfiltered_iterator{this->cached_begin()};
-      it.setCursor(i);
-      return it;
-    }
+  unfiltered_iterator rawIteratorAt(uint64_t i) const
+  {
+    auto it = unfiltered_iterator{this->cached_begin()};
+    it.setCursor(i);
+    return it;
+  }
 
-    auto rawSlice(uint64_t start, uint64_t end) const
-    {
-      SelectionVector newSelection;
-      newSelection.resize(static_cast<int64_t>(end - start + 1));
-      std::iota(newSelection.begin(), newSelection.end(), start);
-      return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
-    }
+  auto rawSlice(uint64_t start, uint64_t end) const
+  {
+    SelectionVector newSelection;
+    newSelection.resize(static_cast<int64_t>(end - start + 1));
+    std::iota(newSelection.begin(), newSelection.end(), start);
+    return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
+  }
 
-    auto emptySlice() const
-    {
-      return self_t{{this->asArrowTable()}, SelectionVector{}, 0};
-    }
+  auto emptySlice() const
+  {
+    return self_t{{this->asArrowTable()}, SelectionVector{}, 0};
+  }
 
-    auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
-    {
-      return doFilteredSliceByCached(this, node, value, cache);
-    }
+  auto sliceByCached(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doFilteredSliceByCached(this, node, value, cache);
+  }
 
-    auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
-    {
-      return doSliceByCachedUnsorted(this, node, value, cache);
-    }
+  auto sliceByCachedUnsorted(framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache) const
+  {
+    return doSliceByCachedUnsorted(this, node, value, cache);
+  }
 
-    template <typename T1, bool OPT, bool SORTED>
-    auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
-    {
-      if constexpr (SORTED) {
-        return doFilteredSliceBy(this, container, value);
-      } else {
-        return doSliceBy(this, container, value);
-      }
+  template <typename T1, bool OPT, bool SORTED>
+  auto sliceBy(o2::framework::PresliceBase<T1, OPT, SORTED> const& container, int value) const
+  {
+    if constexpr (SORTED) {
+      return doFilteredSliceBy(this, container, value);
+    } else {
+      return doSliceBy(this, container, value);
     }
+  }
 
-   private:
-    std::vector<std::shared_ptr<arrow::Table>> extractTablesFromFiltered(std::vector<FilteredNG<T>>& tables)
-    {
-      std::vector<std::shared_ptr<arrow::Table>> outTables;
-      for (auto& table : tables) {
-        outTables.push_back(table.asArrowTable());
-      }
-      return outTables;
+ private:
+  std::vector<std::shared_ptr<arrow::Table>> extractTablesFromFiltered(std::vector<FilteredNG<T>>& tables)
+  {
+    std::vector<std::shared_ptr<arrow::Table>> outTables;
+    for (auto& table : tables) {
+      outTables.push_back(table.asArrowTable());
     }
+    return outTables;
+  }
 };
 
 template <typename T>
@@ -5656,15 +5676,15 @@ struct SmallGroupsBase : public Filtered<T> {
 
 template <typename T, bool APPLY>
 struct SmallGroupsBaseNG : public FilteredNG<T> {
-    static constexpr bool applyFilters = APPLY;
-    SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
-      : Filtered<T>(std::move(tables), selection, offset) {}
+  static constexpr bool applyFilters = APPLY;
+  SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gandiva::Selection const& selection, uint64_t offset = 0)
+    : Filtered<T>(std::move(tables), selection, offset) {}
 
-    SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
-      : Filtered<T>(std::move(tables), std::forward<SelectionVector>(selection), offset) {}
+  SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, SelectionVector&& selection, uint64_t offset = 0)
+    : Filtered<T>(std::move(tables), std::forward<SelectionVector>(selection), offset) {}
 
-    SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
-      : Filtered<T>(std::move(tables), selection, offset) {}
+  SmallGroupsBaseNG(std::vector<std::shared_ptr<arrow::Table>>&& tables, gsl::span<int64_t const> const& selection, uint64_t offset = 0)
+    : Filtered<T>(std::move(tables), selection, offset) {}
 };
 
 template <typename T>

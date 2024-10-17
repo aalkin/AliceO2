@@ -46,21 +46,22 @@ DECLARE_SOA_TABLE(Events, "AOD", "EVENTS",
                   test::EventProperty);
 
 DECLARE_SOA_TABLE_NG(FooNGs, "AOD", "FOO",
-                  test::Foo);
+                     test::Foo);
 DECLARE_SOA_EXTENDED_TABLE_NG(FooNGss, FooNGs, "FOOS", test::Sqfoo);
 DECLARE_SOA_TABLE_NG(BarNGs, "AOD", "BAR",
-                  test::Bar);
+                     test::Bar);
 DECLARE_SOA_TABLE_NG(FooBarNGs, "AOD", "FOOBAR",
-                  test::Foo, test::Bar,
-                  test::Sum<test::Foo, test::Bar>);
+                     test::Foo, test::Bar,
+                     test::Sum<test::Foo, test::Bar>);
 DECLARE_SOA_TABLE_NG(XYZNG, "AOD", "XYZ",
-                  test::X, test::Y, test::Z);
+                     test::X, test::Y, test::Z);
 DECLARE_SOA_TABLE_NG(EventNGs, "AOD", "EVENTS",
-                  test::EventProperty);
+                     test::EventProperty);
 
 DECLARE_SOA_TABLE_NG(Roots, "AOD", "ROOTS", test::Foo);
 
-namespace idx {
+namespace idx
+{
 DECLARE_SOA_INDEX_COLUMN(Root, root);
 }
 
@@ -68,11 +69,12 @@ DECLARE_SOA_TABLE_NG(B1s, "AOD", "B1", idx::RootId, test::X);
 DECLARE_SOA_TABLE_NG(B2s, "AOD", "B2", idx::RootId, test::Y);
 DECLARE_SOA_TABLE_NG(B3s, "AOD", "B3", idx::RootId, test::Z);
 
-namespace idx {
+namespace idx
+{
 DECLARE_SOA_INDEX_COLUMN(B1, b1);
 DECLARE_SOA_INDEX_COLUMN(B2, b2);
 DECLARE_SOA_INDEX_COLUMN(B3, b3);
-}
+} // namespace idx
 
 DECLARE_SOA_INDEX_TABLE_NG(Bs, Roots, "BS", idx::RootId, idx::B1Id, idx::B2Id, idx::B3Id);
 
@@ -92,7 +94,6 @@ struct ATaskNG {
 
   void process(o2::aod::Track const&)
   {
-
   }
 };
 

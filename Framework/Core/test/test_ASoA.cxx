@@ -234,8 +234,8 @@ TEST_CASE("TestTableIterationNG")
   REQUIRE(*i == 1);
 
   arrow::ChunkedArray* chunks[2] = {
-                                    table->column(0).get(),
-                                    table->column(1).get()};
+    table->column(0).get(),
+    table->column(1).get()};
   o2::aod::PointsNG::iterator tests(chunks, {table->num_rows(), 0});
   REQUIRE(tests.x() == 0);
   REQUIRE(tests.y() == 0);
@@ -745,10 +745,10 @@ TEST_CASE("TestConcatTablesNG")
   rowWriterD(0, 23, 15);
   auto tableD = builderD.finalize();
 
-  using TestA = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;//o2::aod::TestA;
-  using TestB = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X>;//o2::aod::TestB;
-  using TestC = InPlaceTableNG<0, o2::aod::test::Z>;//o2::aod::TestC;
-  using TestD = InPlaceTableNG<0, o2::aod::test::X, o2::aod::test::Z>;//o2::aod::TestD;
+  using TestA = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>; // o2::aod::TestA;
+  using TestB = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X>;                   // o2::aod::TestB;
+  using TestC = InPlaceTableNG<0, o2::aod::test::Z>;                                     // o2::aod::TestC;
+  using TestD = InPlaceTableNG<0, o2::aod::test::X, o2::aod::test::Z>;                   // o2::aod::TestD;
   using ConcatTest = ConcatNG<TestA, TestB>;
   using JoinedTest = JoinNG<TestA, TestC>;
   using NestedJoinTest = JoinNG<JoinedTest, TestD>;
@@ -765,7 +765,7 @@ TEST_CASE("TestConcatTablesNG")
 
   static_assert(std::is_same_v<NestedConcatTest::columns_t, o2::framework::pack<o2::aod::test::X>>, "Bad nested concat");
 
-         // Hardcode a selection for the first 5 odd numbers
+  // Hardcode a selection for the first 5 odd numbers
   using FilteredTest = FilteredNG<TestA>;
   using namespace o2::framework;
   expressions::Filter testf = (o2::aod::test::x == 1) || (o2::aod::test::x == 3);
@@ -1110,7 +1110,7 @@ TEST_CASE("TestFilteredOperatorsNG")
   auto tableA = builderA.finalize();
   REQUIRE(tableA->num_rows() == 8);
 
-  using TestA = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>; //o2::soa::Table<OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
+  using TestA = InPlaceTableNG<0, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>; // o2::soa::Table<OriginEnc{"AOD"}, o2::soa::Index<>, o2::aod::test::X, o2::aod::test::Y>;
   using FilteredTest = FilteredNG<TestA>;
   using namespace o2::framework;
 
@@ -1284,11 +1284,11 @@ TEST_CASE("TestNestedFilteringNG")
 TEST_CASE("TestEmptyTables")
 {
   TableBuilder bPoints;
-  [[maybe_unused]]auto pwriter = bPoints.cursor<o2::aod::Points>();
+  [[maybe_unused]] auto pwriter = bPoints.cursor<o2::aod::Points>();
   auto pempty = bPoints.finalize();
 
   TableBuilder bInfos;
-  [[maybe_unused]]auto iwriter = bInfos.cursor<o2::aod::Infos>();
+  [[maybe_unused]] auto iwriter = bInfos.cursor<o2::aod::Infos>();
   auto iempty = bInfos.finalize();
 
   o2::aod::Points p{pempty};
@@ -1304,11 +1304,11 @@ TEST_CASE("TestEmptyTables")
 TEST_CASE("TestEmptyTablesNG")
 {
   TableBuilder bPoints;
-  [[maybe_unused]]auto pwriter = bPoints.cursor<o2::aod::PointsNG>();
+  [[maybe_unused]] auto pwriter = bPoints.cursor<o2::aod::PointsNG>();
   auto pempty = bPoints.finalize();
 
   TableBuilder bInfos;
-  [[maybe_unused]]auto iwriter = bInfos.cursor<o2::aod::InfosNG>();
+  [[maybe_unused]] auto iwriter = bInfos.cursor<o2::aod::InfosNG>();
   auto iempty = bInfos.finalize();
 
   o2::aod::PointsNG p{pempty};
@@ -1777,7 +1777,7 @@ namespace o2::aod
 {
 DECLARE_SOA_TABLE(PointsSelfRef, "TEST", "PTSSR", test::OtherPointId, test::PointSeqIdSlice, test::PointSetIds);
 DECLARE_SOA_TABLE_NG(PointsSelfRefNG, "TEST", "PTSSR", test::OtherPointId, test::PointSeqIdSlice, test::PointSetIds);
-}
+} // namespace o2::aod
 
 TEST_CASE("TestSelfIndexRecursion")
 {

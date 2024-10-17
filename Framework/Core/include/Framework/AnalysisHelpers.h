@@ -11,19 +11,19 @@
 #ifndef o2_framework_AnalysisHelpers_H_DEFINED
 #define o2_framework_AnalysisHelpers_H_DEFINED
 
-#include "Framework/DataAllocator.h"
-#include "Framework/Traits.h"
-#include "Framework/TableBuilder.h"
 #include "Framework/ASoA.h"
-#include "Framework/OutputSpec.h"
-#include "Framework/OutputRef.h"
-#include "Framework/InputSpec.h"
-#include "Framework/OutputObjHeader.h"
-#include "Framework/StringHelpers.h"
-#include "Framework/Output.h"
-#include "Framework/IndexBuilderHelpers.h"
-#include "Framework/Plugins.h"
+#include "Framework/DataAllocator.h"
 #include "Framework/ExpressionHelpers.h"
+#include "Framework/IndexBuilderHelpers.h"
+#include "Framework/InputSpec.h"
+#include "Framework/Output.h"
+#include "Framework/OutputObjHeader.h"
+#include "Framework/OutputRef.h"
+#include "Framework/OutputSpec.h"
+#include "Framework/Plugins.h"
+#include "Framework/StringHelpers.h"
+#include "Framework/TableBuilder.h"
+#include "Framework/Traits.h"
 
 #include <string>
 namespace o2::soa
@@ -35,8 +35,7 @@ constexpr auto tableRef2InputSpec()
     o2::aod::Hash<R.label_hash>::str,
     o2::aod::Hash<R.origin_hash>::origin,
     o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
-    R.version
-  };
+    R.version};
 }
 
 template <TableRef R>
@@ -46,8 +45,7 @@ constexpr auto tableRef2OutputSpec()
     framework::OutputLabel{o2::aod::Hash<R.label_hash>::str},
     o2::aod::Hash<R.origin_hash>::origin,
     o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
-    R.version
-  };
+    R.version};
 }
 
 template <TableRef R>
@@ -56,8 +54,7 @@ constexpr auto tableRef2Output()
   return framework::Output{
     o2::aod::Hash<R.origin_hash>::origin,
     o2::aod::description(o2::aod::Hash<R.desc_hash>::str),
-    R.version
-  };
+    R.version};
 }
 
 template <TableRef R>
@@ -65,8 +62,7 @@ constexpr auto tableRef2OutputRef()
 {
   return framework::OutputRef{
     o2::aod::Hash<R.label_hash>::str,
-    R.version
-  };
+    R.version};
 }
 
 template <TableRef R>
@@ -76,10 +72,9 @@ constexpr auto tableRef2ConfigParamSpec()
     std::string{"iput:"} + o2::aod::Hash<R.label_hash>::str,
     framework::VariantType::String,
     aod::sourceSpec<R>(),
-    {"\"\""}
-  };
+    {"\"\""}};
 }
-}
+}  // namespace o2::soa
 
 namespace o2::framework
 {
@@ -263,12 +258,12 @@ struct OutputForTableNG {
 /// means of the WritingCursor helper class, from which produces actually
 /// derives.
 template <soa::hasMetadata T>
-struct Produces : WritingCursor<typename soa::PackToTable<aod::MetadataTrait<T>::metadata::origin(), typename T::table_t::persistent_columns_t>::table>
-{};
+struct Produces : WritingCursor<typename soa::PackToTable<aod::MetadataTrait<T>::metadata::origin(), typename T::table_t::persistent_columns_t>::table> {
+};
 
 template <soa::hasngMetadata T>
-struct ProducesNG : WritingCursorNG<T>
-{};
+struct ProducesNG : WritingCursorNG<T> {
+};
 
 /// Use this to group together produces. Useful to separate them logically
 /// or simply to stay within the 100 elements per Task limit.
@@ -339,8 +334,7 @@ struct TableTransform {
 };
 
 template <o2::aod::NGMetadata M, soa::TableRef Ref>
-struct TableTransformNG
-{
+struct TableTransformNG {
   using metadata = M;
   constexpr static auto sources = M::sources;
 
@@ -404,8 +398,7 @@ struct Spawns : TableTransform<typename aod::MetadataTrait<framework::pack_head_
 };
 
 template <typename T>
-struct SpawnsNG : TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref>
-{
+struct SpawnsNG : TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
   using metadata = TableTransformNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
   using extension_t = typename metadata::extension_table_t;
   using base_table_t = typename metadata::base_table_t;
@@ -485,7 +478,7 @@ struct Reduction {
 
 template <typename Key, typename C>
 using reduced_t = Reduction<Key, C>::type;
-} // namespace
+}  // namespace
 
 template <typename Kind>
 struct IndexBuilder {
@@ -554,7 +547,8 @@ struct IndexBuilderNG {
 
     auto sq = std::make_index_sequence<sizeof...(Cs)>();
 
-    auto columnBuilders = [&tables, &pool]<size_t... Is>(std::index_sequence<Is...>) -> std::array<std::shared_ptr<framework::SelfIndexColumnBuilder>, sizeof...(Cs)> {
+    auto columnBuilders = [&tables, &pool ]<size_t... Is>(std::index_sequence<Is...>) -> std::array<std::shared_ptr<framework::SelfIndexColumnBuilder>, sizeof...(Cs)>
+    {
       return {[](arrow::Table* table, arrow::MemoryPool* pool) {
         using T = framework::pack_element_t<Is, framework::pack<Cs...>>;
         if constexpr (!Key::template hasOriginal<refs[Is + 1]>()) {
@@ -564,7 +558,8 @@ struct IndexBuilderNG {
           return std::make_shared<SelfIndexColumnBuilder>(T::columnLabel(), pool);
         }
       }(tables[Is + 1].get(), pool)...};
-    }(sq);
+    }
+    (sq);
 
     std::array<bool, sizeof...(Cs)> finds;
 
@@ -575,43 +570,41 @@ struct IndexBuilderNG {
       } else {
         idx = keyIndex->valueAt(counter);
       }
-      finds = [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>){
+      finds = [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>) {
         return std::array{
-          [&idx, &columnBuilders](){
+          [&idx, &columnBuilders]() {
             using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
             return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template find<T>(idx);
-          }()
-          ...};
+          }()...};
       }(sq);
       if constexpr (std::is_same_v<Kind, Sparse>) {
-        [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>){
-          ([&idx, &columnBuilders](){
+        [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>) {
+          ([&idx, &columnBuilders]() {
             using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
-            return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template fill<T>(idx);}()
-           , ...);
+            return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template fill<T>(idx); }(), ...);
         }(sq);
         self.fill<C1>(counter);
       } else if constexpr (std::is_same_v<Kind, Exclusive>) {
         if (std::none_of(finds.begin(), finds.end(), [](bool const x) { return x == false; })) {
-          [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>){
-            ([&idx, &columnBuilders](){
+          [&idx, &columnBuilders]<size_t... Is>(std::index_sequence<Is...>) {
+            ([&idx, &columnBuilders]() {
               using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
               return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template fill<T>(idx);
-            }()
-             , ...);
+            }(),
+             ...);
           }(sq);
           self.fill<C1>(counter);
         }
       }
     }
 
-    return [&label, &columnBuilders, &self]<size_t... Is>(std::index_sequence<Is...>){
+    return [&label, &columnBuilders, &self]<size_t... Is>(std::index_sequence<Is...>) {
       return makeArrowTable(label,
-                            {self.template result<C1>(), [&columnBuilders](){
+                            {self.template result<C1>(), [&columnBuilders]() {
                                using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
                                return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->template result<T>();
                              }()...},
-                            {self.field(), [&columnBuilders](){
+                            {self.field(), [&columnBuilders]() {
                                using T = typename framework::pack_element_t<Is, framework::pack<Cs...>>;
                                return std::static_pointer_cast<typename Reduction<Key, T>::type>(columnBuilders[Is])->field();
                              }()...});
@@ -811,7 +804,8 @@ auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
   return std::make_unique<o2::soa::Filtered<T>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
 }
 
-template <soa::soaTable T> requires (!soa::soaFilteredTable<T>)
+template <soa::soaTable T>
+  requires(!soa::soaFilteredTable<T>)
 auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
 {
   return std::make_unique<o2::soa::Filtered<T>>(std::vector{table.asArrowTable()}, std::forward<soa::SelectionVector>(selection));
@@ -823,7 +817,8 @@ auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
   return std::make_unique<o2::soa::FilteredNG<T>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
 }
 
-template <soa::ngTable T> requires (!soa::ngFilteredTable<T>)
+template <soa::ngTable T>
+  requires(!soa::ngFilteredTable<T>)
 auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
 {
   return std::make_unique<o2::soa::FilteredNG<T>>(std::vector{table.asArrowTable()}, std::forward<soa::SelectionVector>(selection));
@@ -1054,13 +1049,13 @@ struct PartitionNG {
     return mFiltered->size();
   }
 };
-} // namespace o2::framework
+}  // namespace o2::framework
 
 namespace o2::soa
 {
 /// On-the-fly adding of expression columns
 template <typename T, typename... Cs>
-  requires (soa::is_soa_table_like_v<T>)
+  requires(soa::is_soa_table_like_v<T>)
 auto Extend(T const& table)
 {
   static_assert((soa::is_type_spawnable_v<Cs> && ...), "You can only extend a table with expression columns");
@@ -1069,7 +1064,7 @@ auto Extend(T const& table)
 }
 
 template <typename T, typename... Cs>
-  requires (framework::is_base_of_template_v<TableNG, T>)
+  requires(framework::is_base_of_template_v<TableNG, T>)
 auto Extend(T const& table)
 {
   static_assert((soa::is_type_spawnable_v<Cs> && ...), "You can only extend a table with expression columns");
@@ -1080,7 +1075,7 @@ auto Extend(T const& table)
 /// Template function to attach dynamic columns on-the-fly (e.g. inside
 /// process() function). Dynamic columns need to be compatible with the table.
 template <typename T, typename... Cs>
-  requires (soa::is_soa_table_like_v<T>)
+  requires(soa::is_soa_table_like_v<T>)
 auto Attach(T const& table)
 {
   static_assert((framework::is_base_of_template_v<o2::soa::DynamicColumn, Cs> && ...), "You can only attach dynamic columns");
@@ -1089,13 +1084,13 @@ auto Attach(T const& table)
 }
 
 template <typename T, typename... Cs>
-  requires (framework::is_base_of_template_v<TableNG, T>)
+  requires(framework::is_base_of_template_v<TableNG, T>)
 auto Attach(T const& table)
 {
   static_assert((framework::is_base_of_template_v<o2::soa::DynamicColumn, Cs> && ...), "You can only attach dynamic columns");
   using output_t = JoinNG<T, o2::soa::TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Cs...>>;
   return output_t{{table.asArrowTable()}, table.offset()};
 }
-} // namespace o2::soa
+}  // namespace o2::soa
 
-#endif // o2_framework_AnalysisHelpers_H_DEFINED
+#endif  // o2_framework_AnalysisHelpers_H_DEFINED

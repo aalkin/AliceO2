@@ -137,7 +137,7 @@ struct WritingCursor<soa::Table<ORIGIN, PC...>> {
   template <typename T>
   static decltype(auto) extract(T const& arg)
   {
-    if constexpr (soa::is_soa_iterator_v<T>) {
+    if constexpr (soa::soa_iterator<T>) {
       return arg.globalIndex();
     } else {
       static_assert(!framework::has_type<T>(framework::pack<PC...>{}), "Argument type mismatch");
@@ -152,7 +152,7 @@ struct WritingCursor<soa::Table<ORIGIN, PC...>> {
   int64_t mCount = -1;
 };
 
-template <soa::ngTable T>
+template <soa::ng_table T>
 struct WritingCursorNG {
  public:
   using persistent_table_t = T;
@@ -203,7 +203,7 @@ struct WritingCursorNG {
   template <typename A>
   static decltype(auto) extract(A const& arg)
   {
-    if constexpr (soa::is_soa_iterator_v<T>) {
+    if constexpr (soa::soa_iterator<T>) {
       return arg.globalIndex();
     } else {
       static_assert(!framework::has_type<A>(typename T::persistent_columns_t{}), "Argument type mismatch");
@@ -219,8 +219,7 @@ struct WritingCursorNG {
 };
 
 /// Helper to define output for a Table
-template <typename T>
-  requires soa::is_soa_table_like_v<T>
+template <soa::soa_table T>
 struct OutputForTable {
   using table_t = T;
   using metadata = typename aod::MetadataTrait<table_t>::metadata;
@@ -236,8 +235,7 @@ struct OutputForTable {
   }
 };
 
-template <typename T>
-  requires o2::soa::WithOriginals<T>
+template <o2::soa::with_originals T>
 struct OutputForTableNG {
   using table_t = T;
   using metadata = aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
@@ -257,11 +255,11 @@ struct OutputForTableNG {
 /// given analysis task. Notice how the actual cursor is implemented by the
 /// means of the WritingCursor helper class, from which produces actually
 /// derives.
-template <soa::hasMetadata T>
+template <soa::has_metadata T>
 struct Produces : WritingCursor<typename soa::PackToTable<aod::MetadataTrait<T>::metadata::origin(), typename T::table_t::persistent_columns_t>::table> {
 };
 
-template <soa::hasngMetadata T>
+template <soa::has_ng_metadata T>
 struct ProducesNG : WritingCursorNG<T> {
 };
 
@@ -333,7 +331,7 @@ struct TableTransform {
   }
 };
 
-template <o2::aod::NGMetadata M, soa::TableRef Ref>
+template <o2::aod::ng_metadata M, soa::TableRef Ref>
 struct TableTransformNG {
   using metadata = M;
   constexpr static auto sources = M::sources;
@@ -798,27 +796,25 @@ struct Service {
   }
 };
 
-template <soa::soaFilteredTable T>
-auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
+auto getTableFromFilter(soa::soa_filtered_table auto const& table, soa::SelectionVector&& selection)
 {
-  return std::make_unique<o2::soa::Filtered<T>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
+  return std::make_unique<o2::soa::Filtered<std::decay_t<decltype(table)>>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
 }
 
-template <soa::soaTable T>
-  requires(!soa::soaFilteredTable<T>)
+template <soa::soa_table T>
+  requires(!soa::soa_filtered_table<T>)
 auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
 {
   return std::make_unique<o2::soa::Filtered<T>>(std::vector{table.asArrowTable()}, std::forward<soa::SelectionVector>(selection));
 }
 
-template <soa::ngFilteredTable T>
-auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
+auto getTableFromFilter(soa::ng_filtered_table auto const& table, soa::SelectionVector&& selection)
 {
-  return std::make_unique<o2::soa::FilteredNG<T>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
+  return std::make_unique<o2::soa::FilteredNG<std::decay_t<decltype(table)>>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
 }
 
-template <soa::ngTable T>
-  requires(!soa::ngFilteredTable<T>)
+template <soa::ng_table T>
+  requires(!soa::ng_filtered_table<T>)
 auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
 {
   return std::make_unique<o2::soa::FilteredNG<T>>(std::vector{table.asArrowTable()}, std::forward<soa::SelectionVector>(selection));
@@ -1054,16 +1050,14 @@ struct PartitionNG {
 namespace o2::soa
 {
 /// On-the-fly adding of expression columns
-template <soa::soaTable T, typename... Cs>
-requires (soa::is_type_spawnable_v<Cs> && ...)
+template <soa::soa_table T, soa::spawnable... Cs>
 auto Extend(T const& table)
 {
   using output_t = Join<T, soa::Table<OriginEnc{"JOIN"}, Cs...>>;
   return output_t{{o2::framework::spawner<OriginEnc{"JOIN"}>(framework::pack<Cs...>{}, {table.asArrowTable()}, "dynamicExtension"), table.asArrowTable()}, 0};
 }
 
-template <soa::ngTable T, typename... Cs>
-requires (soa::is_type_spawnable_v<Cs> && ...)
+template <soa::ng_table T, soa::spawnable... Cs>
 auto Extend(T const& table)
 {
   using output_t = JoinNG<T, soa::TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Cs...>>;
@@ -1072,16 +1066,14 @@ auto Extend(T const& table)
 
 /// Template function to attach dynamic columns on-the-fly (e.g. inside
 /// process() function). Dynamic columns need to be compatible with the table.
-template <soa::soaTable T, typename... Cs>
-requires (framework::is_base_of_template_v<o2::soa::DynamicColumn, Cs> && ...)
+template <soa::soa_table T, soa::dynamic... Cs>
 auto Attach(T const& table)
 {
   using output_t = Join<T, o2::soa::Table<OriginEnc{"JOIN"}, Cs...>>;
   return output_t{{table.asArrowTable()}, table.offset()};
 }
 
-template <soa::ngTable T, typename... Cs>
-requires (framework::is_base_of_template_v<o2::soa::DynamicColumn, Cs> && ...)
+template <soa::ng_table T, soa::dynamic... Cs>
 auto Attach(T const& table)
 {
   using output_t = JoinNG<T, o2::soa::TableNG<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Cs...>>;

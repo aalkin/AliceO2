@@ -730,7 +730,7 @@ struct SpawnManager {
   static bool requestInputs(std::vector<InputSpec>&, T const&) { return false; }
 };
 
-template <soa::soaTable TABLE>
+template <soa::soa_table TABLE>
 struct SpawnManager<Spawns<TABLE>> {
   static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
   {
@@ -743,7 +743,7 @@ struct SpawnManager<Spawns<TABLE>> {
   }
 };
 
-template <soa::ngTable TABLE>
+template <soa::ng_table TABLE>
 struct SpawnManager<SpawnsNG<TABLE>> {
   static bool requestInputs(std::vector<InputSpec>& inputs, SpawnsNG<TABLE>& spawns)
   {

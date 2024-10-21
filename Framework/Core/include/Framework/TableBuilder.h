@@ -867,7 +867,7 @@ std::shared_ptr<arrow::Table> spawnerHelper(std::shared_ptr<arrow::Table> const&
                                             expressions::Projector* projectors, std::vector<std::shared_ptr<arrow::Field>> const& fields, const char* name);
 
 /// Expression-based column generator to materialize columns
-template <aod::aodHash D>
+template <aod::aod_hash D>
 auto spawner(std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* name)
 {
   using expression_pack_t = typename o2::aod::MetadataTraitNG<D>::metadata::expression_pack_t;
@@ -885,7 +885,7 @@ auto spawner(std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* na
   return spawnerHelper(fullTable, new_schema, framework::pack_size(expression_pack_t{}), projectors.data(), fields, name);
 }
 
-template <aod::aodHash D>
+template <aod::aod_hash D>
 auto spawner(std::shared_ptr<arrow::Table> const& fullTable, const char* name)
 {
   using expression_pack_t = typename o2::aod::MetadataTraitNG<D>::metadata::expression_pack_t;

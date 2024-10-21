@@ -38,8 +38,7 @@
   };
 
 #define DECLARE_SOA_ITERATOR_METADATA()                                       \
-  template <typename IT>                                                      \
-    requires(o2::soa::is_soa_iterator_v<IT>)                                  \
+  template <o2::soa::soa_iterator IT>                                         \
   struct MetadataTrait<IT> {                                                  \
     using metadata = typename MetadataTrait<typename IT::parent_t>::metadata; \
   };
@@ -236,33 +235,26 @@ struct fmt::formatter<o2::soa::OriginEnc> {
 
 namespace o2::soa
 {
-template <typename C>
-consteval auto is_persistent_column()
-{
-  if constexpr (requires { typename C::persistent{}; }) {
-    return C::persistent::value;
-  } else {
-    return false;
-  }
-}
-
-template <typename C>
-using is_persistent_t = std::conditional_t<is_persistent_column<C>(), std::true_type, std::false_type>;
-
 template <typename T>
 concept not_void = requires { !std::same_as<T, void>; };
 
 template <typename C>
-concept is_index_column = requires { not_void<typename C::binding_t>; };
+concept persistent = requires(C c) { c.mColumnIterator; };
 
 template <typename C>
-using is_external_index_t = typename std::conditional_t<is_index_column<C>, std::true_type, std::false_type>;
+using is_persistent_t = std::conditional_t<persistent<C>, std::true_type, std::false_type>;
 
 template <typename C>
-concept is_self_index = requires { typename C::self_index_t{}; };
+concept index_column = requires { not_void<typename C::binding_t>; };
 
 template <typename C>
-using is_self_index_t = typename std::conditional_t<is_self_index<C>, std::true_type, std::false_type>;
+using is_external_index_t = typename std::conditional_t<index_column<C>, std::true_type, std::false_type>;
+
+template <typename C>
+concept self_index_column = requires { typename C::self_index_t{}; };
+
+template <typename C>
+using is_self_index_t = typename std::conditional_t<self_index_column<C>, std::true_type, std::false_type>;
 } // namespace o2::soa
 
 namespace o2::aod
@@ -307,7 +299,7 @@ struct TableMetadataNG {
 };
 
 template <typename T>
-concept NGMetadata = framework::is_base_of_template_v<TableMetadataNG, T>;
+concept ng_metadata = framework::is_base_of_template_v<TableMetadataNG, T>;
 
 template <typename D>
 struct MetadataTraitNG {
@@ -389,19 +381,11 @@ static inline constexpr header::DataDescription description(const char* const st
   return {out};
 }
 
-template <typename T, template <uint32_t> class H>
-struct is_hash : std::false_type {
-};
-
-template <template <uint32_t> class H, uint32_t Arg>
-struct is_hash<H<Arg>, H> : std::true_type {
-};
+template <typename T>
+concept aod_hash = requires(T t) { t.hash; t.str; };
 
 template <typename T>
-inline constexpr bool is_hash_v = is_hash<T, o2::aod::Hash>::value;
-
-template <typename T>
-concept aodHash = is_hash_v<T>;
+concept origin_hash = aod_hash<T> && requires(T t) { t.origin; };
 
 template <soa::TableRef R>
 static constexpr auto sourceSpec()
@@ -413,7 +397,7 @@ static constexpr auto sourceSpec()
 
 namespace o2::soa
 {
-template <aod::aodHash L, aod::aodHash D, aod::aodHash O, typename... Ts>
+template <aod::aod_hash L, aod::aod_hash D, aod::origin_hash O, typename... Ts>
 class TableNG;
 
 struct Binding {
@@ -466,32 +450,14 @@ inline constexpr bool is_type_with_parent_v = false;
 template <typename T>
 inline constexpr bool is_type_with_parent_v<T, std::void_t<decltype(sizeof(typename T::parent_t))>> = true;
 
-template <typename, typename = void>
-inline constexpr bool is_type_with_metadata_v = false;
+template <typename T>
+concept has_metadata = not_void<typename aod::MetadataTrait<std::decay_t<T>>::metadata>;
 
 template <typename T>
-inline constexpr bool is_type_with_metadata_v<T, std::void_t<decltype(sizeof(typename T::metadata))>> = true;
+concept has_ng_metadata = not_void<typename aod::MetadataTraitNG<o2::aod::Hash<std::decay_t<T>::ref.desc_hash>>::metadata>;
 
 template <typename T>
-concept withMetadata = is_type_with_metadata_v<T>;
-
-template <typename T>
-concept hasMetadata = !std::is_same_v<void, typename aod::MetadataTrait<T>::metadata>;
-
-template <typename T>
-concept hasngMetadata = !std::is_same_v<void, typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata>;
-
-template <typename, typename = void>
-inline constexpr bool is_type_with_binding_v = false;
-
-template <typename T>
-inline constexpr bool is_type_with_binding_v<T, std::void_t<decltype(sizeof(typename T::binding_t))>> = true;
-
-template <typename, typename = void>
-inline constexpr bool is_type_spawnable_v = false;
-
-template <typename T>
-inline constexpr bool is_type_spawnable_v<T, std::void_t<decltype(sizeof(typename T::spawnable_t))>> = true;
+concept spawnable = std::is_same_v<typename T::spawnable_t, std::true_type>;
 
 template <typename, typename = void>
 inline constexpr bool is_soa_extension_table_v = false;
@@ -506,12 +472,6 @@ template <typename T>
 inline constexpr bool is_index_table_v<T, std::void_t<decltype(sizeof(typename T::indexing_t))>> = true;
 
 template <typename, typename = void>
-inline constexpr bool is_self_index_column_v = false;
-
-template <typename T>
-inline constexpr bool is_self_index_column_v<T, std::void_t<decltype(sizeof(typename T::self_index_t))>> = true;
-
-template <typename, typename = void>
 inline constexpr bool is_with_base_table_v = false;
 
 template <typename T>
@@ -522,24 +482,16 @@ struct EquivalentIndex {
   constexpr static bool value = false;
 };
 
+template <aod::aod_hash A, aod::aod_hash B>
+struct EquivalentIndexNG {
+  constexpr static bool value = false;
+};
+
 template <typename B, typename E>
 constexpr bool is_index_equivalent_v = EquivalentIndex<B, E>::value || EquivalentIndex<E, B>::value;
 
-template <typename T, typename TLambda>
-void call_if_has_originals(TLambda&& lambda)
-{
-  if constexpr (is_type_with_originals_v<T>) {
-    lambda(static_cast<T*>(nullptr));
-  }
-}
-
-template <typename T, typename TLambda>
-void call_if_has_not_originals(TLambda&& lambda)
-{
-  if constexpr (!is_type_with_originals_v<T>) {
-    lambda(static_cast<T*>(nullptr));
-  }
-}
+template <aod::aod_hash A, aod::aod_hash B>
+constexpr bool is_ng_index_equivalent_v = EquivalentIndexNG<A, B>::value || EquivalentIndexNG<B, A>::value;
 
 template <typename H, typename... T>
 consteval decltype(auto) make_originals_from_type()
@@ -782,7 +734,6 @@ struct Column {
   Column(Column&&) = default;
   Column& operator=(Column&&) = default;
 
-  using persistent = std::true_type;
   using type = T;
   static constexpr const char* const& columnLabel() { return INHERIT::mLabel; }
   ColumnIterator<T> const& getIterator() const
@@ -806,7 +757,6 @@ template <typename F, typename INHERIT>
 struct DynamicColumn {
   using inherited_t = INHERIT;
 
-  using persistent = std::false_type;
   static constexpr const char* const& columnLabel() { return INHERIT::mLabel; }
 };
 
@@ -814,7 +764,6 @@ template <typename INHERIT>
 struct IndexColumn {
   using inherited_t = INHERIT;
 
-  using persistent = std::false_type;
   static constexpr const char* const& columnLabel() { return INHERIT::mLabel; }
 };
 
@@ -822,7 +771,6 @@ template <typename INHERIT>
 struct MarkerColumn {
   using inherited_t = INHERIT;
 
-  using persistent = std::false_type;
   static constexpr const char* const& columnLabel() { return INHERIT::mLabel; }
 };
 
@@ -924,55 +872,19 @@ struct Index : o2::soa::IndexColumn<Index<START, END>> {
 };
 
 template <typename T>
-consteval bool is_soa_column_v()
-{
-  if constexpr (framework::is_base_of_template_v<soa::Column, T>) {
-    return true;
-  } else if constexpr (framework::is_base_of_template_v<soa::DynamicColumn, T>) {
-    return true;
-  } else if constexpr (framework::is_base_of_template_v<soa::IndexColumn, T>) {
-    return true;
-  } else if constexpr (framework::is_base_of_template_v<soa::MarkerColumn, T>) {
-    return true;
-  } else {
-    return false;
-  }
-}
+concept dynamic = framework::is_base_of_template_v<soa::DynamicColumn, T>;
 
 template <typename T>
-using is_dynamic_t = framework::is_specialization<typename T::base, DynamicColumn>;
-
-// namespace persistent_type_helper
-// {
-// // This checks both for the existence of the ::persistent member in the class T as well as the value returned stored in it.
-// // Hack: a pointer to any field of type int inside persistent. Both true_type and false_type do not have any int field, but anyways we pass nullptr.
-// // The compiler picks the version with exact number of arguments when only it can, i.e., when T::persistent is defined.
-// template <class T>
-// typename T::persistent test(int T::persistent::*);
-
-// template <class>
-// std::false_type test(...);
-// } // namespace persistent_type_helper
-
-// template <typename T>
-// using is_persistent_t = decltype(persistent_type_helper::test<T>(nullptr));
+using is_dynamic_t = std::conditional_t<dynamic<T>, std::true_type, std::false_type>;
 
 template <typename T>
-constexpr auto is_persistent_v = soa::is_persistent_t<T>::value;
+concept index = framework::is_base_of_template_v<soa::IndexColumn, T>;
 
 template <typename T>
-constexpr auto is_dynamic_v = is_dynamic_t<T>::value;
-
-template <typename T, template <auto...> class Ref>
-struct is_index : std::false_type {
-};
-
-template <template <auto...> class Ref, auto... Args>
-struct is_index<Ref<Args...>, Ref> : std::true_type {
-};
+concept soa_column = framework::is_base_of_template_v<soa::Column, T> || dynamic<T> || index<T> || framework::is_base_of_template_v<soa::MarkerColumn, T>;
 
 template <typename T>
-using is_index_t = is_index<T, Index>;
+using is_index_t = std::conditional_t<index<T>, std::true_type, std::false_type>;
 
 struct IndexPolicyBase {
   /// Position inside the current table
@@ -1168,7 +1080,7 @@ struct DefaultIndexPolicy : IndexPolicyBase {
 template <OriginEnc ORIGIN, typename... C>
 class Table;
 
-template <aod::aodHash L, aod::aodHash D, aod::aodHash O, typename... T>
+template <aod::aod_hash L, aod::aod_hash D, aod::origin_hash O, typename... T>
 class TableNG;
 
 /// Similar to a pair but not a pair, to avoid
@@ -1355,14 +1267,10 @@ struct TableIterator : IP, C... {
   {
     using namespace o2::soa;
     auto f = framework::overloaded{
-      [this]<typename T>(T*) -> void
-        requires is_persistent_v<T>
-                 { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
-                 [this]<typename T>(T*) -> void
-                   requires is_dynamic_v<T>
-      { bindDynamicColumn<T>(typename T::bindings_t{}); },
+      [this]<soa::persistent T>(T*) -> void { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
+      [this]<soa::dynamic T>(T*) -> void { bindDynamicColumn<T>(typename T::bindings_t{}); },
       [this]<typename T>(T*) -> void {},
-      };
+    };
     (f(static_cast<C*>(nullptr)), ...);
     if constexpr (has_index_v) {
       this->setIndices(this->getIndices());
@@ -1567,14 +1475,10 @@ struct RowViewCore : public IP, C... {
   {
     using namespace o2::soa;
     auto f = framework::overloaded{
-      [this]<typename T>(T*) -> void
-        requires is_persistent_v<T>
-                 { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
-                 [this]<typename T>(T*) -> void
-                   requires is_dynamic_v<T>
-      { bindDynamicColumn<T>(typename T::bindings_t{}); },
+      [this]<soa::persistent T>(T*) -> void { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
+      [this]<soa::dynamic T>(T*) -> void { bindDynamicColumn<T>(typename T::bindings_t{}); },
       [this]<typename T>(T*) -> void {},
-      };
+    };
     (f(static_cast<C*>(nullptr)), ...);
     if constexpr (has_index_v) {
       this->setIndices(this->getIndices());
@@ -1609,12 +1513,6 @@ struct RowViewCore : public IP, C... {
   }
 };
 
-template <typename, typename = void>
-constexpr bool is_type_with_policy_v = false;
-
-template <typename T>
-constexpr bool is_type_with_policy_v<T, std::void_t<decltype(sizeof(typename T::policy_t))>> = true;
-
 struct ArrowHelpers {
   static std::shared_ptr<arrow::Table> joinTables(std::vector<std::shared_ptr<arrow::Table>>&& tables);
   static std::shared_ptr<arrow::Table> concatTables(std::vector<std::shared_ptr<arrow::Table>>&& tables);
@@ -1634,16 +1532,10 @@ constexpr bool are_bindings_compatible_v(framework::pack<Os...>&&)
 }
 
 template <typename T>
-inline constexpr bool is_soa_table_like_v = soa::is_base_of_template_origin_v<soa::Table, T>;
+concept soa_table = soa::is_base_of_template_origin_v<soa::Table, T>;
 
 template <typename T>
-concept soaTable = is_soa_table_like_v<T>;
-
-template <typename T>
-inline constexpr bool is_ng_table_like_v = framework::is_base_of_template_v<soa::TableNG, T>;
-
-template <typename T>
-concept ngTable = is_ng_table_like_v<T>;
+concept ng_table = framework::is_base_of_template_v<soa::TableNG, T>;
 
 /// special case for the template with origin
 template <typename T, template <OriginEnc, typename...> class Ref>
@@ -1659,56 +1551,56 @@ inline constexpr bool is_specialization_origin_v = is_specialization_origin<T, R
 
 //! Helper to check if a type T is an iterator
 template <typename T>
-inline constexpr bool is_soa_iterator_v = soa::is_base_of_template_origin_v<RowViewCore, T> || soa::is_specialization_origin_v<T, RowViewCore>;
+concept soa_iterator = soa::is_base_of_template_origin_v<RowViewCore, T> || soa::is_specialization_origin_v<T, RowViewCore>;
 
 template <typename T>
-concept soaIterator = is_soa_iterator_v<T>;
+concept ng_iterator = framework::is_base_of_template_v<TableIterator, T> || framework::is_specialization_v<T, TableIterator>;
 
-template <typename T>
-inline constexpr bool is_ng_iterator_v = framework::is_base_of_template_v<TableIterator, T> || framework::is_specialization_v<T, TableIterator>;
-
-template <typename T>
-concept ngIterator = is_ng_iterator_v<T>;
-
-template <typename T, typename B>
-  requires((o2::soa::is_soa_iterator_v<T> || o2::soa::is_soa_table_like_v<T>) && o2::soa::is_soa_table_like_v<B>)
+template <typename T, soa::soa_table B>
+  requires(o2::soa::soa_iterator<T> || o2::soa::soa_table<T>)
 consteval bool is_binding_compatible_v()
 {
   return are_bindings_compatible_v<T>(originals_pack_t<B>{});
 }
 
-template <typename T, soa::ngTable B>
-  requires((o2::soa::is_soa_iterator_v<T> || o2::soa::is_soa_table_like_v<T>))
+template <typename T, soa::ng_table B>
+  requires(o2::soa::soa_iterator<T> || o2::soa::soa_table<T>)
 consteval bool is_binding_compatible_v()
 {
   return false;
 }
 
-template <soa::ngTable T, soa::soaTable B>
+template <soa::ng_table T, soa::soa_table B>
 consteval bool is_binding_compatible_v()
 {
   return false;
 }
 
 template <typename A>
-concept WithOriginals = requires() {
+concept with_originals = requires() {
   A::originals.size();
 };
 
 template <typename T>
-concept WithSources = requires() {
+concept with_sources = requires() {
   o2::aod::MetadataTraitNG<T>::metadata::sources.size();
 };
 
-template <WithOriginals T, WithOriginals B>
+template <with_originals T, with_originals B>
 consteval bool is_binding_compatible_v()
 {
-  return std::ranges::count_if(B::originals.begin(), B::originals.end(), [&](TableRef const& a) { return std::any_of(T::originals.begin(), T::originals.end(), [&](TableRef const& e) { return e.desc_hash == a.desc_hash; }); }) != 0;
+  return []<size_t... Is>(std::index_sequence<Is...>) {
+    return ([]<size_t... Ks>(std::index_sequence<Ks...>) {
+      constexpr auto thash = T::originals[Is].desc_hash;
+      using tHash = o2::aod::Hash<T::originals[Is].desc_hash>;
+      return (((thash == B::originals[Ks].desc_hash) || is_ng_index_equivalent_v<tHash, o2::aod::Hash<B::originals[Ks].desc_hash>>) || ...);
+    }(std::make_index_sequence<B::originals.size()>()) ||
+            ...);
+  }(std::make_index_sequence<T::originals.size()>());
 }
 
 template <typename T, typename B>
-struct is_binding_compatible : std::conditional_t<is_binding_compatible_v<T, typename B::binding_t>(), std::true_type, std::false_type> {
-};
+using is_binding_compatible = std::conditional_t<is_binding_compatible_v<T, typename B::binding_t>(), std::true_type, std::false_type>;
 
 template <typename T>
 static constexpr std::string getLabelFromType()
@@ -1743,14 +1635,13 @@ static constexpr std::string getLabelFromType()
   }
 }
 
-template <soa::ngTable T>
-  requires soa::is_ng_table_like_v<T>
+template <soa::ng_table T>
 static constexpr std::string getLabelFromTypeNG()
 {
   return std::string{o2::aod::Hash<std::decay_t<T>::originals[0].label_hash>::str};
 }
 
-template <soa::ngIterator T>
+template <soa::ng_iterator T>
 static constexpr std::string getLabelFromTypeNG()
 {
   return getLabelFromTypeNG<typename std::decay_t<T>::parent_t>();
@@ -1760,14 +1651,15 @@ template <typename L, typename D, typename O, typename Key, typename H, typename
 struct IndexTableNG;
 
 template <typename T>
-  requires framework::is_specialization_v<T, o2::soa::IndexTableNG>
+concept index_table = framework::is_specialization_v<T, o2::soa::IndexTableNG>;
+
+template <index_table T>
 static constexpr std::string getLabelFromTypeNG()
 {
   return getLabelFromTypeNG<typename std::decay_t<T>::first_t>();
 }
 
-template <typename T>
-  requires WithSources<T>
+template <with_sources T>
 static constexpr std::string getLabelFromTypeNG()
 {
   return getLabelFromTypeNG<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>();
@@ -1779,8 +1671,7 @@ static constexpr auto hasColumnForKey(framework::pack<C...>, std::string const& 
   return ((C::inherited_t::mLabel == key) || ...);
 }
 
-template <typename T>
-  requires soa::is_soa_table_like_v<T>
+template <soa::soa_table T>
 static constexpr std::pair<bool, std::string> hasKey(std::string const& key)
 {
   return {hasColumnForKey(typename T::persistent_columns_t{}, key), getLabelFromType<T>()};
@@ -1801,8 +1692,7 @@ static constexpr auto haveKey(framework::pack<C...>, std::string const& key)
 void notFoundColumn(const char* label, const char* key);
 void missingOptionalPreslice(const char* label, const char* key);
 
-template <typename T, bool OPT = false>
-  requires soa::is_soa_table_like_v<T>
+template <soa::soa_table T, bool OPT = false>
 static constexpr std::string getLabelFromTypeForKey(std::string const& key)
 {
   if constexpr (soa::is_type_with_originals_v<std::decay_t<T>>) {
@@ -1826,8 +1716,7 @@ static constexpr std::string getLabelFromTypeForKey(std::string const& key)
   O2_BUILTIN_UNREACHABLE();
 }
 
-template <typename T, bool OPT = false>
-  requires WithOriginals<T>
+template <with_originals T, bool OPT = false>
 static constexpr std::string getLabelFromTypeForKey(std::string const& key)
 {
   if constexpr (T::originals.size() == 1) {
@@ -1957,7 +1846,7 @@ namespace o2::soa
 template <typename T>
 inline consteval bool is_soa_filtered_iterator_v()
 {
-  if constexpr (!is_soa_iterator_v<T> && !is_ng_iterator_v<T>) {
+  if constexpr (!soa::soa_iterator<T> && !soa::ng_iterator<T>) {
     return false;
   } else {
     if constexpr (std::is_same_v<typename T::policy_t, soa::FilteredIndexPolicy>) {
@@ -1985,25 +1874,25 @@ template <typename T>
 inline constexpr bool is_soa_filtered_v = framework::is_base_of_template_v<soa::FilteredBase, T> || framework::is_base_of_template_v<soa::FilteredBaseNG, T>;
 
 template <typename T>
-concept hasFilteredPolicy = std::same_as<typename T::policy_t, soa::FilteredIndexPolicy>;
+concept has_filtered_policy = not_void<typename T::policy_t> && std::same_as<typename T::policy_t, soa::FilteredIndexPolicy>;
 
 template <typename T>
-concept soaFilteredIterator = soaIterator<T> && hasFilteredPolicy<T>;
+concept soa_filtered_iterator = soa_iterator<T> && has_filtered_policy<T>;
 
 template <typename T>
-concept ngFilteredIterator = ngIterator<T> && hasFilteredPolicy<T>;
+concept ng_filtered_iterator = ng_iterator<T> && has_filtered_policy<T>;
 
 template <typename T>
-concept soaFilteredTable = framework::is_base_of_template_v<soa::FilteredBase, T>;
+concept soa_filtered_table = framework::is_base_of_template_v<soa::FilteredBase, T>;
 
 template <typename T>
-concept ngFilteredTable = framework::is_base_of_template_v<soa::FilteredBaseNG, T>;
+concept ng_filtered_table = framework::is_base_of_template_v<soa::FilteredBaseNG, T>;
 
 template <typename T>
-concept soaFiltered = soaFilteredTable<T> || soaFilteredIterator<T>;
+concept soa_filtered = soa_filtered_table<T> || soa_filtered_iterator<T>;
 
 template <typename T>
-concept ngFiltered = ngFilteredTable<T> || ngFilteredIterator<T>;
+concept ng_filtered = ng_filtered_table<T> || ng_filtered_iterator<T>;
 
 /// Helper function to extract bound indices
 template <typename... Is>
@@ -2141,15 +2030,13 @@ auto doSliceByCachedUnsorted(T const* table, framework::expressions::BindingNode
   }
 }
 
-template <typename T>
-  requires soa::is_soa_table_like_v<T>
+template <soa::soa_table T>
 auto select(T const& t, framework::expressions::Filter const& f)
 {
   return Filtered<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
 }
 
-template <typename T>
-  requires WithOriginals<T>
+template <with_originals T>
 auto select(T const& t, framework::expressions::Filter const& f)
 {
   return FilteredNG<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
@@ -2168,21 +2055,7 @@ consteval auto getColumns()
   return typename aod::MetadataTraitNG<o2::aod::Hash<ref.desc_hash>>::metadata::columns{};
 }
 
-template <typename... Ts>
-consteval auto originalsPack()
-  requires(sizeof...(Ts) > 0 && (o2::soa::is_soa_column_v<Ts>() && ...))
-{
-  return framework::pack<>{};
-}
-
-template <typename... Ts>
-consteval auto originalsPack()
-  requires(sizeof...(Ts) > 0 && !(o2::soa::is_soa_column_v<Ts>() && ...))
-{
-  return framework::pack<Ts...>{};
-}
-
-template <aod::aodHash L, aod::aodHash D, aod::aodHash O, typename... Ts>
+template <aod::aod_hash L, aod::aod_hash D, aod::origin_hash O, typename... Ts>
 class TableNG
 {
  public:
@@ -2194,7 +2067,7 @@ class TableNG
     if constexpr (sizeof...(Ts) == 0) {
       return std::array<TableRef, 1>{ref};
     } else {
-      if constexpr ((o2::soa::is_soa_column_v<Ts>() && ...)) {
+      if constexpr ((o2::soa::soa_column<Ts> && ...)) {
         return std::array<TableRef, 1>{ref};
       } else {
         return o2::soa::mergeOriginals<Ts...>();
@@ -2231,7 +2104,7 @@ class TableNG
     if constexpr (sizeof...(Ts) == 0) {
       return getColumns<originals[0]>();
     } else {
-      if constexpr ((o2::soa::is_soa_column_v<Ts>() && ...)) {
+      if constexpr ((o2::soa::soa_column<Ts> && ...)) {
         return framework::pack<Ts...>{};
       } else {
         if constexpr (std::same_as<O, o2::aod::Hash<"CONC"_h>>) {
@@ -2349,7 +2222,7 @@ class TableNG
         return framework::pack_element_t<idx, external_index_columns_t>::getId();
       } else if constexpr (std::is_same_v<decayed, Parent>) { // self index
         return this->globalIndex();
-      } else if constexpr (is_index_t<decayed>::value && decayed::mLabel == "Index") { // soa::Index<>
+      } else if constexpr (soa::index<decayed>) { // soa::Index<>
         return this->globalIndex();
       } else {
         return static_cast<int32_t>(-1);
@@ -2368,7 +2241,7 @@ class TableNG
     auto getValue() const
     {
       using COL = std::decay_t<CC>;
-      static_assert(is_dynamic_t<COL>() || is_persistent_v<COL>, "Should be persistent or dynamic column with no argument that has a return type convertable to float");
+      static_assert(is_dynamic_t<COL>() || soa::persistent<COL>, "Should be persistent or dynamic column with no argument that has a return type convertable to float");
       return static_cast<B>(static_cast<COL>(*this).get());
     }
 
@@ -2411,7 +2284,7 @@ class TableNG
     if constexpr (sizeof...(Ts) == 0) {
       return iterator_template<IP, Parent>{};
     } else {
-      if constexpr ((o2::soa::is_soa_column_v<Ts>() && ...)) {
+      if constexpr ((o2::soa::soa_column<Ts> && ...)) {
         return iterator_template<IP, Parent>{};
       } else {
         return iterator_template<IP, Parent, Ts...>{};
@@ -2637,7 +2510,7 @@ class TableNG
   template <typename T>
   arrow::ChunkedArray* lookupColumn()
   {
-    if constexpr (T::persistent::value) {
+    if constexpr (soa::persistent<T>) {
       auto label = T::columnLabel();
       return getIndexFromLabel(mTable.get(), label);
     } else {
@@ -2652,8 +2525,7 @@ class TableNG
   iterator mBegin;
 };
 
-template <uint32_t D, typename... C>
-  requires((soa::is_soa_column_v<C>() && ...))
+template <uint32_t D, soa::soa_column... C>
 using InPlaceTableNG = TableNG<o2::aod::Hash<"TEST"_h>, o2::aod::Hash<D>, o2::aod::Hash<"TEST"_h>, C...>;
 
 /// A Table class which observes an arrow::Table and provides
@@ -2775,7 +2647,7 @@ class Table
         return framework::pack_element_t<idx, external_index_columns_t>::getId();
       } else if constexpr (std::is_same_v<decayed, Parent>) { // self index
         return this->globalIndex();
-      } else if constexpr (is_index_t<decayed>::value && decayed::mLabel == "Index") { // soa::Index<>
+      } else if constexpr (soa::index<decayed>) { // soa::Index<>
         return this->globalIndex();
       } else {
         return static_cast<int32_t>(-1);
@@ -2786,7 +2658,7 @@ class Table
     auto getDynamicColumn() const
     {
       using decayed = std::decay_t<CD>;
-      static_assert(is_dynamic_t<decayed>(), "Requested column is not a dynamic column");
+      static_assert(soa::dynamic<decayed>, "Requested column is not a dynamic column");
       return static_cast<decayed>(*this).template getDynamicValue<CDArgs...>();
     }
 
@@ -2794,7 +2666,7 @@ class Table
     auto getValue() const
     {
       using COL = std::decay_t<CC>;
-      static_assert(is_dynamic_t<COL>() || is_persistent_v<COL>, "Should be persistent or dynamic column with no argument that has a return type convertable to float");
+      static_assert(soa::dynamic<COL> || soa::persistent<COL>, "Should be persistent or dynamic column with no argument that has a return type convertable to float");
       return static_cast<B>(static_cast<COL>(*this).get());
     }
 
@@ -3036,7 +2908,7 @@ class Table
   template <typename T>
   arrow::ChunkedArray* lookupColumn()
   {
-    if constexpr (T::persistent::value) {
+    if constexpr (soa::persistent<T>) {
       auto label = T::columnLabel();
       return getIndexFromLabel(mTable.get(), label);
     } else {
@@ -3109,14 +2981,14 @@ namespace row_helpers
 template <typename... Cs>
 std::array<arrow::ChunkedArray*, sizeof...(Cs)> getArrowColumns(arrow::Table* table, framework::pack<Cs...>)
 {
-  static_assert(std::conjunction_v<typename Cs::persistent...>, "Arrow columns: only persistent columns accepted (not dynamic and not index ones");
+  static_assert((soa::persistent<Cs> && ...), "Arrow columns: only persistent columns accepted (not dynamic and not index ones");
   return std::array<arrow::ChunkedArray*, sizeof...(Cs)>{o2::soa::getIndexFromLabel(table, Cs::columnLabel())...};
 }
 
 template <typename... Cs>
 std::array<std::shared_ptr<arrow::Array>, sizeof...(Cs)> getChunks(arrow::Table* table, framework::pack<Cs...>, uint64_t ci)
 {
-  static_assert(std::conjunction_v<typename Cs::persistent...>, "Arrow chunks: only persistent columns accepted (not dynamic and not index ones");
+  static_assert((soa::persistent<Cs> && ...), "Arrow chunks: only persistent columns accepted (not dynamic and not index ones");
   return std::array<std::shared_ptr<arrow::Array>, sizeof...(Cs)>{o2::soa::getIndexFromLabel(table, Cs::columnLabel())->chunk(ci)...};
 }
 
@@ -3153,11 +3025,11 @@ template <typename T, typename C>
 typename C::type getSingleRowData(arrow::Table* table, T& rowIterator, uint64_t ci = -1, uint64_t ai = std::numeric_limits<uint64_t>::max(), uint64_t globalIndex = std::numeric_limits<uint64_t>::max())
 {
   using decayed = std::decay_t<C>;
-  if constexpr (decayed::persistent::value) {
+  if constexpr (soa::persistent<decayed>) {
     return getSingleRowPersistentData<T, C>(table, rowIterator, ci, ai);
-  } else if constexpr (o2::soa::is_dynamic_t<decayed>()) {
+  } else if constexpr (soa::dynamic<decayed>) {
     return getSingleRowDynamicData<T, C>(rowIterator, globalIndex);
-  } else if constexpr (o2::soa::is_index_t<decayed>::value) {
+  } else if constexpr (soa::index<decayed>) {
     return getSingleRowIndexData<T, C>(rowIterator, globalIndex);
   } else {
     static_assert(!sizeof(decayed*), "Unrecognized column kind"); // A trick to delay static_assert until we actually instantiate this branch
@@ -3192,7 +3064,7 @@ O2HASH("TEST/0");
   template <typename T>                                                                             \
   consteval int getVersion()                                                                        \
   {                                                                                                 \
-    if constexpr (o2::soa::is_type_with_metadata_v<MetadataTrait<T>>) {                             \
+    if constexpr (o2::soa::has_metadata<T>) {                                                       \
       return MetadataTrait<T>::metadata::version();                                                 \
     } else if constexpr (o2::soa::is_type_with_originals_v<T>) {                                    \
       return MetadataTrait<o2::framework::pack_head_t<typename T::originals>>::metadata::version(); \
@@ -3334,13 +3206,13 @@ O2HASH("TEST/0");
 
 /// SLICE
 
-template <o2::soa::ngTable T>
+template <o2::soa::ng_table T>
 consteval auto getIndexTargets()
 {
   return T::originals;
 }
 
-template <o2::soa::soaTable T>
+template <o2::soa::soa_table T>
 consteval auto getIndexTargets()
 {
   return std::array<o2::soa::TableRef, 0>{};
@@ -3677,7 +3549,7 @@ consteval auto getIndexTargets()
     using type = _Type_;                                                                                                                                           \
     using column_t = _Name_##Id;                                                                                                                                   \
     using self_index_t = std::true_type;                                                                                                                           \
-    using compatible_signature = std::conditional<aod::aodHash<_IndexTarget_>, _IndexTarget_, void>;                                                               \
+    using compatible_signature = std::conditional<aod::aod_hash<_IndexTarget_>, _IndexTarget_, void>;                                                              \
     _Name_##Id(arrow::ChunkedArray const* column)                                                                                                                  \
       : o2::soa::Column<_Type_, _Name_##Id>(o2::soa::ColumnIterator<type>(column))                                                                                 \
     {                                                                                                                                                              \
@@ -3736,7 +3608,7 @@ consteval auto getIndexTargets()
     using type = _Type_[2];                                                                            \
     using column_t = _Name_##IdSlice;                                                                  \
     using self_index_t = std::true_type;                                                               \
-    using compatible_signature = std::conditional<aod::aodHash<_IndexTarget_>, _IndexTarget_, void>;   \
+    using compatible_signature = std::conditional<aod::aod_hash<_IndexTarget_>, _IndexTarget_, void>;  \
     _Name_##IdSlice(arrow::ChunkedArray const* column)                                                 \
       : o2::soa::Column<_Type_[2], _Name_##IdSlice>(o2::soa::ColumnIterator<type>(column))             \
     {                                                                                                  \
@@ -3799,7 +3671,7 @@ consteval auto getIndexTargets()
     using type = std::vector<_Type_>;                                                                  \
     using column_t = _Name_##Ids;                                                                      \
     using self_index_t = std::true_type;                                                               \
-    using compatible_signature = std::conditional<aod::aodHash<_IndexTarget_>, _IndexTarget_, void>;   \
+    using compatible_signature = std::conditional<aod::aod_hash<_IndexTarget_>, _IndexTarget_, void>;  \
     _Name_##Ids(arrow::ChunkedArray const* column)                                                     \
       : o2::soa::Column<std::vector<_Type_>, _Name_##Ids>(o2::soa::ColumnIterator<type>(column))       \
     {                                                                                                  \

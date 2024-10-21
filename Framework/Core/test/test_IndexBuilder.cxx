@@ -20,7 +20,7 @@ using namespace o2::aod;
 
 namespace o2::aod
 {
-O2HASH("TST");
+O2ORIGIN("TST");
 namespace coords
 {
 DECLARE_SOA_COLUMN_FULL(X, x, float, "x");

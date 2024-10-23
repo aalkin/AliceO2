@@ -52,12 +52,7 @@ namespace o2::framework
 {
 namespace detail
 {
-/// FIXME: adapt type conversion to arrow 1.0
-// This is needed by Arrow 0.12.0 which dropped
-//
-//      using ArrowType = ArrowType_;
-//
-// from ARROW_STL_CONVERSION
+/// FIXME: adapt type conversion to new arrow
 template <typename T>
 struct ConversionTraits {
 };
@@ -69,6 +64,11 @@ struct ConversionTraits<T (&)[N]> {
 
 template <typename T, int N>
 struct ConversionTraits<T[N]> {
+  using ArrowType = ::arrow::FixedSizeListType;
+};
+
+template <typename T, int N>
+struct ConversionTraits<std::array<T, N>> {
   using ArrowType = ::arrow::FixedSizeListType;
 };
 
@@ -347,6 +347,27 @@ struct BuilderMaker<T (&)[N]> {
 
 template <typename T, int N>
 struct BuilderMaker<T[N]> {
+  using FillType = T*;
+  using BuilderType = arrow::FixedSizeListBuilder;
+  using ArrowType = arrow::FixedSizeListType;
+  using ElementType = typename detail::ConversionTraits<T>::ArrowType;
+
+  static std::unique_ptr<BuilderType> make(arrow::MemoryPool* pool)
+  {
+    std::unique_ptr<arrow::ArrayBuilder> valueBuilder;
+    auto status =
+      arrow::MakeBuilder(pool, arrow::TypeTraits<ElementType>::type_singleton(), &valueBuilder);
+    return std::make_unique<BuilderType>(pool, std::move(valueBuilder), N);
+  }
+
+  static std::shared_ptr<arrow::DataType> make_datatype()
+  {
+    return arrow::fixed_size_list(arrow::TypeTraits<ElementType>::type_singleton(), N);
+  }
+};
+
+template <typename T, int N>
+struct BuilderMaker<std::array<T, N>> {
   using FillType = T*;
   using BuilderType = arrow::FixedSizeListBuilder;
   using ArrowType = arrow::FixedSizeListType;

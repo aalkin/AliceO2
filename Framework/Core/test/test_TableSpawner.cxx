@@ -30,8 +30,8 @@ DECLARE_SOA_EXPRESSION_COLUMN(Rsq, rsq, float, test::x * test::x + test::y * tes
 DECLARE_SOA_EXPRESSION_COLUMN(Sin, sin, float, test::x / nsqrt (test::x * test::x + test::y * test::y));
 }
 
-DECLARE_SOA_TABLE_NG(PointNGs, "AOD", "PTSNG", test::X, test::Y, test::Z);
-DECLARE_SOA_EXTENDED_TABLE_NG(ExPointNGs, PointNGs, "EXPTSNG", test::Rsq, test::Sin);
+DECLARE_SOA_TABLE(PointNGs, "AOD", "PTSNG", test::X, test::Y, test::Z);
+DECLARE_SOA_EXTENDED_TABLE(ExPointNGs, PointNGs, "EXPTSNG", 0, test::Rsq, test::Sin);
 }
 
 TEST_CASE("TestTableSpawner")

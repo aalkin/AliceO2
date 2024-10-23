@@ -1358,14 +1358,13 @@ auto combinations(const o2::framework::expressions::Filter& filter, const T2s&..
   }
 }
 
-template <typename... T2s>
-  requires(with_originals<T2s> && ...)
+template <soa::ng_table... T2s>
 auto combinations(const o2::framework::expressions::Filter& filter, const T2s&... tables)
 {
   if constexpr (isSameType<T2s...>()) {
-    return CombinationsGenerator<CombinationsStrictlyUpperIndexPolicy<FilteredNG<T2s>...>>(CombinationsStrictlyUpperIndexPolicy(tables.select(filter)...));
+    return CombinationsGenerator<CombinationsStrictlyUpperIndexPolicy<Filtered<T2s>...>>(CombinationsStrictlyUpperIndexPolicy(tables.select(filter)...));
   } else {
-    return CombinationsGenerator<CombinationsUpperIndexPolicy<FilteredNG<T2s>...>>(CombinationsUpperIndexPolicy(tables.select(filter)...));
+    return CombinationsGenerator<CombinationsUpperIndexPolicy<Filtered<T2s>...>>(CombinationsUpperIndexPolicy(tables.select(filter)...));
   }
 }
 
@@ -1383,11 +1382,10 @@ CombinationsGenerator<P2<Filtered<T2s>...>> combinations(P2<T2s...>&&, const o2:
   return CombinationsGenerator<P2<Filtered<T2s>...>>(P2<Filtered<T2s>...>(tables.select(filter)...));
 }
 
-template <template <typename...> typename P2, typename... T2s>
-  requires(with_originals<T2s> && ...)
-CombinationsGenerator<P2<FilteredNG<T2s>...>> combinations(P2<T2s...>&&, const o2::framework::expressions::Filter& filter, const T2s&... tables)
+template <template <typename...> typename P2, soa::ng_table... T2s>
+CombinationsGenerator<P2<Filtered<T2s>...>> combinations(P2<T2s...>&&, const o2::framework::expressions::Filter& filter, const T2s&... tables)
 {
-  return CombinationsGenerator<P2<FilteredNG<T2s>...>>(P2<FilteredNG<T2s>...>(tables.select(filter)...));
+  return CombinationsGenerator<P2<Filtered<T2s>...>>(P2<Filtered<T2s>...>(tables.select(filter)...));
 }
 
 template <typename... T2s>

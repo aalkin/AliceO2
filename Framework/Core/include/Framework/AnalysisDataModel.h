@@ -64,15 +64,16 @@ DECLARE_SOA_COLUMN(Timestamp, timestamp, uint64_t); //! Timestamp of a BC in ms 
 
 DECLARE_SOA_TABLE(Timestamps, "AOD", "TIMESTAMPS", //! Table which holds the timestamp of a BC
                   timestamp::Timestamp);
+
+using BCsWithTimestamps = soa::Join<aod::BCs, aod::Timestamps>;
 } // namespace aod
+
 namespace soa
 {
-extern template struct Join<aod::BCs, aod::Timestamps>;
+extern template struct JoinFull<o2::aod::Hash<"JOIN/0"_h>, aod::BCs, aod::Timestamps>;
 }
 namespace aod
 {
-using BCsWithTimestamps = soa::Join<aod::BCs, aod::Timestamps>;
-
 namespace collision
 {
 DECLARE_SOA_INDEX_COLUMN(BC, bc);                              //! Most probably BC to where this collision has occured
@@ -473,7 +474,7 @@ DECLARE_SOA_TABLE_FULL(StoredTracks, "Tracks", "AOD", "TRACK", //! On disk versi
                        track::Sign<track::Signed1Pt>,
                        o2::soa::Marker<1>);
 
-DECLARE_SOA_EXTENDED_TABLE(Tracks, StoredTracks, "TRACK", //! Track parameters at collision vertex
+DECLARE_SOA_EXTENDED_TABLE(Tracks, StoredTracks, "EXTRACK", 0, //! Track parameters at collision vertex
                            aod::track::Pt,
                            aod::track::P,
                            aod::track::Eta,
@@ -493,7 +494,7 @@ DECLARE_SOA_TABLE_FULL(StoredTracksIU, "Tracks_IU", "AOD", "TRACK_IU", //! On di
                        track::Sign<track::Signed1Pt>,
                        o2::soa::Marker<2>);
 
-DECLARE_SOA_EXTENDED_TABLE(TracksIU, StoredTracksIU, "TRACK_IU", //! Track parameters at inner most update (e.g. ITS) as it comes from the tracking
+DECLARE_SOA_EXTENDED_TABLE(TracksIU, StoredTracksIU, "EXTRACK_IU", 0, //! Track parameters at inner most update (e.g. ITS) as it comes from the tracking
                            aod::track::Pt,
                            aod::track::P,
                            aod::track::Eta,
@@ -504,7 +505,7 @@ DECLARE_SOA_TABLE_FULL(StoredTracksCov, "TracksCov", "AOD", "TRACKCOV", //! On d
                        track::RhoZY, track::RhoSnpY, track::RhoSnpZ, track::RhoTglY, track::RhoTglZ,
                        track::RhoTglSnp, track::Rho1PtY, track::Rho1PtZ, track::Rho1PtSnp, track::Rho1PtTgl, o2::soa::Marker<1>);
 
-DECLARE_SOA_EXTENDED_TABLE(TracksCov, StoredTracksCov, "TRACKCOV", //! Track covariance matrix at collision vertex
+DECLARE_SOA_EXTENDED_TABLE(TracksCov, StoredTracksCov, "EXTRACKCOV", 0, //! Track covariance matrix at collision vertex
                            aod::track::CYY,
                            aod::track::CZY,
                            aod::track::CZZ,
@@ -526,7 +527,7 @@ DECLARE_SOA_TABLE_FULL(StoredTracksCovIU, "TracksCov_IU", "AOD", "TRACKCOV_IU", 
                        track::RhoZY, track::RhoSnpY, track::RhoSnpZ, track::RhoTglY, track::RhoTglZ,
                        track::RhoTglSnp, track::Rho1PtY, track::Rho1PtZ, track::Rho1PtSnp, track::Rho1PtTgl, o2::soa::Marker<2>);
 
-DECLARE_SOA_EXTENDED_TABLE(TracksCovIU, StoredTracksCovIU, "TRACKCOV_IU", //! Track covariance matrix at inner most update (e.g. ITS) as it comes from the tracking
+DECLARE_SOA_EXTENDED_TABLE(TracksCovIU, StoredTracksCovIU, "EXTRACKCOV_IU", 0, //! Track covariance matrix at inner most update (e.g. ITS) as it comes from the tracking
                            aod::track::CYY,
                            aod::track::CZY,
                            aod::track::CZZ,
@@ -599,9 +600,9 @@ DECLARE_SOA_TABLE_FULL_VERSIONED(StoredTracksExtra_001, "TracksExtra", "AOD", "T
                                  track::TPCFractionSharedCls<track::TPCNClsShared, track::TPCNClsFindable, track::TPCNClsFindableMinusFound>,
                                  track::TrackEtaEMCAL, track::TrackPhiEMCAL, track::TrackTime, track::TrackTimeRes);
 
-DECLARE_SOA_EXTENDED_TABLE(TracksExtra_000, StoredTracksExtra_000, "TRACKEXTRA", //! Additional track information (clusters, PID, etc.)
+DECLARE_SOA_EXTENDED_TABLE(TracksExtra_000, StoredTracksExtra_000, "EXTRACKEXTRA", 0, //! Additional track information (clusters, PID, etc.)
                            track::DetectorMap);
-DECLARE_SOA_EXTENDED_TABLE(TracksExtra_001, StoredTracksExtra_001, "TRACKEXTRA", //! Additional track information (clusters, PID, etc.)
+DECLARE_SOA_EXTENDED_TABLE(TracksExtra_001, StoredTracksExtra_001, "EXTRACKEXTRA", 1, //! Additional track information (clusters, PID, etc.)
                            track::v001::DetectorMap);
 
 DECLARE_SOA_TABLE(Run2TrackExtras, "AOD", "RUN2TRACKEXTRA",
@@ -620,9 +621,9 @@ using Run2TrackExtra = Run2TrackExtras::iterator;
 } // namespace aod
 namespace soa
 {
-extern template struct soa::Join<aod::Tracks, aod::TracksExtra>;
-extern template struct soa::Join<aod::Tracks, aod::TracksCov, aod::TracksExtra>;
-extern template struct soa::Join<aod::TracksExtension, aod::StoredTracks>;
+extern template struct soa::JoinFull<o2::aod::Hash<"JOIN/0"_h>, aod::Tracks, aod::TracksExtra>;
+extern template struct soa::JoinFull<o2::aod::Hash<"JOIN/0"_h>, aod::Tracks, aod::TracksCov, aod::TracksExtra>;
+extern template struct soa::JoinFull<o2::aod::Hash<"JOIN/0"_h>, aod::TracksExtension, aod::StoredTracks>;
 } // namespace soa
 namespace aod
 {
@@ -803,12 +804,12 @@ DECLARE_SOA_TABLE_FULL_VERSIONED(StoredMFTTracks_001, "MFTTracks", "AOD", "MFTTR
                                  fwdtrack::Sign<fwdtrack::Signed1Pt>, fwdtrack::Chi2,
                                  fwdtrack::TrackTime, fwdtrack::TrackTimeRes);
 
-DECLARE_SOA_EXTENDED_TABLE(MFTTracks_000, StoredMFTTracks_000, "MFTTRACK", //! Additional MFTTracks information (Pt, Eta, P), version 0
+DECLARE_SOA_EXTENDED_TABLE(MFTTracks_000, StoredMFTTracks_000, "EXMFTTRACK", 0, //! Additional MFTTracks information (Pt, Eta, P), version 0
                            aod::fwdtrack::Pt,
                            aod::fwdtrack::Eta,
                            aod::fwdtrack::P);
 
-DECLARE_SOA_EXTENDED_TABLE(MFTTracks_001, StoredMFTTracks_001, "MFTTRACK", //! Additional MFTTracks information (Pt, Eta, P), version 1
+DECLARE_SOA_EXTENDED_TABLE(MFTTracks_001, StoredMFTTracks_001, "EXMFTTRACK", 1, //! Additional MFTTracks information (Pt, Eta, P), version 1
                            aod::fwdtrack::Pt,
                            aod::fwdtrack::Eta,
                            aod::fwdtrack::P);
@@ -837,9 +838,9 @@ DECLARE_SOA_TABLE_FULL(StoredFwdTracks, "FwdTracks", "AOD", "FWDTRACK",
                        fwdtrack::MCHBitMap, fwdtrack::MIDBitMap, fwdtrack::MIDBoards,
                        fwdtrack::TrackTime, fwdtrack::TrackTimeRes);
 
-DECLARE_SOA_EXTENDED_TABLE(FwdTracks, StoredFwdTracks, "FWDTRACK", //!
-                           aod::fwdtrack::Eta,                     // NOTE the order is different here than in MFTTracks as table extension has to be unique
+DECLARE_SOA_EXTENDED_TABLE(FwdTracks, StoredFwdTracks, "EXFWDTRACK", 0, //!
                            aod::fwdtrack::Pt,
+                           aod::fwdtrack::Eta,
                            aod::fwdtrack::P);
 
 DECLARE_SOA_TABLE_FULL(StoredFwdTracksCov, "FwdTracksCov", "AOD", "FWDTRACKCOV", //!
@@ -847,7 +848,7 @@ DECLARE_SOA_TABLE_FULL(StoredFwdTracksCov, "FwdTracksCov", "AOD", "FWDTRACKCOV",
                        fwdtrack::RhoXY, fwdtrack::RhoPhiY, fwdtrack::RhoPhiX, fwdtrack::RhoTglX, fwdtrack::RhoTglY,
                        fwdtrack::RhoTglPhi, fwdtrack::Rho1PtX, fwdtrack::Rho1PtY, fwdtrack::Rho1PtPhi, fwdtrack::Rho1PtTgl);
 
-DECLARE_SOA_EXTENDED_TABLE(FwdTracksCov, StoredFwdTracksCov, "FWDTRACKCOV", //!
+DECLARE_SOA_EXTENDED_TABLE(FwdTracksCov, StoredFwdTracksCov, "EXFWDTRACKCOV", 0, //!
                            aod::fwdtrack::CXX,
                            aod::fwdtrack::CXY,
                            aod::fwdtrack::CYY,
@@ -870,7 +871,7 @@ using FwdTrackCovFwd = FwdTracksCov::iterator;
 } // namespace aod
 namespace soa
 {
-extern template struct Join<aod::FwdTracks, aod::FwdTracksCov>;
+extern template struct JoinFull<o2::aod::Hash<"JOIN/0"_h>, aod::FwdTracks, aod::FwdTracksCov>;
 }
 namespace aod
 {
@@ -1764,14 +1765,14 @@ DECLARE_SOA_TABLE_FULL_VERSIONED(StoredMcParticles_001, "McParticles", "AOD", "M
                                  mcparticle::GetProcess<mcparticle::Flags, mcparticle::StatusCode>,
                                  mcparticle::IsPhysicalPrimary<mcparticle::Flags>);
 
-DECLARE_SOA_EXTENDED_TABLE(McParticles_000, StoredMcParticles_000, "MCPARTICLE", //! Basic MC particle properties
+DECLARE_SOA_EXTENDED_TABLE(McParticles_000, StoredMcParticles_000, "EXMCPARTICLE", 0, //! Basic MC particle properties
                            mcparticle::Phi,
                            mcparticle::Eta,
                            mcparticle::Pt,
                            mcparticle::P,
                            mcparticle::Y);
 
-DECLARE_SOA_EXTENDED_TABLE(McParticles_001, StoredMcParticles_001, "MCPARTICLE", //! Basic MC particle properties
+DECLARE_SOA_EXTENDED_TABLE(McParticles_001, StoredMcParticles_001, "EXMCPARTICLE", 1, //! Basic MC particle properties
                            mcparticle::Phi,
                            mcparticle::Eta,
                            mcparticle::Pt,
@@ -1978,8 +1979,8 @@ DECLARE_EQUIVALENT_FOR_INDEX(aod::StoredTracksIU, aod::McTrackLabels);
 DECLARE_EQUIVALENT_FOR_INDEX(aod::Collisions, aod::McCollisionLabels);
 // Joins with collisions (only for sparse ones)
 // NOTE: index table needs to be always last argument
-extern template struct Join<aod::Collisions, aod::Run2MatchedSparse>;
-extern template struct Join<aod::Collisions, aod::Run3MatchedSparse>;
+extern template struct JoinFull<o2::aod::Hash<"JOIN/0"_h>, aod::Collisions, aod::Run2MatchedSparse>;
+extern template struct JoinFull<o2::aod::Hash<"JOIN/0"_h>, aod::Collisions, aod::Run3MatchedSparse>;
 } // namespace soa
 namespace aod
 {

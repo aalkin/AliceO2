@@ -84,6 +84,48 @@ struct PartitionManager {
   }
 };
 
+// template <typename T>
+// struct PartitionManager<Partition<T>> {
+//   template <typename T2>
+//   static void doSetPartition(Partition<T>& partition, T2& table)
+//   {
+//     if constexpr (std::is_same_v<T, T2>) {
+//       partition.bindTable(table);
+//     }
+//   }
+
+//   template <typename... T2s>
+//   static void setPartition(Partition<T>& partition, T2s&... tables)
+//   {
+//     (doSetPartition(partition, tables), ...);
+//   }
+
+//   template <typename... Ts>
+//   static void bindExternalIndices(Partition<T>& partition, Ts*... tables)
+//   {
+//     partition.bindExternalIndices(tables...);
+//   }
+
+//   template <typename E>
+//   static void bindInternalIndices(Partition<T>& partition, E* table)
+//   {
+//     if constexpr (o2::soa::is_binding_compatible_v<T, std::decay_t<E>>()) {
+//       partition.bindInternalIndicesTo(table);
+//     }
+//   }
+
+//   static void updatePlaceholders(Partition<T>& partition, InitContext& context)
+//   {
+//     partition.updatePlaceholders(context);
+//   }
+
+//   static bool newDataframe(Partition<T>& partition)
+//   {
+//     partition.dataframeChanged = true;
+//     return true;
+//   }
+// };
+
 template <typename T>
 struct PartitionManager<Partition<T>> {
   template <typename T2>
@@ -120,48 +162,6 @@ struct PartitionManager<Partition<T>> {
   }
 
   static bool newDataframe(Partition<T>& partition)
-  {
-    partition.dataframeChanged = true;
-    return true;
-  }
-};
-
-template <typename T>
-struct PartitionManager<PartitionNG<T>> {
-  template <typename T2>
-  static void doSetPartition(PartitionNG<T>& partition, T2& table)
-  {
-    if constexpr (std::is_same_v<T, T2>) {
-      partition.bindTable(table);
-    }
-  }
-
-  template <typename... T2s>
-  static void setPartition(PartitionNG<T>& partition, T2s&... tables)
-  {
-    (doSetPartition(partition, tables), ...);
-  }
-
-  template <typename... Ts>
-  static void bindExternalIndices(PartitionNG<T>& partition, Ts*... tables)
-  {
-    partition.bindExternalIndices(tables...);
-  }
-
-  template <typename E>
-  static void bindInternalIndices(PartitionNG<T>& partition, E* table)
-  {
-    if constexpr (o2::soa::is_binding_compatible_v<T, std::decay_t<E>>()) {
-      partition.bindInternalIndicesTo(table);
-    }
-  }
-
-  static void updatePlaceholders(PartitionNG<T>& partition, InitContext& context)
-  {
-    partition.updatePlaceholders(context);
-  }
-
-  static bool newDataframe(PartitionNG<T>& partition)
   {
     partition.dataframeChanged = true;
     return true;
@@ -281,6 +281,30 @@ struct OutputManager {
 };
 
 /// Produces specialization
+// template <typename TABLE>
+// struct OutputManager<Produces<TABLE>> {
+//   static bool appendOutput(std::vector<OutputSpec>& outputs, Produces<TABLE>& /*what*/, uint32_t)
+//   {
+//     outputs.emplace_back(OutputForTable<TABLE>::spec());
+//     return true;
+//   }
+//   static bool prepare(ProcessingContext& context, Produces<TABLE>& what)
+//   {
+//     what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTable<TABLE>::ref())));
+//     return true;
+//   }
+//   static bool finalize(ProcessingContext&, Produces<TABLE>& what)
+//   {
+//     what.setLabel(o2::aod::MetadataTrait<TABLE>::metadata::tableLabel());
+//     what.release();
+//     return true;
+//   }
+//   static bool postRun(EndOfStreamContext&, Produces<TABLE>&)
+//   {
+//     return true;
+//   }
+// };
+
 template <typename TABLE>
 struct OutputManager<Produces<TABLE>> {
   static bool appendOutput(std::vector<OutputSpec>& outputs, Produces<TABLE>& /*what*/, uint32_t)
@@ -295,35 +319,11 @@ struct OutputManager<Produces<TABLE>> {
   }
   static bool finalize(ProcessingContext&, Produces<TABLE>& what)
   {
-    what.setLabel(o2::aod::MetadataTrait<TABLE>::metadata::tableLabel());
-    what.release();
-    return true;
-  }
-  static bool postRun(EndOfStreamContext&, Produces<TABLE>&)
-  {
-    return true;
-  }
-};
-
-template <typename TABLE>
-struct OutputManager<ProducesNG<TABLE>> {
-  static bool appendOutput(std::vector<OutputSpec>& outputs, ProducesNG<TABLE>& /*what*/, uint32_t)
-  {
-    outputs.emplace_back(OutputForTableNG<TABLE>::spec());
-    return true;
-  }
-  static bool prepare(ProcessingContext& context, ProducesNG<TABLE>& what)
-  {
-    what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTableNG<TABLE>::ref())));
-    return true;
-  }
-  static bool finalize(ProcessingContext&, ProducesNG<TABLE>& what)
-  {
     what.setLabel(o2::aod::Hash<TABLE::ref.label_hash>::str);
     what.release();
     return true;
   }
-  static bool postRun(EndOfStreamContext&, ProducesNG<TABLE>&)
+  static bool postRun(EndOfStreamContext&, Produces<TABLE>&)
   {
     return true;
   }
@@ -397,6 +397,47 @@ static inline std::vector<std::shared_ptr<arrow::Table>> extractOriginals(framew
   return {extractOriginal<Os>(pc)...};
 }
 
+// template <typename T>
+// struct OutputManager<Spawns<T>> {
+//   static bool appendOutput(std::vector<OutputSpec>& outputs, Spawns<T>& what, uint32_t)
+//   {
+//     outputs.emplace_back(what.spec());
+//     return true;
+//   }
+
+//   static bool prepare(ProcessingContext& pc, Spawns<T>& what)
+//   {
+//     auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals(what.sources_pack(), pc));
+//     if (originalTable->schema()->fields().empty() == true) {
+//       using base_table_t = typename Spawns<T>::base_table_t::table_t;
+//       originalTable = makeEmptyTable<base_table_t>(aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel());
+//     }
+
+//     what.extension = std::make_shared<typename Spawns<T>::extension_t>(o2::framework::spawner<aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::origin()>(what.pack(), extractOriginals(what.sources_pack(), pc), aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel()));
+//     what.table = std::make_shared<typename T::table_t>(soa::ArrowHelpers::joinTables({what.extension->asArrowTable(), originalTable}));
+//     return true;
+//   }
+
+//   static bool finalize(ProcessingContext& pc, Spawns<T>& what)
+//   {
+//     pc.outputs().adopt(what.output(), what.asArrowTable());
+//     return true;
+//   }
+
+//   static bool postRun(EndOfStreamContext&, Spawns<T>&)
+//   {
+//     return true;
+//   }
+// };
+
+template <size_t N, std::array<soa::TableRef, N> refs>
+static inline auto extractOriginals(ProcessingContext& pc)
+{
+  return [&]<size_t... Is>(std::index_sequence<Is...>) -> std::vector<std::shared_ptr<arrow::Table>> {
+    return {pc.inputs().get<TableConsumer>(o2::aod::Hash<refs[Is].label_hash>::str)->asArrowTable()...};
+  }(std::make_index_sequence<refs.size()>());
+}
+
 template <typename T>
 struct OutputManager<Spawns<T>> {
   static bool appendOutput(std::vector<OutputSpec>& outputs, Spawns<T>& what, uint32_t)
@@ -407,13 +448,14 @@ struct OutputManager<Spawns<T>> {
 
   static bool prepare(ProcessingContext& pc, Spawns<T>& what)
   {
-    auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals(what.sources_pack(), pc));
+    using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
+    auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals<metadata::sources.size(), metadata::sources>(pc));
     if (originalTable->schema()->fields().empty() == true) {
       using base_table_t = typename Spawns<T>::base_table_t::table_t;
-      originalTable = makeEmptyTable<base_table_t>(aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel());
+      originalTable = makeEmptyTable<base_table_t>(o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str);
     }
 
-    what.extension = std::make_shared<typename Spawns<T>::extension_t>(o2::framework::spawner<aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::origin()>(what.pack(), extractOriginals(what.sources_pack(), pc), aod::MetadataTrait<typename Spawns<T>::extension_t>::metadata::tableLabel()));
+    what.extension = std::make_shared<typename Spawns<T>::extension_t>(o2::framework::spawner<o2::aod::Hash<metadata::extension_table_t::ref.desc_hash>>(originalTable, o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str));
     what.table = std::make_shared<typename T::table_t>(soa::ArrowHelpers::joinTables({what.extension->asArrowTable(), originalTable}));
     return true;
   }
@@ -425,48 +467,6 @@ struct OutputManager<Spawns<T>> {
   }
 
   static bool postRun(EndOfStreamContext&, Spawns<T>&)
-  {
-    return true;
-  }
-};
-
-template <size_t N, std::array<soa::TableRef, N> refs>
-static inline auto extractOriginals(ProcessingContext& pc)
-{
-  return [&]<size_t... Is>(std::index_sequence<Is...>) -> std::vector<std::shared_ptr<arrow::Table>> {
-    return {pc.inputs().get<TableConsumer>(o2::aod::Hash<refs[Is].label_hash>::str)->asArrowTable()...};
-  }(std::make_index_sequence<refs.size()>());
-}
-
-template <typename T>
-struct OutputManager<SpawnsNG<T>> {
-  static bool appendOutput(std::vector<OutputSpec>& outputs, SpawnsNG<T>& what, uint32_t)
-  {
-    outputs.emplace_back(what.spec());
-    return true;
-  }
-
-  static bool prepare(ProcessingContext& pc, SpawnsNG<T>& what)
-  {
-    using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
-    auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals<metadata::sources.size(), metadata::sources>(pc));
-    if (originalTable->schema()->fields().empty() == true) {
-      using base_table_t = typename SpawnsNG<T>::base_table_t::table_t;
-      originalTable = makeEmptyTable<base_table_t>(o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str);
-    }
-
-    what.extension = std::make_shared<typename SpawnsNG<T>::extension_t>(o2::framework::spawner<o2::aod::Hash<metadata::extension_table_t::ref.desc_hash>>(originalTable, o2::aod::Hash<metadata::extension_table_t::ref.label_hash>::str));
-    what.table = std::make_shared<typename T::table_t>(soa::ArrowHelpers::joinTables({what.extension->asArrowTable(), originalTable}));
-    return true;
-  }
-
-  static bool finalize(ProcessingContext& pc, SpawnsNG<T>& what)
-  {
-    pc.outputs().adopt(what.output(), what.asArrowTable());
-    return true;
-  }
-
-  static bool postRun(EndOfStreamContext&, SpawnsNG<T>&)
   {
     return true;
   }
@@ -495,6 +495,32 @@ static inline auto extractOriginalsVector(framework::pack<Os...>, ProcessingCont
   return std::vector{extractOriginalJoined<Os>(pc)...};
 }
 
+// template <typename T>
+// struct OutputManager<Builds<T>> {
+//   static bool appendOutput(std::vector<OutputSpec>& outputs, Builds<T>& what, uint32_t)
+//   {
+//     outputs.emplace_back(what.spec());
+//     return true;
+//   }
+
+//   static bool prepare(ProcessingContext& pc, Builds<T>& what)
+//   {
+//     return what.template build<typename T::indexing_t>(what.pack(), what.originals_pack(),
+//                                                        extractOriginalsVector(what.originals_pack(), pc));
+//   }
+
+//   static bool finalize(ProcessingContext& pc, Builds<T>& what)
+//   {
+//     pc.outputs().adopt(what.output(), what.asArrowTable());
+//     return true;
+//   }
+
+//   static bool postRun(EndOfStreamContext&, Builds<T>&)
+//   {
+//     return true;
+//   }
+// };
+
 template <typename T>
 struct OutputManager<Builds<T>> {
   static bool appendOutput(std::vector<OutputSpec>& outputs, Builds<T>& what, uint32_t)
@@ -505,8 +531,8 @@ struct OutputManager<Builds<T>> {
 
   static bool prepare(ProcessingContext& pc, Builds<T>& what)
   {
-    return what.template build<typename T::indexing_t>(what.pack(), what.originals_pack(),
-                                                       extractOriginalsVector(what.originals_pack(), pc));
+    using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
+    return what.template build<typename T::indexing_t>(what.pack(), extractOriginals<metadata::sources.size(), metadata::sources>(pc));
   }
 
   static bool finalize(ProcessingContext& pc, Builds<T>& what)
@@ -516,32 +542,6 @@ struct OutputManager<Builds<T>> {
   }
 
   static bool postRun(EndOfStreamContext&, Builds<T>&)
-  {
-    return true;
-  }
-};
-
-template <typename T>
-struct OutputManager<BuildsNG<T>> {
-  static bool appendOutput(std::vector<OutputSpec>& outputs, BuildsNG<T>& what, uint32_t)
-  {
-    outputs.emplace_back(what.spec());
-    return true;
-  }
-
-  static bool prepare(ProcessingContext& pc, BuildsNG<T>& what)
-  {
-    using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
-    return what.template build<typename T::indexing_t>(what.pack(), extractOriginals<metadata::sources.size(), metadata::sources>(pc));
-  }
-
-  static bool finalize(ProcessingContext& pc, BuildsNG<T>& what)
-  {
-    pc.outputs().adopt(what.output(), what.asArrowTable());
-    return true;
-  }
-
-  static bool postRun(EndOfStreamContext&, BuildsNG<T>&)
   {
     return true;
   }
@@ -730,22 +730,22 @@ struct SpawnManager {
   static bool requestInputs(std::vector<InputSpec>&, T const&) { return false; }
 };
 
-template <soa::soa_table TABLE>
-struct SpawnManager<Spawns<TABLE>> {
-  static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
-  {
-    auto base_specs = spawns.base_specs();
-    for (auto base_spec : base_specs) {
-      base_spec.metadata.push_back(ConfigParamSpec{std::string{"control:spawn"}, VariantType::Bool, true, {"\"\""}});
-      DataSpecUtils::updateInputList(inputs, std::forward<InputSpec>(base_spec));
-    }
-    return true;
-  }
-};
+// template <soa::soa_table TABLE>
+// struct SpawnManager<Spawns<TABLE>> {
+//   static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
+//   {
+//     auto base_specs = spawns.base_specs();
+//     for (auto base_spec : base_specs) {
+//       base_spec.metadata.push_back(ConfigParamSpec{std::string{"control:spawn"}, VariantType::Bool, true, {"\"\""}});
+//       DataSpecUtils::updateInputList(inputs, std::forward<InputSpec>(base_spec));
+//     }
+//     return true;
+//   }
+// };
 
 template <soa::ng_table TABLE>
-struct SpawnManager<SpawnsNG<TABLE>> {
-  static bool requestInputs(std::vector<InputSpec>& inputs, SpawnsNG<TABLE>& spawns)
+struct SpawnManager<Spawns<TABLE>> {
+  static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
   {
     auto base_specs = spawns.base_specs();
     for (auto base_spec : base_specs) {
@@ -762,22 +762,22 @@ struct IndexManager {
   static bool requestInputs(std::vector<InputSpec>&, T const&) { return false; };
 };
 
+// template <typename IDX>
+// struct IndexManager<Builds<IDX>> {
+//   static bool requestInputs(std::vector<InputSpec>& inputs, Builds<IDX>& builds)
+//   {
+//     auto base_specs = builds.base_specs();
+//     for (auto base_spec : base_specs) {
+//       base_spec.metadata.push_back(ConfigParamSpec{std::string{"control:build"}, VariantType::Bool, true, {"\"\""}});
+//       DataSpecUtils::updateInputList(inputs, std::forward<InputSpec>(base_spec));
+//     }
+//     return true;
+//   }
+// };
+
 template <typename IDX>
 struct IndexManager<Builds<IDX>> {
   static bool requestInputs(std::vector<InputSpec>& inputs, Builds<IDX>& builds)
-  {
-    auto base_specs = builds.base_specs();
-    for (auto base_spec : base_specs) {
-      base_spec.metadata.push_back(ConfigParamSpec{std::string{"control:build"}, VariantType::Bool, true, {"\"\""}});
-      DataSpecUtils::updateInputList(inputs, std::forward<InputSpec>(base_spec));
-    }
-    return true;
-  }
-};
-
-template <typename IDX>
-struct IndexManager<BuildsNG<IDX>> {
-  static bool requestInputs(std::vector<InputSpec>& inputs, BuildsNG<IDX>& builds)
   {
     auto base_specs = builds.base_specs();
     for (auto base_spec : base_specs) {

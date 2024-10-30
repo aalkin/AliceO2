@@ -262,7 +262,7 @@ TEST_CASE("AdaptorCompilation")
   REQUIRE(task1ng.inputs.size() == 2);
   REQUIRE(task1ng.outputs.size() == 1);
   REQUIRE(task1ng.inputs[1].binding == std::string("TracksExtension"));
-  REQUIRE(task1ng.inputs[0].binding == std::string("Tracks"));
+  REQUIRE(task1ng.inputs[0].binding == std::string("StoredTracks"));
   REQUIRE(task1ng.outputs[0].binding.value == std::string("FooBars"));
 
   auto task1ngc = adaptAnalysisTask<ATaskconsumer>(*cfgc);
@@ -276,11 +276,11 @@ TEST_CASE("AdaptorCompilation")
   auto task2 = adaptAnalysisTask<BTask>(*cfgc, TaskName{"test2"});
   REQUIRE(task2.inputs.size() == 10);
   REQUIRE(task2.inputs[2].binding == "TracksExtension");
-  REQUIRE(task2.inputs[1].binding == "Tracks");
+  REQUIRE(task2.inputs[1].binding == "StoredTracks");
   REQUIRE(task2.inputs[4].binding == "TracksExtra_001Extension");
-  REQUIRE(task2.inputs[3].binding == "TracksExtra");
+  REQUIRE(task2.inputs[3].binding == "StoredTracksExtra_001");
   REQUIRE(task2.inputs[6].binding == "TracksCovExtension");
-  REQUIRE(task2.inputs[5].binding == "TracksCov");
+  REQUIRE(task2.inputs[5].binding == "StoredTracksCov");
   REQUIRE(task2.inputs[7].binding == "AmbiguousTracks");
   REQUIRE(task2.inputs[8].binding == "Calos");
   REQUIRE(task2.inputs[9].binding == "CaloTriggers");
@@ -289,12 +289,12 @@ TEST_CASE("AdaptorCompilation")
   auto task3 = adaptAnalysisTask<CTask>(*cfgc, TaskName{"test3"});
   REQUIRE(task3.inputs.size() == 3);
   REQUIRE(task3.inputs[0].binding == "Collisions_001");
-  REQUIRE(task3.inputs[1].binding == "Tracks");
+  REQUIRE(task3.inputs[1].binding == "StoredTracks");
   REQUIRE(task3.inputs[2].binding == "TracksExtension");
 
   auto task4 = adaptAnalysisTask<DTask>(*cfgc, TaskName{"test4"});
   REQUIRE(task4.inputs.size() == 2);
-  REQUIRE(task4.inputs[0].binding == "Tracks");
+  REQUIRE(task4.inputs[0].binding == "StoredTracks");
   REQUIRE(task4.inputs[1].binding == "TracksExtension");
 
   auto task5 = adaptAnalysisTask<ETask>(*cfgc, TaskName{"test5"});

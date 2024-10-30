@@ -3851,6 +3851,12 @@ consteval auto getIndexTargets()
 #define DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, ...) \
     using _Name_##Metadata = TableMetadataNG<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
 
+#define DECLARE_SOA_TABLE_METADATA_TRAIT(_Name_, _Desc_, _Version_)\
+  template <>                                                                                       \
+  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                        \
+    using metadata = _Name_##Metadata;                                                              \
+  };
+
 #define DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, _Version_)               \
   O2HASH(_Desc_ "/" #_Version_);                                                                      \
   template <typename O>                                                                               \
@@ -3861,14 +3867,20 @@ consteval auto getIndexTargets()
     using metadata = _Name_##Metadata;                                                                \
   };
 
+#define DECLARE_SOA_STAGE(_Name_, _Origin_, _Desc_, _Version_)              \
+  template <typename O>                                                                               \
+  using _Name_##From = o2::soa::TableNG<Hash<#_Name_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;     \
+  using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;
+
 #define DECLARE_SOA_TABLE_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, _Version_, ...)        \
+  O2HASH(#_Name_);\
   DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, __VA_ARGS__);                              \
-  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, _Version_);
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, #_Name_, _Origin_, _Desc_, _Version_);
 
 #define DECLARE_SOA_TABLE_FULL(_Name_, _Label_, _Origin_, _Desc_, ...) \
-  O2HASH(_Label_);                                                     \
+  O2HASH(#_Name_);                                                     \
   DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, 0, __VA_ARGS__);          \
-  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, 0)
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, #_Name_, _Origin_, _Desc_, 0)
 
 #define DECLARE_SOA_TABLE(_Name_, _Origin_, _Desc_, ...) \
   DECLARE_SOA_TABLE_FULL(_Name_, #_Name_, _Origin_, _Desc_, __VA_ARGS__)
@@ -3884,8 +3896,9 @@ consteval auto getIndexTargets()
   O2HASH("Stored" #_BaseName_);                                                                     \
   DECLARE_SOA_TABLE_METADATA(_BaseName_, _Desc_, _Version_, __VA_ARGS__);                           \
   using Stored##_BaseName_##Metadata = _BaseName_##Metadata;                                        \
-  DECLARE_SOA_TABLE_FULL_VERSIONED_(_BaseName_, #_BaseName_, "AOD", _Desc_, _Version_);             \
-  DECLARE_SOA_TABLE_FULL_VERSIONED_(Stored##_BaseName_, "Stored" #_BaseName_, "AOD1", _Desc_, _Version_);
+  DECLARE_SOA_TABLE_METADATA_TRAIT(_BaseName_, _Desc_, _Version_);                                  \
+  DECLARE_SOA_STAGE(_BaseName_, "AOD", _Desc_, _Version_);                                          \
+  DECLARE_SOA_STAGE(Stored##_BaseName_, "AOD1", _Desc_, _Version_);
 
 #define DECLARE_SOA_TABLE_STAGED(_BaseName_, _Desc_, ...) \
   DECLARE_SOA_TABLE_STAGED_VERSIONED(_BaseName_, _Desc_, 0, __VA_ARGS__);

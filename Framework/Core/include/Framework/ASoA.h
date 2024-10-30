@@ -3848,17 +3848,11 @@ consteval auto getIndexTargets()
 // #define DECLARE_SOA_TABLE_VERSIONED_OLD(_Name_, _Origin_, _Description_, _Version_, ...) \
 //   DECLARE_SOA_TABLE_FULL_OLD_VERSIONED(_Name_, #_Name_, _Origin_, _Description_, _Version_, __VA_ARGS__);
 
-#define DECLARE_SOA_TABLE_STAGED_VERSIONED(_BaseName_, _Description_, _Version_, ...)                      \
-  DECLARE_SOA_TABLE_FULL_VERSIONED(_BaseName_, #_BaseName_, "AOD", _Description_, _Version_, __VA_ARGS__); \
-  DECLARE_SOA_TABLE_FULL_VERSIONED(Stored##_BaseName_, "Stored" #_BaseName_, "AOD1", _Description_, _Version_, __VA_ARGS__, soa::Marker<1>);
+#define DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, ...) \
+    using _Name_##Metadata = TableMetadataNG<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
 
-#define DECLARE_SOA_TABLE_STAGED(_BaseName_, _Description_, ...) \
-  DECLARE_SOA_TABLE_STAGED_VERSIONED(_BaseName_, _Description_, 0, __VA_ARGS__);
-
-#define DECLARE_SOA_TABLE_NG_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, _Version_, ...)        \
-  O2HASH(_Label_);                                                                                    \
+#define DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, _Version_)               \
   O2HASH(_Desc_ "/" #_Version_);                                                                      \
-  using _Name_##Metadata = TableMetadataNG<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
   template <typename O>                                                                               \
   using _Name_##From = o2::soa::TableNG<Hash<_Label_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;     \
   using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;                                                   \
@@ -3867,16 +3861,34 @@ consteval auto getIndexTargets()
     using metadata = _Name_##Metadata;                                                                \
   };
 
+#define DECLARE_SOA_TABLE_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, _Version_, ...)        \
+  DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, __VA_ARGS__);                              \
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, _Version_);
+
 #define DECLARE_SOA_TABLE_FULL(_Name_, _Label_, _Origin_, _Desc_, ...) \
   O2HASH(_Label_);                                                     \
-  DECLARE_SOA_TABLE_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, 0, __VA_ARGS__)
+  DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, 0, __VA_ARGS__);          \
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, 0)
 
 #define DECLARE_SOA_TABLE(_Name_, _Origin_, _Desc_, ...) \
   DECLARE_SOA_TABLE_FULL(_Name_, #_Name_, _Origin_, _Desc_, __VA_ARGS__)
 
 #define DECLARE_SOA_TABLE_VERSIONED(_Name_, _Origin_, _Desc_, _Version_, ...) \
   O2HASH(#_Name_);                                                            \
-  DECLARE_SOA_TABLE_FULL_VERSIONED(_Name_, #_Name_, _Origin_, _Desc_, _Version_, __VA_ARGS__)
+  DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, __VA_ARGS__);          \
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, #_Name_, _Origin_, _Desc_, _Version_)
+
+#define DECLARE_SOA_TABLE_STAGED_VERSIONED(_BaseName_, _Desc_, _Version_, ...)                      \
+  O2HASH(_Desc_ "/" #_Version_);                                                                    \
+  O2HASH(#_BaseName_);                                                                              \
+  O2HASH("Stored" #_BaseName_);                                                                     \
+  DECLARE_SOA_TABLE_METADATA(_BaseName_, _Desc_, _Version_, __VA_ARGS__);                           \
+  using Stored##_BaseName_##Metadata = _BaseName_##Metadata;                                        \
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(_BaseName_, #_BaseName_, "AOD", _Desc_, _Version_);             \
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(Stored##_BaseName_, "Stored" #_BaseName_, "AOD1", _Desc_, _Version_);
+
+#define DECLARE_SOA_TABLE_STAGED(_BaseName_, _Desc_, ...) \
+  DECLARE_SOA_TABLE_STAGED_VERSIONED(_BaseName_, _Desc_, 0, __VA_ARGS__);
 
 // #define DECLARE_SOA_EXTENDED_TABLE_FULL_OLD(_Name_, _Table_, _Origin_, _Description_, ...)                                                  \
 //   template <o2::soa::OriginEnc ORIGIN = o2::soa::OriginEnc{_Origin_}>                                                                       \

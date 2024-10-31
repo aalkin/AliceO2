@@ -5522,6 +5522,11 @@ struct IndexTable : TableNG<L, D, O> {
   {
   }
 
+  IndexTable(std::vector<std::shared_ptr<arrow::Table>> tables, uint64_t offset = 0)
+    : base_t{tables[0], offset}
+  {
+  }
+
   IndexTable(IndexTable const&) = default;
   IndexTable(IndexTable&&) = default;
   IndexTable& operator=(IndexTable const&) = default;

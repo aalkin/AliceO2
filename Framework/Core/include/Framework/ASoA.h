@@ -1573,11 +1573,11 @@ concept ng_iterator = framework::is_base_of_template_v<TableIterator, T> || fram
 //   return false;
 // }
 
-template <soa::ng_table T, soa::soa_table B>
-consteval bool is_binding_compatible_v()
-{
-  return false;
-}
+// template <soa::ng_table T, soa::soa_table B>
+// consteval bool is_binding_compatible_v()
+// {
+//   return false;
+// }
 
 template <typename A>
 concept with_originals = requires() {
@@ -3082,10 +3082,16 @@ O2HASH("TEST/0");
     }                                                                                               \
   }
 
-#define DECLARE_EQUIVALENT_FOR_INDEX(_Base_, _Equiv_) \
-  template <>                                         \
-  struct EquivalentIndex<_Base_, _Equiv_> {           \
-    constexpr static bool value = true;               \
+#define DECLARE_EQUIVALENT_FOR_INDEX(_Base_, _Equiv_)                                                     \
+  template <>                                                                                             \
+  struct EquivalentIndexNG<o2::aod::Hash<_Base_::ref.desc_hash>, o2::aod::Hash<_Equiv_::ref.desc_hash>> { \
+    constexpr static bool value = true;                                                                   \
+  }
+
+#define DECLARE_EQUIVALENT_FOR_INDEX_NG(_Base_, _Equiv_)                                      \
+  template <>                                                                                 \
+  struct EquivalentIndexNG<o2::aod::Hash<_Base_ ""_h>, o2::aod::Hash<_Equiv_ ""_h>> {         \
+    constexpr static bool value = true;                                                       \
   }
 
 #define DECLARE_SOA_COLUMN_FULL(_Name_, _Getter_, _Type_, _Label_)                                                                                                                \

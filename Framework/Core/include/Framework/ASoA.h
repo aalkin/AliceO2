@@ -242,6 +242,9 @@ template <typename C>
 concept persistent = requires(C c) { c.mColumnIterator; };
 
 template <typename C>
+constexpr bool is_persistent_v = persistent<C>;
+
+template <typename C>
 using is_persistent_t = std::conditional_t<persistent<C>, std::true_type, std::false_type>;
 
 template <typename C>
@@ -1634,34 +1637,41 @@ using is_binding_compatible = std::conditional_t<is_binding_compatible_v<T, type
 //     }
 //   }
 // }
-
-template <soa::ng_table T>
-static constexpr std::string getLabelFromType()
-{
-  return std::string{o2::aod::Hash<std::decay_t<T>::originals[0].label_hash>::str};
-}
-
-template <soa::ng_iterator T>
-static constexpr std::string getLabelFromType()
-{
-  return getLabelFromType<typename std::decay_t<T>::parent_t>();
-}
-
 template <typename L, typename D, typename O, typename Key, typename H, typename... Ts>
 struct IndexTable;
 
 template <typename T>
 concept index_table = framework::is_specialization_v<T, o2::soa::IndexTable>;
 
+template <soa::ng_table T>
+static constexpr std::string getLabelForTable()
+{
+  return std::string{o2::aod::Hash<std::decay_t<T>::originals[0].label_hash>::str};
+}
+
+template <soa::ng_table T>
+  requires (!index_table<T>)
+static constexpr std::string getLabelFromType()
+{
+  return getLabelForTable<T>();
+}
+
+template <soa::ng_iterator T>
+static constexpr std::string getLabelFromType()
+{
+  return getLabelForTable<typename std::decay_t<T>::parent_t>();
+}
+
 template <index_table T>
 static constexpr std::string getLabelFromType()
 {
-  return getLabelFromType<typename std::decay_t<T>::first_t>();
+  return getLabelForTable<typename std::decay_t<T>::first_t>();
 }
 template <with_sources T>
+  requires (not_void<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>)
 static constexpr std::string getLabelFromType()
 {
-  return getLabelFromType<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>();
+  return getLabelForTable<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>();
 }
 
 template <typename... C>

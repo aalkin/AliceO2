@@ -305,25 +305,25 @@ struct OutputManager {
 //   }
 // };
 
-template <typename TABLE>
-struct OutputManager<Produces<TABLE>> {
-  static bool appendOutput(std::vector<OutputSpec>& outputs, Produces<TABLE>& /*what*/, uint32_t)
+template <producable T>
+struct OutputManager<Produces<T>> {
+  static bool appendOutput(std::vector<OutputSpec>& outputs, Produces<T>& /*what*/, uint32_t)
   {
-    outputs.emplace_back(OutputForTable<TABLE>::spec());
+    outputs.emplace_back(OutputForTable<typename Produces<T>::persistent_table_t>::spec());
     return true;
   }
-  static bool prepare(ProcessingContext& context, Produces<TABLE>& what)
+  static bool prepare(ProcessingContext& context, Produces<T>& what)
   {
-    what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTable<TABLE>::ref())));
+    what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTable<typename Produces<T>::persistent_table_t>::ref())));
     return true;
   }
-  static bool finalize(ProcessingContext&, Produces<TABLE>& what)
+  static bool finalize(ProcessingContext&, Produces<T>& what)
   {
-    what.setLabel(o2::aod::Hash<TABLE::ref.label_hash>::str);
+    what.setLabel(o2::aod::Hash<Produces<T>::persistent_table_t::ref.label_hash>::str);
     what.release();
     return true;
   }
-  static bool postRun(EndOfStreamContext&, Produces<TABLE>&)
+  static bool postRun(EndOfStreamContext&, Produces<T>&)
   {
     return true;
   }

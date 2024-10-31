@@ -152,16 +152,19 @@ class TableConsumer;
 //   int64_t mCount = -1;
 // };
 
-template <soa::ng_table T>
+template <typename T>
+concept producable = soa::has_ng_metadata<T> || soa::has_ng_metadata<typename T::parent_t>;
+
+template <producable T>
 struct WritingCursor {
  public:
-  using persistent_table_t = T;
-  using cursor_t = decltype(std::declval<TableBuilder>().cursor<T>());
+  using persistent_table_t = decltype([](){ if constexpr (soa::ng_iterator<T>) { return typename T::parent_t{nullptr}; } else { return T{nullptr}; } }());//std::conditional<soa::ng_iterator<T>, typename T::parent_t, T>;
+  using cursor_t = decltype(std::declval<TableBuilder>().cursor<persistent_table_t>());
 
   template <typename... Ts>
   void operator()(Ts... args)
   {
-    static_assert(sizeof...(Ts) == framework::pack_size(typename T::persistent_columns_t{}), "Argument number mismatch");
+    static_assert(sizeof...(Ts) == framework::pack_size(typename persistent_table_t::persistent_columns_t{}), "Argument number mismatch");
     ++mCount;
     cursor(0, extract(args)...);
   }
@@ -189,7 +192,7 @@ struct WritingCursor {
   /// spend time reallocating the buffers.
   void reserve(int64_t size)
   {
-    mBuilder->reserve(typename T::column_types{}, size);
+    mBuilder->reserve(typename persistent_table_t::column_types{}, size);
   }
 
   void release()
@@ -206,7 +209,7 @@ struct WritingCursor {
     if constexpr (soa::ng_iterator<A>) {
       return arg.globalIndex();
     } else {
-      static_assert(!framework::has_type<A>(typename T::persistent_columns_t{}), "Argument type mismatch");
+      static_assert(!framework::has_type<A>(typename persistent_table_t::persistent_columns_t{}), "Argument type mismatch");
       return arg;
     }
   }
@@ -259,7 +262,7 @@ struct OutputForTable {
 // struct Produces : WritingCursor<typename soa::PackToTable<aod::MetadataTrait<T>::metadata::origin(), typename T::table_t::persistent_columns_t>::table> {
 // };
 
-template <soa::has_ng_metadata T>
+template <producable T>
 struct Produces : WritingCursor<T> {
 };
 

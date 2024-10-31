@@ -199,11 +199,11 @@ struct WritingCursor {
 
   decltype(FFL(std::declval<cursor_t>())) cursor;
 
- private:
+ private: 
   template <typename A>
   static decltype(auto) extract(A const& arg)
   {
-    if constexpr (soa::ng_iterator<T>) {
+    if constexpr (soa::ng_iterator<A>) {
       return arg.globalIndex();
     } else {
       static_assert(!framework::has_type<A>(typename T::persistent_columns_t{}), "Argument type mismatch");

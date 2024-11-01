@@ -3896,14 +3896,13 @@ consteval auto getIndexTargets()
   using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;
 
 #define DECLARE_SOA_TABLE_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, _Version_, ...)        \
-  O2HASH(#_Name_);\
   DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, __VA_ARGS__);                              \
-  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, #_Name_, _Origin_, _Desc_, _Version_);
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, _Version_);
 
 #define DECLARE_SOA_TABLE_FULL(_Name_, _Label_, _Origin_, _Desc_, ...) \
-  O2HASH(#_Name_);                                                     \
+  O2HASH(_Label_);                                                     \
   DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, 0, __VA_ARGS__);          \
-  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, #_Name_, _Origin_, _Desc_, 0)
+  DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, 0)
 
 #define DECLARE_SOA_TABLE(_Name_, _Origin_, _Desc_, ...) \
   DECLARE_SOA_TABLE_FULL(_Name_, #_Name_, _Origin_, _Desc_, __VA_ARGS__)

@@ -462,23 +462,26 @@ concept has_ng_metadata = not_void<typename aod::MetadataTraitNG<o2::aod::Hash<s
 template <typename T>
 concept spawnable = std::is_same_v<typename T::spawnable_t, std::true_type>;
 
-template <typename, typename = void>
-inline constexpr bool is_soa_extension_table_v = false;
+// template <typename, typename = void>
+// inline constexpr bool is_soa_extension_table_v = false;
+
+// template <typename T>
+// inline constexpr bool is_soa_extension_table_v<T, std::void_t<decltype(sizeof(typename T::expression_pack_t))>> = true;
 
 template <typename T>
-inline constexpr bool is_soa_extension_table_v<T, std::void_t<decltype(sizeof(typename T::expression_pack_t))>> = true;
+concept extension_table = not_void<typename T::expression_pack_t>;
 
-template <typename T, typename = void>
-inline constexpr bool is_index_table_v = false;
+// template <typename T, typename = void>
+// inline constexpr bool is_index_table_v = false;
 
-template <typename T>
-inline constexpr bool is_index_table_v<T, std::void_t<decltype(sizeof(typename T::indexing_t))>> = true;
+// template <typename T>
+// inline constexpr bool is_index_table_v<T, std::void_t<decltype(sizeof(typename T::indexing_t))>> = true;
 
-template <typename, typename = void>
-inline constexpr bool is_with_base_table_v = false;
+// template <typename, typename = void>
+// inline constexpr bool is_with_base_table_v = false;
 
-template <typename T>
-inline constexpr bool is_with_base_table_v<T, std::void_t<decltype(sizeof(typename T::base_table_t))>> = true;
+// template <typename T>
+// inline constexpr bool is_with_base_table_v<T, std::void_t<decltype(sizeof(typename T::base_table_t))>> = true;
 
 template <typename B, typename E>
 struct EquivalentIndex {
@@ -1852,27 +1855,22 @@ using PresliceOptional = PresliceBase<T, true, true>;
 
 namespace o2::soa
 {
-template <typename T>
-inline consteval bool is_soa_filtered_iterator_v()
-{
-  if constexpr (!soa::ng_iterator<T>) {
-    return false;
-  } else {
-    if constexpr (std::is_same_v<typename T::policy_t, soa::FilteredIndexPolicy>) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-}
+// template <typename T>
+// inline consteval bool is_soa_filtered_iterator_v()
+// {
+//   if constexpr (!soa::ng_iterator<T>) {
+//     return false;
+//   } else {
+//     if constexpr (std::is_same_v<typename T::policy_t, soa::FilteredIndexPolicy>) {
+//       return true;
+//     } else {
+//       return false;
+//     }
+//   }
+// }
 
-template <typename T>
-using is_soa_table_t = typename soa::is_specialization_origin<T, soa::Table>;
-
-template <typename T>
-class FilteredBase;
-template <typename T>
-class Filtered;
+// template <typename T>
+// using is_soa_table_t = typename soa::is_specialization_origin<T, soa::Table>;
 
 template <typename T>
 class FilteredBase;
@@ -1880,7 +1878,12 @@ template <typename T>
 class Filtered;
 
 template <typename T>
-inline constexpr bool is_soa_filtered_v = framework::is_base_of_template_v<soa::FilteredBase, T> || framework::is_base_of_template_v<soa::FilteredBase, T>;
+class FilteredBase;
+template <typename T>
+class Filtered;
+
+// template <typename T>
+// inline constexpr bool is_soa_filtered_v = framework::is_base_of_template_v<soa::FilteredBase, T> || framework::is_base_of_template_v<soa::FilteredBase, T>;
 
 template <typename T>
 concept has_filtered_policy = not_void<typename T::policy_t> && std::same_as<typename T::policy_t, soa::FilteredIndexPolicy>;
@@ -1896,6 +1899,10 @@ concept ng_filtered_iterator = ng_iterator<T> && has_filtered_policy<T>;
 
 template <typename T>
 concept ng_filtered_table = framework::is_base_of_template_v<soa::FilteredBase, T>;
+
+// FIXME: compatbility declaration to be removed
+template <typename T>
+constexpr bool is_soa_filtered_v = ng_filtered_table<T>;
 
 // template <typename T>
 // concept soa_filtered = soa_filtered_table<T> || soa_filtered_iterator<T>;
@@ -1930,7 +1937,7 @@ auto doSliceBy(T const* table, o2::framework::PresliceBase<C, OPT, SORTED> const
       return t;
     } else {
       auto selection = container.getSliceFor(value);
-      if constexpr (soa::is_soa_filtered_v<T>) {
+      if constexpr (soa::ng_filtered_table<T>) {
         auto t = soa::Filtered<typename T::base_t>({table->asArrowTable()}, selection);
         table->copyIndexBindings(t);
         t.bindInternalIndicesTo(table);
@@ -1956,7 +1963,7 @@ template <typename T>
 auto prepareFilteredSlice(T const* table, std::shared_ptr<arrow::Table> slice, uint64_t offset)
 {
   if (offset >= static_cast<uint64_t>(table->tableSize())) {
-    if constexpr (soa::is_soa_filtered_v<T>) {
+    if constexpr (soa::ng_filtered_table<T>) {
       Filtered<typename T::base_t> fresult{{{slice}}, SelectionVector{}, 0};
       table->copyIndexBindings(fresult);
       return fresult;
@@ -1976,7 +1983,7 @@ auto prepareFilteredSlice(T const* table, std::shared_ptr<arrow::Table> slice, u
                  [&start](int64_t idx) {
                    return idx - static_cast<int64_t>(start);
                  });
-  if constexpr (soa::is_soa_filtered_v<T>) {
+  if constexpr (soa::ng_filtered_table<T>) {
     Filtered<typename T::base_t> fresult{{{slice}}, std::move(slicedSelection), start};
     table->copyIndexBindings(fresult);
     return fresult;
@@ -2027,7 +2034,7 @@ template <typename T>
 auto doSliceByCachedUnsorted(T const* table, framework::expressions::BindingNode const& node, int value, o2::framework::SliceCache& cache)
 {
   auto localCache = cache.ptr->getCacheUnsortedFor({o2::soa::getLabelFromTypeForKey<T>(node.name), node.name});
-  if constexpr (soa::is_soa_filtered_v<T>) {
+  if constexpr (soa::ng_filtered_table<T>) {
     auto t = typename T::self_t({table->asArrowTable()}, localCache.getSliceFor(value));
     t.intersectWithSelection(table->getSelectedRows());
     table->copyIndexBindings(t);
@@ -3392,7 +3399,7 @@ consteval auto getIndexTargets()
     template <typename T>                                                                                \
     std::vector<typename T::iterator> getFilteredIterators() const                                       \
     {                                                                                                    \
-      if constexpr (o2::soa::is_soa_filtered_v<T>) {                                                     \
+      if constexpr (o2::soa::ng_filtered_table<T>) {                                                     \
         auto result = std::vector<typename T::iterator>();                                               \
         for (auto const& i : *mColumnIterator) {                                                         \
           auto pos = mBinding.get<T>()->isInSelectedRows(i);                                             \
@@ -4162,6 +4169,9 @@ constexpr auto join(Ts const&... t)
 {
   return Join<Ts...>(ArrowHelpers::joinTables({t.asArrowTable()...}));
 }
+
+template <typename T>
+constexpr bool is_soa_join_v = framework::is_specialization_v<T, JoinFull>;
 
 template <typename... Ts>
 struct Concat : TableNG<o2::aod::Hash<"CONC"_h>, o2::aod::Hash<"CONC/0"_h>, o2::aod::Hash<"CONC"_h>, Ts...> {

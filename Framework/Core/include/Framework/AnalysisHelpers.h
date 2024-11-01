@@ -399,6 +399,9 @@ struct TableTransform {
 // };
 
 template <typename T>
+concept spawnable = soa::ng_table<T> && soa::has_ng_metadata<T>;
+
+template <spawnable T>
 struct Spawns : TableTransform<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
   using metadata = TableTransform<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
   using extension_t = typename metadata::extension_table_t;
@@ -650,7 +653,7 @@ struct IndexBuilder {
 //   }
 // };
 
-template <typename T>
+template <soa::index_table T>
 struct Builds : TableTransform<typename aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
   using metadata = TableTransform<typename aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
   using IP = std::conditional_t<metadata::exclusive, IndexBuilder<Exclusive>, IndexBuilder<Sparse>>;

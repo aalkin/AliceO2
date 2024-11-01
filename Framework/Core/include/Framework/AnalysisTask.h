@@ -96,7 +96,7 @@ struct AnalysisDataProcessorBuilder {
 
   template <soa::soa_table T>
   static inline auto getSources()
-    requires soa::is_soa_extension_table_v<std::decay_t<T>>
+    requires soa::extension_table<std::decay_t<T>>
   {
     return getInputSpecs(typename aod::MetadataTrait<T>::metadata::sources{});
   }
@@ -163,7 +163,7 @@ struct AnalysisDataProcessorBuilder {
     using metadata = typename aod::MetadataTrait<std::decay_t<O>>::metadata;
     std::vector<ConfigParamSpec> inputMetadata;
     inputMetadata.emplace_back(ConfigParamSpec{std::string{"control:"} + name, VariantType::Bool, value, {"\"\""}});
-    if constexpr (soa::is_soa_extension_table_v<std::decay_t<O>>) {
+    if constexpr (soa::extension_table<std::decay_t<O>>) {
       auto inputSources = getInputMetadata<std::decay_t<O>>();
       inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
     }
@@ -346,7 +346,7 @@ struct AnalysisDataProcessorBuilder {
   template <soa::soa_table T, int AI>
   static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash)
   {
-    if constexpr (soa::is_soa_filtered_v<T>) {
+    if constexpr (soa::ng_filtered_table<T>) {
       return extractFilteredFromRecord<T>(record, *std::find_if(infos.begin(), infos.end(), [&phash](ExpressionInfo const& i) { return (i.processHash == phash && i.argumentIndex == AI); }), soa::make_originals_from_type<T>());
     } else {
       return extractFromRecord<T>(record, soa::make_originals_from_type<T>());
@@ -356,7 +356,7 @@ struct AnalysisDataProcessorBuilder {
   template <soa::ng_table T, int AI>
   static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash)
   {
-    if constexpr (soa::is_soa_filtered_v<T>) {
+    if constexpr (soa::ng_filtered_table<T>) {
       return extractFilteredFromRecord<T>(record, *std::find_if(infos.begin(), infos.end(), [&phash](ExpressionInfo const& i) { return (i.processHash == phash && i.argumentIndex == AI); }));
     } else {
       return extractFromRecord<T>(record);

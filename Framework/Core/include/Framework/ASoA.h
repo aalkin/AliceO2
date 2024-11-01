@@ -1704,29 +1704,29 @@ static constexpr auto haveKey(framework::pack<C...>, std::string const& key)
 void notFoundColumn(const char* label, const char* key);
 void missingOptionalPreslice(const char* label, const char* key);
 
-template <soa::soa_table T, bool OPT = false>
-static constexpr std::string getLabelFromTypeForKey(std::string const& key)
-{
-  if constexpr (soa::is_type_with_originals_v<std::decay_t<T>>) {
-    using Os = typename std::decay_t<T>::originals;
-    auto locate = haveKey(Os{}, key);
-    auto it = std::find_if(locate.begin(), locate.end(), [](auto const& x) { return x.first; });
-    if (it != locate.end()) {
-      return it->second;
-    }
-  } else {
-    auto locate = hasKey<std::decay_t<T>>(key);
-    if (locate.first) {
-      return locate.second;
-    }
-  }
-  if constexpr (!OPT) {
-    notFoundColumn(getLabelFromType<std::decay_t<T>>().data(), key.data());
-  } else {
-    return "[MISSING]";
-  }
-  O2_BUILTIN_UNREACHABLE();
-}
+// template <soa::soa_table T, bool OPT = false>
+// static constexpr std::string getLabelFromTypeForKey(std::string const& key)
+// {
+//   if constexpr (soa::is_type_with_originals_v<std::decay_t<T>>) {
+//     using Os = typename std::decay_t<T>::originals;
+//     auto locate = haveKey(Os{}, key);
+//     auto it = std::find_if(locate.begin(), locate.end(), [](auto const& x) { return x.first; });
+//     if (it != locate.end()) {
+//       return it->second;
+//     }
+//   } else {
+//     auto locate = hasKey<std::decay_t<T>>(key);
+//     if (locate.first) {
+//       return locate.second;
+//     }
+//   }
+//   if constexpr (!OPT) {
+//     notFoundColumn(getLabelFromType<std::decay_t<T>>().data(), key.data());
+//   } else {
+//     return "[MISSING]";
+//   }
+//   O2_BUILTIN_UNREACHABLE();
+// }
 
 template <with_originals T, bool OPT = false>
 static constexpr std::string getLabelFromTypeForKey(std::string const& key)

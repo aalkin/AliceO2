@@ -41,19 +41,27 @@ struct always_static_assert : std::false_type {
 template <typename... T>
 inline constexpr bool always_static_assert_v = always_static_assert<T...>::value;
 
-template <template <typename...> class base, typename derived>
-struct is_base_of_template_impl {
-  template <typename... Ts>
-  static constexpr std::true_type test(const base<Ts...>*);
-  static constexpr std::false_type test(...);
-  using type = decltype(test(std::declval<derived*>()));
+// template <template <typename...> class base, typename derived>
+// struct is_base_of_template_impl {
+//   template <typename... Ts>
+//   static constexpr std::true_type test(const base<Ts...>*);
+//   static constexpr std::false_type test(...);
+//   using type = decltype(test(std::declval<derived*>()));
+// };
+
+// template <template <typename...> class base, typename derived>
+// using is_base_of_template = typename is_base_of_template_impl<base, derived>::type;
+
+// template <template <typename...> class base, typename derived>
+// inline constexpr bool is_base_of_template_v = is_base_of_template<base, derived>::value;
+
+template <template <typename...> typename B, typename D>
+concept base_of_template = requires {
+  []<typename... Ts>(B<Ts...>*){ }(std::declval<D*>());
 };
 
-template <template <typename...> class base, typename derived>
-using is_base_of_template = typename is_base_of_template_impl<base, derived>::type;
-
-template <template <typename...> class base, typename derived>
-inline constexpr bool is_base_of_template_v = is_base_of_template<base, derived>::value;
+template <template <typename...> typename B, typename D>
+constexpr bool is_base_of_template_v = base_of_template<B, D>;
 
 } // namespace o2::framework
 

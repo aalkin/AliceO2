@@ -116,6 +116,7 @@ class ConstMCTruthContainer : public std::vector<char>
 #ifndef GPUCA_STANDALONE
 namespace o2::framework
 {
+// FIXME: this is potentially dangerous
 template <typename T>
 struct is_specialization<o2::dataformats::ConstMCTruthContainer<T>, std::vector> : std::true_type {
 };

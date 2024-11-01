@@ -179,8 +179,7 @@ class DataAllocator
       .get();
   }
 
-  template <typename T, typename... Args>
-    requires VectorOfMessageableTypes<T>
+  template <VectorOfMessageableTypes T, typename... Args>
   decltype(auto) make(const Output& spec, Args... args)
   {
     auto& timingInfo = mRegistry.get<TimingInfo>();

@@ -12,6 +12,7 @@
 #define O2_FRAMEWORK_TRAITS_H_
 
 #include <type_traits>
+#include <concepts>
 
 namespace o2::framework
 {
@@ -29,6 +30,11 @@ struct is_specialization<Ref<Args...>, Ref> : std::true_type {
 
 template <typename T, template <typename...> class Ref>
 inline constexpr bool is_specialization_v = is_specialization<T, Ref>::value;
+
+template <template <typename...> typename B, typename S>
+concept specialization = requires {
+  {[]<typename... Ts>(B<Ts...>*) -> B<Ts...> {}(std::declval<S*>())} -> std::same_as<S>;
+};
 
 template <typename A, typename B>
 struct is_overriding : public std::bool_constant<std::is_same_v<A, B> == false && std::is_member_function_pointer_v<A> && std::is_member_function_pointer_v<B>> {

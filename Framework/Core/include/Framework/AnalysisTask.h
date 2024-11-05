@@ -104,24 +104,24 @@ struct AnalysisDataProcessorBuilder {
   template <soa::with_sources T>
   static inline auto getSources()
   {
-    return []<size_t N>(std::array<soa::TableRef, N> const& refs){
-      return [&refs]<size_t... Is>(std::index_sequence<Is...>){
+    return []<size_t N, std::array<soa::TableRef, N> refs>(){
+      return []<size_t... Is>(std::index_sequence<Is...>){
         return std::vector{soa::tableRef2ConfigParamSpec<refs[Is]>()...};
       }(std::make_index_sequence<N>());
-    }(T::sources);
+    }.template operator()<T::sources.size(), T::sources>();
   }
 
-  template <typename T>
-  static auto getInputMetadata()
-  {
-    std::vector<ConfigParamSpec> inputMetadata;
-    auto inputSources = getSources<T>();
-    std::sort(inputSources.begin(), inputSources.end(), [](ConfigParamSpec const& a, ConfigParamSpec const& b) { return a.name < b.name; });
-    auto last = std::unique(inputSources.begin(), inputSources.end(), [](ConfigParamSpec const& a, ConfigParamSpec const& b) { return a.name == b.name; });
-    inputSources.erase(last, inputSources.end());
-    inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
-    return inputMetadata;
-  }
+  // template <typename T>
+  // static auto getInputMetadata()
+  // {
+  //   std::vector<ConfigParamSpec> inputMetadata;
+  //   auto inputSources = getSources<T>();
+  //   std::sort(inputSources.begin(), inputSources.end(), [](ConfigParamSpec const& a, ConfigParamSpec const& b) { return a.name < b.name; });
+  //   auto last = std::unique(inputSources.begin(), inputSources.end(), [](ConfigParamSpec const& a, ConfigParamSpec const& b) { return a.name == b.name; });
+  //   inputSources.erase(last, inputSources.end());
+  //   inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
+  //   return inputMetadata;
+  // }
 
   template <soa::with_sources T>
   static auto getInputMetadata()
@@ -157,23 +157,23 @@ struct AnalysisDataProcessorBuilder {
     }(framework::pack<Args...>{});
   }
 
-  template <soa::has_metadata O>
-  static void addOriginal(const char* name, bool value, std::vector<InputSpec>& inputs)
-  {
-    using metadata = typename aod::MetadataTrait<std::decay_t<O>>::metadata;
-    std::vector<ConfigParamSpec> inputMetadata;
-    inputMetadata.emplace_back(ConfigParamSpec{std::string{"control:"} + name, VariantType::Bool, value, {"\"\""}});
-    if constexpr (soa::extension_table<std::decay_t<O>>) {
-      auto inputSources = getInputMetadata<std::decay_t<O>>();
-      inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
-    }
-    DataSpecUtils::updateInputList(inputs, InputSpec{metadata::tableLabel(), metadata::origin(), metadata::description(), metadata::version(), Lifetime::Timeframe, inputMetadata});
-  }
+  // template <soa::has_metadata O>
+  // static void addOriginal(const char* name, bool value, std::vector<InputSpec>& inputs)
+  // {
+  //   using metadata = typename aod::MetadataTrait<std::decay_t<O>>::metadata;
+  //   std::vector<ConfigParamSpec> inputMetadata;
+  //   inputMetadata.emplace_back(ConfigParamSpec{std::string{"control:"} + name, VariantType::Bool, value, {"\"\""}});
+  //   if constexpr (soa::extension_table<std::decay_t<O>>) {
+  //     auto inputSources = getInputMetadata<std::decay_t<O>>();
+  //     inputMetadata.insert(inputMetadata.end(), inputSources.begin(), inputSources.end());
+  //   }
+  //   DataSpecUtils::updateInputList(inputs, InputSpec{metadata::tableLabel(), metadata::origin(), metadata::description(), metadata::version(), Lifetime::Timeframe, inputMetadata});
+  // }
 
   template <soa::TableRef R>
   static void addOriginalRef(const char* name, bool value, std::vector<InputSpec>& inputs)
   {
-    using metadata = typename aod::MetadataTraitNG<o2::aod::Hash<R.desc_hash>>::metadata;
+    using metadata = typename aod::MetadataTrait<o2::aod::Hash<R.desc_hash>>::metadata;
     std::vector<ConfigParamSpec> inputMetadata;
     inputMetadata.emplace_back(ConfigParamSpec{std::string{"control:"} + name, VariantType::Bool, value, {"\"\""}});
     if constexpr (soa::with_sources<metadata>) {

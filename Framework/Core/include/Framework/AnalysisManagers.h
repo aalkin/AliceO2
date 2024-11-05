@@ -448,7 +448,7 @@ struct OutputManager<Spawns<T>> {
 
   static bool prepare(ProcessingContext& pc, Spawns<T>& what)
   {
-    using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
+    using metadata = o2::aod::MetadataTrait<o2::aod::Hash<T::ref.desc_hash>>::metadata;
     auto originalTable = soa::ArrowHelpers::joinTables(extractOriginals<metadata::sources.size(), metadata::sources>(pc));
     if (originalTable->schema()->fields().empty() == true) {
       using base_table_t = typename Spawns<T>::base_table_t::table_t;
@@ -531,7 +531,7 @@ struct OutputManager<Builds<T>> {
 
   static bool prepare(ProcessingContext& pc, Builds<T>& what)
   {
-    using metadata = o2::aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
+    using metadata = o2::aod::MetadataTrait<o2::aod::Hash<T::ref.desc_hash>>::metadata;
     return what.template build<typename T::indexing_t>(what.pack(), extractOriginals<metadata::sources.size(), metadata::sources>(pc));
   }
 

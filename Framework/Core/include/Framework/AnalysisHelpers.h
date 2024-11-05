@@ -153,7 +153,7 @@ class TableConsumer;
 // };
 
 template <typename T>
-concept producable = soa::has_ng_metadata<T> || soa::has_ng_metadata<typename T::parent_t>;
+concept producable = soa::has_metadata<T> || soa::has_metadata<typename T::parent_t>;
 
 template <producable T>
 struct WritingCursor {
@@ -241,7 +241,7 @@ struct WritingCursor {
 template <o2::soa::with_originals T>
 struct OutputForTable {
   using table_t = T;
-  using metadata = aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata;
+  using metadata = aod::MetadataTrait<o2::aod::Hash<T::ref.desc_hash>>::metadata;
 
   static OutputSpec const spec()
   {
@@ -399,11 +399,11 @@ struct TableTransform {
 // };
 
 template <typename T>
-concept spawnable = soa::ng_table<T> && soa::has_ng_metadata<T>;
+concept spawnable = soa::ng_table<T> && soa::has_metadata<T>;
 
 template <spawnable T>
-struct Spawns : TableTransform<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
-  using metadata = TableTransform<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
+struct Spawns : TableTransform<typename aod::MetadataTrait<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
+  using metadata = TableTransform<typename aod::MetadataTrait<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
   using extension_t = typename metadata::extension_table_t;
   using base_table_t = typename metadata::base_table_t;
   using expression_pack_t = typename metadata::expression_pack_t;
@@ -546,7 +546,7 @@ struct IndexBuilder {
     SelfIndexColumnBuilder self{C1::columnLabel(), pool};
     std::unique_ptr<ChunkedArrayIterator> keyIndex = nullptr;
     if constexpr (!Key::template hasOriginal<refs[0]>()) {
-      keyIndex = std::make_unique<ChunkedArrayIterator>(tables[0]->column(o2::aod::MetadataTraitNG<o2::aod::Hash<refs[0].desc_hash>>::metadata::template getIndexPosToKey<Key>()));
+      keyIndex = std::make_unique<ChunkedArrayIterator>(tables[0]->column(o2::aod::MetadataTrait<o2::aod::Hash<refs[0].desc_hash>>::metadata::template getIndexPosToKey<Key>()));
     }
 
     auto sq = std::make_index_sequence<sizeof...(Cs)>();
@@ -556,7 +556,7 @@ struct IndexBuilder {
       return {[](arrow::Table* table, arrow::MemoryPool* pool) {
         using T = framework::pack_element_t<Is, framework::pack<Cs...>>;
         if constexpr (!Key::template hasOriginal<refs[Is + 1]>()) {
-          constexpr auto pos = o2::aod::MetadataTraitNG<o2::aod::Hash<refs[Is + 1].desc_hash>>::metadata::template getIndexPosToKey<Key>();
+          constexpr auto pos = o2::aod::MetadataTrait<o2::aod::Hash<refs[Is + 1].desc_hash>>::metadata::template getIndexPosToKey<Key>();
           return std::make_shared<IndexColumnBuilder>(table->column(pos), T::columnLabel(), ColumnTrait<T>::listSize(), pool);
         } else {
           return std::make_shared<SelfIndexColumnBuilder>(T::columnLabel(), pool);
@@ -654,8 +654,8 @@ struct IndexBuilder {
 // };
 
 template <soa::index_table T>
-struct Builds : TableTransform<typename aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
-  using metadata = TableTransform<typename aod::MetadataTraitNG<aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
+struct Builds : TableTransform<typename aod::MetadataTrait<aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
+  using metadata = TableTransform<typename aod::MetadataTrait<aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
   using IP = std::conditional_t<metadata::exclusive, IndexBuilder<Exclusive>, IndexBuilder<Sparse>>;
   using Key = metadata::Key;
   using H = typename T::first_t;

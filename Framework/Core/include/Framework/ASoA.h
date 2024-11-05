@@ -15,6 +15,7 @@
 #include "Framework/Pack.h"
 #include "Framework/FunctionalHelpers.h"
 #include "Headers/DataHeader.h"
+#include "Headers/DataHeaderHelpers.h"
 #include "Framework/CompilerBuiltins.h"
 #include "Framework/Traits.h"
 #include "Framework/Expressions.h"
@@ -313,7 +314,7 @@ template <typename T>
 concept ng_metadata = framework::is_base_of_template_v<TableMetadata, T>;
 
 template <typename D>
-struct MetadataTraitNG {
+struct MetadataTrait {
   using metadata = void;
 };
 
@@ -327,7 +328,7 @@ template <size_t N, std::array<soa::TableRef, N> ar, typename Key>
 consteval auto filterForKey()
 {
   constexpr std::array<bool, N> test = []<size_t... Is>(std::index_sequence<Is...>) {
-    return std::array<bool, N>{(Key::template hasOriginal<ar[Is]>() || (o2::aod::MetadataTraitNG<o2::aod::Hash<ar[Is].desc_hash>>::metadata::template getIndexPosToKey<Key>() >= 0))...};
+    return std::array<bool, N>{(Key::template hasOriginal<ar[Is]>() || (o2::aod::MetadataTrait<o2::aod::Hash<ar[Is].desc_hash>>::metadata::template getIndexPosToKey<Key>() >= 0))...};
   }(std::make_index_sequence<N>());
   constexpr int correct = std::ranges::count(test.begin(), test.end(), true);
   std::array<soa::TableRef, correct> out;
@@ -461,11 +462,11 @@ inline constexpr bool is_type_with_parent_v = false;
 template <typename T>
 inline constexpr bool is_type_with_parent_v<T, std::void_t<decltype(sizeof(typename T::parent_t))>> = true;
 
-template <typename T>
-concept has_metadata = not_void<typename aod::MetadataTrait<std::decay_t<T>>::metadata>;
+// template <typename T>
+// concept has_metadata = not_void<typename aod::MetadataTrait<std::decay_t<T>>::metadata>;
 
 template <typename T>
-concept has_ng_metadata = not_void<typename aod::MetadataTraitNG<o2::aod::Hash<std::decay_t<T>::ref.desc_hash>>::metadata>;
+concept has_metadata = not_void<typename aod::MetadataTrait<o2::aod::Hash<std::decay_t<T>::ref.desc_hash>>::metadata>;
 
 template <typename T>
 concept spawnable = std::is_same_v<typename T::spawnable_t, std::true_type>;
@@ -1590,15 +1591,18 @@ concept ng_iterator = framework::is_base_of_template_v<TableIterator, T> || fram
 //   return false;
 // }
 
-template <typename A>
+template <typename T>
 concept with_originals = requires() {
-  A::originals.size();
+  T::originals.size();
 };
 
 template <typename T>
 concept with_sources = requires() {
-  o2::aod::MetadataTraitNG<T>::metadata::sources.size();
+  T::sources.size();
 };
+
+template <typename T>
+concept with_base_table = not_void<typename aod::MetadataTrait<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>;
 
 template <with_originals T, with_originals B>
 consteval bool is_binding_compatible_v()
@@ -1661,7 +1665,7 @@ static constexpr std::string getLabelForTable()
 }
 
 template <soa::ng_table T>
-  requires (!index_table<T>)
+  requires (!(soa::index_table<T> || soa::with_base_table<T>))
 static constexpr std::string getLabelFromType()
 {
   return getLabelForTable<T>();
@@ -1673,16 +1677,15 @@ static constexpr std::string getLabelFromType()
   return getLabelForTable<typename std::decay_t<T>::parent_t>();
 }
 
-template <index_table T>
+template <soa::index_table T>
 static constexpr std::string getLabelFromType()
 {
   return getLabelForTable<typename std::decay_t<T>::first_t>();
 }
-template <with_sources T>
-  requires (not_void<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>)
+template <soa::with_base_table T>
 static constexpr std::string getLabelFromType()
 {
-  return getLabelForTable<typename aod::MetadataTraitNG<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>();
+  return getLabelForTable<typename aod::MetadataTrait<o2::aod::Hash<T::ref.desc_hash>>::metadata::base_table_t>();
 }
 
 template <typename... C>
@@ -1700,7 +1703,7 @@ static constexpr auto hasColumnForKey(framework::pack<C...>, std::string const& 
 template <TableRef ref>
 static constexpr std::pair<bool, std::string> hasKey(std::string const& key)
 {
-  return {hasColumnForKey(typename aod::MetadataTraitNG<o2::aod::Hash<ref.desc_hash>>::metadata::columns{}, key), o2::aod::Hash<ref.label_hash>::str};
+  return {hasColumnForKey(typename aod::MetadataTrait<o2::aod::Hash<ref.desc_hash>>::metadata::columns{}, key), o2::aod::Hash<ref.label_hash>::str};
 }
 
 template <typename... C>
@@ -2076,7 +2079,7 @@ consteval auto base_iter(framework::pack<C...>&&) -> TableIterator<D, O, IP, C..
 template <TableRef ref>
 consteval auto getColumns()
 {
-  return typename aod::MetadataTraitNG<o2::aod::Hash<ref.desc_hash>>::metadata::columns{};
+  return typename aod::MetadataTrait<o2::aod::Hash<ref.desc_hash>>::metadata::columns{};
 }
 
 template <aod::aod_hash L, aod::aod_hash D, aod::origin_hash O, typename... Ts>
@@ -3884,7 +3887,7 @@ consteval auto getIndexTargets()
 
 #define DECLARE_SOA_TABLE_METADATA_TRAIT(_Name_, _Desc_, _Version_)\
   template <>                                                                                       \
-  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                        \
+  struct MetadataTrait<Hash<_Desc_ "/" #_Version_ ""_h>> {                                        \
     using metadata = _Name_##Metadata;                                                              \
   };
 
@@ -3894,7 +3897,7 @@ consteval auto getIndexTargets()
   using _Name_##From = o2::soa::TableNG<Hash<_Label_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;     \
   using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;                                                   \
   template <>                                                                                         \
-  struct MetadataTraitNG<Hash<_Desc_ "/" #_Version_ ""_h>> {                                          \
+  struct MetadataTrait<Hash<_Desc_ "/" #_Version_ ""_h>> {                                          \
     using metadata = _Name_##Metadata;                                                                \
   };
 
@@ -3986,7 +3989,7 @@ consteval auto getIndexTargets()
   };                                                                                                                            \
   using _Name_##ExtensionMetadata = _Name_##ExtensionMetadataFrom<o2::aod::Hash<_Origin_ ""_h>>;                                \
   template <>                                                                                                                   \
-  struct MetadataTraitNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                           \
+  struct MetadataTrait<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                           \
     using metadata = _Name_##ExtensionMetadata;                                                                                 \
   };                                                                                                                            \
   template <typename O>                                                                                                         \
@@ -4063,7 +4066,7 @@ consteval auto getIndexTargets()
   using _Name_ = _Name_##From<o2::aod::Hash<_Origin_ ""_h>>;                                                                               \
                                                                                                                                            \
   template <>                                                                                                                              \
-  struct MetadataTraitNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                                      \
+  struct MetadataTrait<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                                      \
     using metadata = _Name_##Metadata;                                                                                                     \
   };
 

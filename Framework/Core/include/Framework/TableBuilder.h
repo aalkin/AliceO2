@@ -870,7 +870,7 @@ template <soa::TableRef R>
 auto makeEmptyTable()
 {
   TableBuilder b;
-  [[maybe_unused]] auto writer = b.cursor(typename aod::MetadataTraitNG<aod::Hash<R.desc_hash>>::metadata::columns{});
+  [[maybe_unused]] auto writer = b.cursor(typename aod::MetadataTrait<aod::Hash<R.desc_hash>>::metadata::columns{});
   b.setLabel(aod::Hash<R.label_hash>::str);
   return b.finalize();
 }
@@ -891,7 +891,7 @@ std::shared_ptr<arrow::Table> spawnerHelper(std::shared_ptr<arrow::Table> const&
 template <aod::aod_hash D>
 auto spawner(std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* name)
 {
-  using expression_pack_t = typename o2::aod::MetadataTraitNG<D>::metadata::expression_pack_t;
+  using expression_pack_t = typename o2::aod::MetadataTrait<D>::metadata::expression_pack_t;
   auto fullTable = soa::ArrowHelpers::joinTables(std::move(tables));
   if (fullTable->num_rows() == 0) {
     return makeEmptyTable(name, expression_pack_t{});
@@ -909,7 +909,7 @@ auto spawner(std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* na
 template <aod::aod_hash D>
 auto spawner(std::shared_ptr<arrow::Table> const& fullTable, const char* name)
 {
-  using expression_pack_t = typename o2::aod::MetadataTraitNG<D>::metadata::expression_pack_t;
+  using expression_pack_t = typename o2::aod::MetadataTrait<D>::metadata::expression_pack_t;
   if (fullTable->num_rows() == 0) {
     return makeEmptyTable(name,expression_pack_t{});
   }

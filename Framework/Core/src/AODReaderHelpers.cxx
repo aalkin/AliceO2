@@ -160,7 +160,7 @@ AlgorithmSpec AODReaderHelpers::aodSpawnerCallback(std::vector<InputSpec>& reque
       for (auto& input : requested) {
         auto&& [origin, description, version] = DataSpecUtils::asConcreteDataMatcher(input);
         auto maker = [&]<o2::aod::aod_hash D>() {
-          using metadata_t = o2::aod::MetadataTraitNG<D>::metadata;
+          using metadata_t = o2::aod::MetadataTrait<D>::metadata;
           constexpr auto sources = metadata_t::sources;
           return o2::framework::spawner<D>(extractOriginals<sources.size(), sources>(pc), input.binding.c_str());
         };

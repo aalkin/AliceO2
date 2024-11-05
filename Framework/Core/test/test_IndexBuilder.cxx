@@ -188,7 +188,7 @@ TEST_CASE("TestIndexBuilderNG")
   auto t4 = b4.finalize();
   CategoryNGs st4{t4};
 
-  using m1 = MetadataTraitNG<o2::aod::Hash<"Index1/0"_h>>::metadata;
+  using m1 = MetadataTrait<o2::aod::Hash<"Index1/0"_h>>::metadata;
   auto t5 = IndexBuilder<Exclusive>::indexBuilder<PointNGs, m1::sources.size(), m1::sources>("test1a", {t1, t2, t3, t4}, typename IDXNGs::persistent_columns_t{});
   REQUIRE(t5->num_rows() == 4);
   IDXNGs idxt{t5};
@@ -199,7 +199,7 @@ TEST_CASE("TestIndexBuilderNG")
     REQUIRE(row.categoryng().pointngId() == row.pointngId());
   }
 
-  using m2 = MetadataTraitNG<o2::aod::Hash<"Index2/0"_h>>::metadata;
+  using m2 = MetadataTrait<o2::aod::Hash<"Index2/0"_h>>::metadata;
   auto t6 = IndexBuilder<Sparse>::indexBuilder<PointNGs, m2::sources.size(), m2::sources>("test3", {t2, t1, t3, t4}, typename IDX2NGs::persistent_columns_t{});
   REQUIRE(t6->num_rows() == st2.size());
   IDX2NGs idxs{t6};
@@ -383,7 +383,7 @@ TEST_CASE("AdvancedIndexTablesNG")
                                                    {14, 34},
                                                    {8, 31, 42, 46, 58}}};
 
-  using m3 = MetadataTraitNG<o2::aod::Hash<"Index3/0"_h>>::metadata;
+  using m3 = MetadataTrait<o2::aod::Hash<"Index3/0"_h>>::metadata;
   auto t3 = IndexBuilder<Sparse>::indexBuilder<PointNGs, m3::sources.size(), m3::sources>("test4", {t1, t2, tc}, typename IDX3NGs::persistent_columns_t{});
   REQUIRE(t3->num_rows() == st1.size());
   IDX3NGs idxs{t3};

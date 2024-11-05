@@ -94,12 +94,12 @@ struct AnalysisDataProcessorBuilder {
   //   return getInputSpecs(typename T::sources_t{});
   // }
 
-  template <soa::soa_table T>
-  static inline auto getSources()
-    requires soa::extension_table<std::decay_t<T>>
-  {
-    return getInputSpecs(typename aod::MetadataTrait<T>::metadata::sources{});
-  }
+  // template <soa::soa_table T>
+  // static inline auto getSources()
+  //   requires soa::extension_table<std::decay_t<T>>
+  // {
+  //   return getInputSpecs(typename aod::MetadataTrait<T>::metadata::sources{});
+  // }
 
   template <soa::with_sources T>
   static inline auto getSources()
@@ -226,16 +226,16 @@ struct AnalysisDataProcessorBuilder {
      ...);
   }
 
-  template <soa::soa_table T>
-  static auto extractTableFromRecord(InputRecord& record)
-    requires soa::has_metadata<T>
-  {
-    auto table = record.get<TableConsumer>(aod::MetadataTrait<T>::metadata::tableLabel())->asArrowTable();
-    if (table->num_rows() == 0) {
-      table = makeEmptyTable<T>(aod::MetadataTrait<T>::metadata::tableLabel());
-    }
-    return table;
-  }
+  // template <soa::soa_table T>
+  // static auto extractTableFromRecord(InputRecord& record)
+  //   requires soa::has_metadata<T>
+  // {
+  //   auto table = record.get<TableConsumer>(aod::MetadataTrait<T>::metadata::tableLabel())->asArrowTable();
+  //   if (table->num_rows() == 0) {
+  //     table = makeEmptyTable<T>(aod::MetadataTrait<T>::metadata::tableLabel());
+  //   }
+  //   return table;
+  // }
 
   template <typename T>
   static auto extractTableFromRecord(InputRecord& record) requires soa::is_type_with_originals_v<T>
@@ -253,11 +253,11 @@ struct AnalysisDataProcessorBuilder {
     return table;
   }
 
-  template <soa::soa_table T, typename... Os>
-  static auto extractFromRecord(InputRecord& record, pack<Os...> const&)
-  {
-    return T{{extractTableFromRecord<Os>(record)...}};
-  }
+  // template <soa::soa_table T, typename... Os>
+  // static auto extractFromRecord(InputRecord& record, pack<Os...> const&)
+  // {
+  //   return T{{extractTableFromRecord<Os>(record)...}};
+  // }
 
   // template <soa::soa_iterator T, typename... Os>
   // static auto extractFromRecord(InputRecord& record, pack<Os...> const&)
@@ -343,15 +343,15 @@ struct AnalysisDataProcessorBuilder {
     }
   }
 
-  template <soa::soa_table T, int AI>
-  static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash)
-  {
-    if constexpr (soa::ng_filtered_table<T>) {
-      return extractFilteredFromRecord<T>(record, *std::find_if(infos.begin(), infos.end(), [&phash](ExpressionInfo const& i) { return (i.processHash == phash && i.argumentIndex == AI); }), soa::make_originals_from_type<T>());
-    } else {
-      return extractFromRecord<T>(record, soa::make_originals_from_type<T>());
-    }
-  }
+  // template <soa::soa_table T, int AI>
+  // static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash)
+  // {
+  //   if constexpr (soa::ng_filtered_table<T>) {
+  //     return extractFilteredFromRecord<T>(record, *std::find_if(infos.begin(), infos.end(), [&phash](ExpressionInfo const& i) { return (i.processHash == phash && i.argumentIndex == AI); }), soa::make_originals_from_type<T>());
+  //   } else {
+  //     return extractFromRecord<T>(record, soa::make_originals_from_type<T>());
+  //   }
+  // }
 
   template <soa::ng_table T, int AI>
   static auto extract(InputRecord& record, std::vector<ExpressionInfo>& infos, size_t phash)

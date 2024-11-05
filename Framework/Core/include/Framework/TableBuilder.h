@@ -923,18 +923,18 @@ auto spawner(std::shared_ptr<arrow::Table> const& fullTable, const char* name)
   return spawnerHelper(fullTable, new_schema, framework::pack_size(expression_pack_t{}), projectors.data(), fields, name);
 }
 
-template <soa::OriginEnc ORIGIN, typename... C>
-auto spawner(framework::pack<C...> columns, std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* name)
-{
-  auto fullTable = soa::ArrowHelpers::joinTables(std::move(tables));
-  if (fullTable->num_rows() == 0) {
-    return makeEmptyTable<soa::Table<ORIGIN, C...>>(name);
-  }
-  static auto fields = o2::soa::createFieldsFromColumns(columns);
-  static auto new_schema = std::make_shared<arrow::Schema>(fields);
-  std::array<expressions::Projector, sizeof...(C)> projectors{{std::move(C::Projector())...}};
-  return spawnerHelper(fullTable, new_schema, sizeof...(C), projectors.data(), fields, name);
-}
+// template <soa::OriginEnc ORIGIN, typename... C>
+// auto spawner(framework::pack<C...> columns, std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* name)
+// {
+//   auto fullTable = soa::ArrowHelpers::joinTables(std::move(tables));
+//   if (fullTable->num_rows() == 0) {
+//     return makeEmptyTable<soa::Table<ORIGIN, C...>>(name);
+//   }
+//   static auto fields = o2::soa::createFieldsFromColumns(columns);
+//   static auto new_schema = std::make_shared<arrow::Schema>(fields);
+//   std::array<expressions::Projector, sizeof...(C)> projectors{{std::move(C::Projector())...}};
+//   return spawnerHelper(fullTable, new_schema, sizeof...(C), projectors.data(), fields, name);
+// }
 
 template <typename... C>
 auto spawner(framework::pack<C...> columns, std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* name)

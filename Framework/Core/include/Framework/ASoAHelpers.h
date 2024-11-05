@@ -1348,15 +1348,15 @@ auto combinations(const BP& binningPolicy, int categoryNeighbours, const T1& out
   }
 }
 
-template <soa::soa_table... T2s>
-auto combinations(const o2::framework::expressions::Filter& filter, const T2s&... tables)
-{
-  if constexpr (isSameType<T2s...>()) {
-    return CombinationsGenerator<CombinationsStrictlyUpperIndexPolicy<Filtered<T2s>...>>(CombinationsStrictlyUpperIndexPolicy(tables.select(filter)...));
-  } else {
-    return CombinationsGenerator<CombinationsUpperIndexPolicy<Filtered<T2s>...>>(CombinationsUpperIndexPolicy(tables.select(filter)...));
-  }
-}
+// template <soa::soa_table... T2s>
+// auto combinations(const o2::framework::expressions::Filter& filter, const T2s&... tables)
+// {
+//   if constexpr (isSameType<T2s...>()) {
+//     return CombinationsGenerator<CombinationsStrictlyUpperIndexPolicy<Filtered<T2s>...>>(CombinationsStrictlyUpperIndexPolicy(tables.select(filter)...));
+//   } else {
+//     return CombinationsGenerator<CombinationsUpperIndexPolicy<Filtered<T2s>...>>(CombinationsUpperIndexPolicy(tables.select(filter)...));
+//   }
+// }
 
 template <soa::ng_table... T2s>
 auto combinations(const o2::framework::expressions::Filter& filter, const T2s&... tables)
@@ -1376,11 +1376,11 @@ CombinationsGenerator<P2<T2s...>> combinations(const P2<T2s...>& policy)
   return CombinationsGenerator<P2<T2s...>>(policy);
 }
 
-template <template <typename...> typename P2, soa::soa_table... T2s>
-CombinationsGenerator<P2<Filtered<T2s>...>> combinations(P2<T2s...>&&, const o2::framework::expressions::Filter& filter, const T2s&... tables)
-{
-  return CombinationsGenerator<P2<Filtered<T2s>...>>(P2<Filtered<T2s>...>(tables.select(filter)...));
-}
+// template <template <typename...> typename P2, soa::soa_table... T2s>
+// CombinationsGenerator<P2<Filtered<T2s>...>> combinations(P2<T2s...>&&, const o2::framework::expressions::Filter& filter, const T2s&... tables)
+// {
+//   return CombinationsGenerator<P2<Filtered<T2s>...>>(P2<Filtered<T2s>...>(tables.select(filter)...));
+// }
 
 template <template <typename...> typename P2, soa::ng_table... T2s>
 CombinationsGenerator<P2<Filtered<T2s>...>> combinations(P2<T2s...>&&, const o2::framework::expressions::Filter& filter, const T2s&... tables)

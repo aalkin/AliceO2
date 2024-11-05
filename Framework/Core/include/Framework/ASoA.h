@@ -1091,8 +1091,8 @@ struct DefaultIndexPolicy : IndexPolicyBase {
   int64_t mMaxRow = 0;
 };
 
-template <OriginEnc ORIGIN, typename... C>
-class Table;
+// template <OriginEnc ORIGIN, typename... C>
+// class Table;
 
 template <aod::aod_hash L, aod::aod_hash D, aod::origin_hash O, typename... T>
 class TableNG;
@@ -1545,8 +1545,8 @@ constexpr bool are_bindings_compatible_v(framework::pack<Os...>&&)
   }
 }
 
-template <typename T>
-concept soa_table = soa::is_base_of_template_origin_v<soa::Table, T>;
+// template <typename T>
+// concept soa_table = soa::is_base_of_template_origin_v<soa::Table, T>;
 
 template <typename T>
 concept ng_table = framework::is_base_of_template_v<soa::TableNG, T>;
@@ -1691,11 +1691,11 @@ static constexpr auto hasColumnForKey(framework::pack<C...>, std::string const& 
   return ((C::inherited_t::mLabel == key) || ...);
 }
 
-template <soa::soa_table T>
-static constexpr std::pair<bool, std::string> hasKey(std::string const& key)
-{
-  return {hasColumnForKey(typename T::persistent_columns_t{}, key), getLabelFromType<T>()};
-}
+// template <soa::soa_table T>
+// static constexpr std::pair<bool, std::string> hasKey(std::string const& key)
+// {
+//   return {hasColumnForKey(typename T::persistent_columns_t{}, key), getLabelFromType<T>()};
+// }
 
 template <TableRef ref>
 static constexpr std::pair<bool, std::string> hasKey(std::string const& key)
@@ -2054,11 +2054,11 @@ auto doSliceByCachedUnsorted(T const* table, framework::expressions::BindingNode
   }
 }
 
-template <soa::soa_table T>
-auto select(T const& t, framework::expressions::Filter const& f)
-{
-  return Filtered<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
-}
+// template <soa::soa_table T>
+// auto select(T const& t, framework::expressions::Filter const& f)
+// {
+//   return Filtered<T>({t.asArrowTable()}, selectionToVector(framework::expressions::createSelection(t.asArrowTable(), f)));
+// }
 
 template <with_originals T>
 auto select(T const& t, framework::expressions::Filter const& f)
@@ -2948,27 +2948,27 @@ using InPlaceTable = TableNG<o2::aod::Hash<"TEST"_h>, o2::aod::Hash<D>, o2::aod:
 //   RowViewSentinel mEnd;
 // };
 
-template <OriginEnc, typename T>
-struct PackToTable {
-  static_assert(framework::always_static_assert_v<T>, "Not a pack");
-};
+// template <OriginEnc, typename T>
+// struct PackToTable {
+//   static_assert(framework::always_static_assert_v<T>, "Not a pack");
+// };
 
-template <OriginEnc ORIGIN, typename... C>
-struct PackToTable<ORIGIN, framework::pack<C...>> {
-  using table = o2::soa::Table<ORIGIN, C...>;
-};
+// template <OriginEnc ORIGIN, typename... C>
+// struct PackToTable<ORIGIN, framework::pack<C...>> {
+//   using table = o2::soa::Table<ORIGIN, C...>;
+// };
 
-template <OriginEnc ORIGIN, typename... T>
-struct TableWrap {
-  using all_columns = framework::concatenated_pack_unique_t<typename T::columns...>;
-  using table_t = typename PackToTable<ORIGIN, all_columns>::table;
-};
+// template <OriginEnc ORIGIN, typename... T>
+// struct TableWrap {
+//   using all_columns = framework::concatenated_pack_unique_t<typename T::columns...>;
+//   using table_t = typename PackToTable<ORIGIN, all_columns>::table;
+// };
 
-template <OriginEnc ORIGIN, typename... T>
-struct TableIntersect {
-  using all_columns = framework::full_intersected_pack_t<typename T::columns...>;
-  using table_t = typename PackToTable<ORIGIN, all_columns>::table;
-};
+// template <OriginEnc ORIGIN, typename... T>
+// struct TableIntersect {
+//   using all_columns = framework::full_intersected_pack_t<typename T::columns...>;
+//   using table_t = typename PackToTable<ORIGIN, all_columns>::table;
+// };
 
 /// Template trait which allows to map a given
 /// Table type to its O2 DataModel origin and description
@@ -3242,11 +3242,11 @@ consteval auto getIndexTargets()
   return T::originals;
 }
 
-template <o2::soa::soa_table T>
-consteval auto getIndexTargets()
-{
-  return std::array<o2::soa::TableRef, 0>{};
-}
+// template <o2::soa::soa_table T>
+// consteval auto getIndexTargets()
+// {
+//   return std::array<o2::soa::TableRef, 0>{};
+// }
 
 #define DECLARE_SOA_SLICE_INDEX_COLUMN_FULL_CUSTOM(_Name_, _Getter_, _Type_, _Table_, _Label_, _Suffix_) \
   struct _Name_##IdSlice : o2::soa::Column<_Type_[2], _Name_##IdSlice> {                                 \

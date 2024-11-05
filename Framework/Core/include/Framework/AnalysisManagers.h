@@ -483,11 +483,11 @@ static inline auto doExtractOriginal(framework::pack<Ts...>, ProcessingContext& 
   }
 }
 
-template <typename O>
-static inline auto extractOriginalJoined(ProcessingContext& pc)
-{
-  return o2::soa::ArrowHelpers::joinTables({doExtractOriginal(soa::make_originals_from_type<O>(), pc)});
-}
+// template <typename O>
+// static inline auto extractOriginalJoined(ProcessingContext& pc)
+// {
+//   return o2::soa::ArrowHelpers::joinTables({doExtractOriginal(soa::make_originals_from_type<O>(), pc)});
+// }
 
 template <typename... Os>
 static inline auto extractOriginalsVector(framework::pack<Os...>, ProcessingContext& pc)

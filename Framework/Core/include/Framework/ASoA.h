@@ -40,17 +40,17 @@ std::string cutString(std::string&& str);
 std::string strToUpper(std::string&& str);
 } // namespace o2::framework
 
-#define DECLARE_SOA_METADATA()       \
-  template <typename T>              \
-  struct MetadataTrait {             \
-    using metadata = std::void_t<T>; \
-  };
+#define DECLARE_SOA_METADATA()
+  // template <typename T>              \
+  // struct MetadataTrait {             \
+  //   using metadata = std::void_t<T>; \
+  // };
 
-#define DECLARE_SOA_ITERATOR_METADATA()                                       \
-  template <o2::soa::soa_iterator IT>                                         \
-  struct MetadataTrait<IT> {                                                  \
-    using metadata = typename MetadataTrait<typename IT::parent_t>::metadata; \
-  };
+#define DECLARE_SOA_ITERATOR_METADATA()
+  // template <o2::soa::soa_iterator IT>                                         \
+  // struct MetadataTrait<IT> {                                                  \
+  //   using metadata = typename MetadataTrait<typename IT::parent_t>::metadata; \
+  // };
 
 namespace o2::soa
 {
@@ -164,83 +164,83 @@ consteval auto intersectOriginals()
   }
 }
 
-struct OriginEnc {
-  static constexpr auto size = 4U;
-  uint64_t value;
-  consteval OriginEnc(uint32_t v) : value{v}
-  {
-  }
-#if defined(__clang__)
-  consteval OriginEnc(std::string_view in) noexcept : value{0}
-#elif defined(__GNUC__) || defined(__GNUG__)
-  constexpr OriginEnc(std::string_view in) noexcept : value{0}
-#endif
-  {
-    for (auto i = 0U; i < (size < (uint32_t)in.size() ? size : (uint32_t)in.size()); ++i) {
-      value |= ((uint32_t)in[i]) << (8 * i);
-    }
-  }
-  constexpr operator std::string_view() const noexcept
-  {
-    return static_cast<const char*>(static_cast<const void*>(&value));
-  }
+// struct OriginEnc {
+//   static constexpr auto size = 4U;
+//   uint64_t value;
+//   consteval OriginEnc(uint32_t v) : value{v}
+//   {
+//   }
+// #if defined(__clang__)
+//   consteval OriginEnc(std::string_view in) noexcept : value{0}
+// #elif defined(__GNUC__) || defined(__GNUG__)
+//   constexpr OriginEnc(std::string_view in) noexcept : value{0}
+// #endif
+//   {
+//     for (auto i = 0U; i < (size < (uint32_t)in.size() ? size : (uint32_t)in.size()); ++i) {
+//       value |= ((uint32_t)in[i]) << (8 * i);
+//     }
+//   }
+//   constexpr operator std::string_view() const noexcept
+//   {
+//     return static_cast<const char*>(static_cast<const void*>(&value));
+//   }
 
-  consteval operator o2::header::DataOrigin()
-  {
-    return o2::header::DataOrigin{static_cast<uint32_t>(value)};
-  }
+//   consteval operator o2::header::DataOrigin()
+//   {
+//     return o2::header::DataOrigin{static_cast<uint32_t>(value)};
+//   }
 
-  constexpr OriginEnc(OriginEnc const& other) noexcept = default;
-  constexpr OriginEnc(OriginEnc&& other) noexcept = default;
-  constexpr OriginEnc& operator=(OriginEnc const& other) noexcept = default;
-  constexpr OriginEnc& operator=(OriginEnc&& other) noexcept = default;
+//   constexpr OriginEnc(OriginEnc const& other) noexcept = default;
+//   constexpr OriginEnc(OriginEnc&& other) noexcept = default;
+//   constexpr OriginEnc& operator=(OriginEnc const& other) noexcept = default;
+//   constexpr OriginEnc& operator=(OriginEnc&& other) noexcept = default;
 
-  constexpr bool operator==(OriginEnc const& other) const
-  {
-    return this->value == other.value;
-  }
-};
+//   constexpr bool operator==(OriginEnc const& other) const
+//   {
+//     return this->value == other.value;
+//   }
+// };
 
-template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
-struct is_base_of_template_origin_impl {
-  template <o2::soa::OriginEnc ORIGIN, typename... Ts>
-  static constexpr std::true_type test(const base<ORIGIN, Ts...>*);
-  static constexpr std::false_type test(...);
-  using type = decltype(test(std::declval<derived*>()));
-};
+// template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
+// struct is_base_of_template_origin_impl {
+//   template <o2::soa::OriginEnc ORIGIN, typename... Ts>
+//   static constexpr std::true_type test(const base<ORIGIN, Ts...>*);
+//   static constexpr std::false_type test(...);
+//   using type = decltype(test(std::declval<derived*>()));
+// };
 
-template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
-using is_base_of_template_origin = typename is_base_of_template_origin_impl<base, derived>::type;
+// template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
+// using is_base_of_template_origin = typename is_base_of_template_origin_impl<base, derived>::type;
 
-template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
-inline constexpr bool is_base_of_template_origin_v = is_base_of_template_origin<base, derived>::value;
+// template <template <o2::soa::OriginEnc, typename...> class base, typename derived>
+// inline constexpr bool is_base_of_template_origin_v = is_base_of_template_origin<base, derived>::value;
 } // namespace o2::soa
 
-template <>
-struct fmt::formatter<o2::soa::OriginEnc> {
-  char presentation = 's';
-  constexpr auto parse(format_parse_context& ctx)
-  {
-    auto it = ctx.begin(), end = ctx.end();
-    if (it != end && (*it == 's')) {
-      presentation = *it++;
-    }
+// template <>
+// struct fmt::formatter<o2::soa::OriginEnc> {
+//   char presentation = 's';
+//   constexpr auto parse(format_parse_context& ctx)
+//   {
+//     auto it = ctx.begin(), end = ctx.end();
+//     if (it != end && (*it == 's')) {
+//       presentation = *it++;
+//     }
 
-    // Check if reached the end of the range:
-    if (it != end && *it != '}') {
-      throw format_error("invalid pick format");
-    }
+//     // Check if reached the end of the range:
+//     if (it != end && *it != '}') {
+//       throw format_error("invalid pick format");
+//     }
 
-    // Return an iterator past the end of the parsed range:
-    return it;
-  }
+//     // Return an iterator past the end of the parsed range:
+//     return it;
+//   }
 
-  template <typename FormatContext>
-  auto format(o2::soa::OriginEnc const& origin, FormatContext& ctx)
-  {
-    return fmt::format_to(ctx.out(), "{}", (std::string_view)origin);
-  }
-};
+//   template <typename FormatContext>
+//   auto format(o2::soa::OriginEnc const& origin, FormatContext& ctx)
+//   {
+//     return fmt::format_to(ctx.out(), "{}", (std::string_view)origin);
+//   }
+// };
 
 namespace o2::soa
 {
@@ -271,7 +271,7 @@ using is_self_index_t = typename std::conditional_t<self_index_column<C>, std::t
 
 namespace o2::aod
 {
-DECLARE_SOA_METADATA();
+// DECLARE_SOA_METADATA();
 
 template <typename D, typename... Cs>
 struct TableMetadata {
@@ -477,8 +477,8 @@ concept spawnable = std::is_same_v<typename T::spawnable_t, std::true_type>;
 // template <typename T>
 // inline constexpr bool is_soa_extension_table_v<T, std::void_t<decltype(sizeof(typename T::expression_pack_t))>> = true;
 
-template <typename T>
-concept extension_table = not_void<typename T::expression_pack_t>;
+// template <typename T>
+// concept extension_table = not_void<typename T::expression_pack_t>;
 
 // template <typename T, typename = void>
 // inline constexpr bool is_index_table_v = false;
@@ -508,40 +508,40 @@ constexpr bool is_index_equivalent_v = EquivalentIndex<B, E>::value || Equivalen
 template <aod::aod_hash A, aod::aod_hash B>
 constexpr bool is_ng_index_equivalent_v = EquivalentIndexNG<A, B>::value || EquivalentIndexNG<B, A>::value;
 
-template <typename H, typename... T>
-consteval decltype(auto) make_originals_from_type()
-{
-  using decayed = std::decay_t<H>;
-  if constexpr (sizeof...(T) == 0) {
-    if constexpr (is_type_with_originals_v<decayed>) {
-      return typename decayed::originals{};
-    } else if constexpr (is_type_with_originals_v<typename decayed::table_t>) {
-      return typename decayed::table_t::originals{};
-    } else if constexpr (is_type_with_parent_v<decayed>) {
-      return make_originals_from_type<typename decayed::parent_t>();
-    } else {
-      return framework::pack<decayed>{};
-    }
-  } else if constexpr (is_type_with_originals_v<decayed>) {
-    return framework::concatenate_pack(typename decayed::originals{}, make_originals_from_type<T...>());
-  } else if constexpr (is_type_with_originals_v<typename decayed::table_t>) {
-    return framework::concatenate_pack(typename decayed::table_t::originals{}, make_originals_from_type<T...>());
-  } else {
-    return framework::concatenate_pack(framework::pack<decayed>{}, make_originals_from_type<T...>());
-  }
-}
+// template <typename H, typename... T>
+// consteval decltype(auto) make_originals_from_type()
+// {
+//   using decayed = std::decay_t<H>;
+//   if constexpr (sizeof...(T) == 0) {
+//     if constexpr (is_type_with_originals_v<decayed>) {
+//       return typename decayed::originals{};
+//     } else if constexpr (is_type_with_originals_v<typename decayed::table_t>) {
+//       return typename decayed::table_t::originals{};
+//     } else if constexpr (is_type_with_parent_v<decayed>) {
+//       return make_originals_from_type<typename decayed::parent_t>();
+//     } else {
+//       return framework::pack<decayed>{};
+//     }
+//   } else if constexpr (is_type_with_originals_v<decayed>) {
+//     return framework::concatenate_pack(typename decayed::originals{}, make_originals_from_type<T...>());
+//   } else if constexpr (is_type_with_originals_v<typename decayed::table_t>) {
+//     return framework::concatenate_pack(typename decayed::table_t::originals{}, make_originals_from_type<T...>());
+//   } else {
+//     return framework::concatenate_pack(framework::pack<decayed>{}, make_originals_from_type<T...>());
+//   }
+// }
 
-template <typename... T>
-consteval decltype(auto) make_originals_from_type(framework::pack<T...> p)
-{
-  if constexpr (sizeof...(T) == 0) {
-    return framework::pack<>{};
-  } else {
-    return []<typename H, typename... Ta>(framework::pack<H, Ta...>) {
-      return make_originals_from_type<H, Ta...>();
-    }(p);
-  }
-}
+// template <typename... T>
+// consteval decltype(auto) make_originals_from_type(framework::pack<T...> p)
+// {
+//   if constexpr (sizeof...(T) == 0) {
+//     return framework::pack<>{};
+//   } else {
+//     return []<typename H, typename... Ta>(framework::pack<H, Ta...>) {
+//       return make_originals_from_type<H, Ta...>();
+//     }(p);
+//   }
+// }
 
 /// Policy class for columns which are chunked. This
 /// will make the compiler take the most generic (and
@@ -1552,17 +1552,17 @@ constexpr bool are_bindings_compatible_v(framework::pack<Os...>&&)
 template <typename T>
 concept ng_table = framework::is_base_of_template_v<soa::TableNG, T>;
 
-/// special case for the template with origin
-template <typename T, template <OriginEnc, typename...> class Ref>
-struct is_specialization_origin : std::false_type {
-};
+// /// special case for the template with origin
+// template <typename T, template <OriginEnc, typename...> class Ref>
+// struct is_specialization_origin : std::false_type {
+// };
 
-template <template <OriginEnc, typename...> class Ref, OriginEnc ORIGIN, typename... Args>
-struct is_specialization_origin<Ref<ORIGIN, Args...>, Ref> : std::true_type {
-};
+// template <template <OriginEnc, typename...> class Ref, OriginEnc ORIGIN, typename... Args>
+// struct is_specialization_origin<Ref<ORIGIN, Args...>, Ref> : std::true_type {
+// };
 
-template <typename T, template <OriginEnc, typename...> class Ref>
-inline constexpr bool is_specialization_origin_v = is_specialization_origin<T, Ref>::value;
+// template <typename T, template <OriginEnc, typename...> class Ref>
+// inline constexpr bool is_specialization_origin_v = is_specialization_origin<T, Ref>::value;
 
 //! Helper to check if a type T is an iterator
 // template <typename T>
@@ -3087,18 +3087,18 @@ O2ORIGIN("TEST");
 O2HASH("TEST/0");
 } // namespace o2::aod
 
-#define DECLARE_SOA_VERSIONING()                                                                    \
-  template <typename T>                                                                             \
-  consteval int getVersion()                                                                        \
-  {                                                                                                 \
-    if constexpr (o2::soa::has_metadata<T>) {                                                       \
-      return MetadataTrait<T>::metadata::version();                                                 \
-    } else if constexpr (o2::soa::is_type_with_originals_v<T>) {                                    \
-      return MetadataTrait<o2::framework::pack_head_t<typename T::originals>>::metadata::version(); \
-    } else {                                                                                        \
-      static_assert(o2::framework::always_static_assert_v<T>, "Not a versioned type");              \
-    }                                                                                               \
-  }
+#define DECLARE_SOA_VERSIONING()
+//   template <typename T>                                                                             \
+//   consteval int getVersion()                                                                        \
+//   {                                                                                                 \
+//     if constexpr (o2::soa::has_metadata<T>) {                                                       \
+//       return MetadataTrait<T>::metadata::version();                                                 \
+//     } else if constexpr (o2::soa::is_type_with_originals_v<T>) {                                    \
+//       return MetadataTrait<o2::framework::pack_head_t<typename T::originals>>::metadata::version(); \
+//     } else {                                                                                        \
+//       static_assert(o2::framework::always_static_assert_v<T>, "Not a versioned type");              \
+//     }                                                                                               \
+//   }
 
 #define DECLARE_EQUIVALENT_FOR_INDEX(_Base_, _Equiv_)                                                     \
   template <>                                                                                             \

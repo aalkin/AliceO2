@@ -82,11 +82,11 @@ struct AnalysisDataProcessorBuilder {
     return soa::tableRef2ConfigParamSpec<R>();
   }
 
-  template <typename... T>
-  static inline std::vector<ConfigParamSpec> getInputSpecs(framework::pack<T...>)
-  {
-    return std::vector{getSpec<T>()...};
-  }
+  // template <typename... T>
+  // static inline std::vector<ConfigParamSpec> getInputSpecs(framework::pack<T...>)
+  // {
+  //   return std::vector{getSpec<T>()...};
+  // }
 
   // template <typename T>
   // static inline auto getSources() requires soa::is_soa_index_table_v<std::decay_t<T>>

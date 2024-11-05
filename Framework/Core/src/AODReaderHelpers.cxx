@@ -65,17 +65,17 @@ static inline auto doExtractOriginal(framework::pack<Ts...>, ProcessingContext& 
   }
 }
 
-template <typename O>
-static inline auto extractTypedOriginal(ProcessingContext& pc)
-{
-  return O{doExtractOriginal(soa::make_originals_from_type<O>(), pc)};
-}
+// template <typename O>
+// static inline auto extractTypedOriginal(ProcessingContext& pc)
+// {
+//   return O{doExtractOriginal(soa::make_originals_from_type<O>(), pc)};
+// }
 
-template <typename O>
-static inline auto extractOriginal(ProcessingContext& pc)
-{
-  return o2::soa::ArrowHelpers::joinTables({doExtractOriginal(soa::make_originals_from_type<O>(), pc)});
-}
+// template <typename O>
+// static inline auto extractOriginal(ProcessingContext& pc)
+// {
+//   return o2::soa::ArrowHelpers::joinTables({doExtractOriginal(soa::make_originals_from_type<O>(), pc)});
+// }
 
 template <typename... Os>
 static inline auto extractOriginalsTuple(framework::pack<Os...>, ProcessingContext& pc)

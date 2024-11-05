@@ -273,7 +273,7 @@ namespace o2::aod
 DECLARE_SOA_METADATA();
 
 template <typename D, typename... Cs>
-struct TableMetadataNG {
+struct TableMetadata {
   using columns = framework::pack<Cs...>;
   using persistent_columns_t = framework::selected_pack<soa::is_persistent_t, Cs...>;
   using external_index_columns_t = framework::selected_pack<soa::is_external_index_t, Cs...>;
@@ -310,7 +310,7 @@ struct TableMetadataNG {
 };
 
 template <typename T>
-concept ng_metadata = framework::is_base_of_template_v<TableMetadataNG, T>;
+concept ng_metadata = framework::is_base_of_template_v<TableMetadata, T>;
 
 template <typename D>
 struct MetadataTraitNG {
@@ -3880,7 +3880,7 @@ consteval auto getIndexTargets()
 //   DECLARE_SOA_TABLE_FULL_OLD_VERSIONED(_Name_, #_Name_, _Origin_, _Description_, _Version_, __VA_ARGS__);
 
 #define DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, ...) \
-    using _Name_##Metadata = TableMetadataNG<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
+    using _Name_##Metadata = TableMetadata<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
 
 #define DECLARE_SOA_TABLE_METADATA_TRAIT(_Name_, _Desc_, _Version_)\
   template <>                                                                                       \
@@ -3978,7 +3978,7 @@ consteval auto getIndexTargets()
   using _Name_##ExtensionFrom = soa::TableNG<o2::aod::Hash<_Label_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O>;        \
   using _Name_##Extension = _Name_##ExtensionFrom<o2::aod::Hash<_Origin_ ""_h>>;                                                \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                          \
-  struct _Name_##ExtensionMetadataFrom : TableMetadataNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__> {              \
+  struct _Name_##ExtensionMetadataFrom : TableMetadata<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__> {              \
     using base_table_t = _OriginalTable_;                                                                                       \
     using extension_table_t = _Name_##ExtensionFrom<O>;                                                                         \
     using expression_pack_t = framework::pack<__VA_ARGS__>;                                                                     \
@@ -4047,7 +4047,7 @@ consteval auto getIndexTargets()
   O2HASH(#_Name_);                                                                                                                         \
   O2HASH(_Desc_ "/" #_Version_);                                                                                                           \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                                     \
-  struct _Name_##MetadataFrom : o2::aod::TableMetadataNG<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, soa::Index<>, __VA_ARGS__> {           \
+  struct _Name_##MetadataFrom : o2::aod::TableMetadata<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, soa::Index<>, __VA_ARGS__> {           \
     static constexpr bool exclusive = _Exclusive_;                                                                                         \
     using Key = _Key_;                                                                                                                     \
     using index_pack_t = framework::pack<__VA_ARGS__>;                                                                                     \

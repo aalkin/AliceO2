@@ -31,6 +31,14 @@
 #include <gsl/span>
 #include <limits>
 
+namespace o2::framework
+{
+using ListVector = std::vector<std::vector<int64_t>>;
+
+std::string cutString(std::string&& str);
+std::string strToUpper(std::string&& str);
+} // namespace o2::framework
+
 #define DECLARE_SOA_METADATA()       \
   template <typename T>              \
   struct MetadataTrait {             \
@@ -5655,19 +5663,19 @@ template <typename T>
 constexpr bool is_smallgroups_v = is_smallgroups_t<T>::value;
 } // namespace o2::soa
 
-namespace o2::framework
-{
-using ListVector = std::vector<std::vector<int64_t>>;
+// namespace o2::framework
+// {
+// using ListVector = std::vector<std::vector<int64_t>>;
 
-std::string cutString(std::string&& str);
+// std::string cutString(std::string&& str);
 
-void sliceByColumnGeneric(
-  char const* key,
-  char const* target,
-  std::shared_ptr<arrow::Table> const& input,
-  int32_t fullSize,
-  ListVector* groups,
-  ListVector* unassigned = nullptr);
-} // namespace o2::framework
+// void sliceByColumnGeneric(
+//   char const* key,
+//   char const* target,
+//   std::shared_ptr<arrow::Table> const& input,
+//   int32_t fullSize,
+//   ListVector* groups,
+//   ListVector* unassigned = nullptr);
+// } // namespace o2::framework
 
 #endif // O2_FRAMEWORK_ASOA_H_

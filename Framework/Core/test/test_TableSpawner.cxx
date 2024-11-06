@@ -30,25 +30,25 @@ DECLARE_SOA_EXPRESSION_COLUMN(Rsq, rsq, float, test::x * test::x + test::y * tes
 DECLARE_SOA_EXPRESSION_COLUMN(Sin, sin, float, test::x / nsqrt (test::x * test::x + test::y * test::y));
 }
 
-DECLARE_SOA_TABLE(PointNGs, "AOD", "PTSNG", test::X, test::Y, test::Z);
-DECLARE_SOA_EXTENDED_TABLE(ExPointNGs, PointNGs, "EXPTSNG", 0, test::Rsq, test::Sin);
+DECLARE_SOA_TABLE(Points, "AOD", "PTSNG", test::X, test::Y, test::Z);
+DECLARE_SOA_EXTENDED_TABLE(ExPoints, Points, "EXPTSNG", 0, test::Rsq, test::Sin);
 }
 
 TEST_CASE("TestTableSpawner")
 {
   TableBuilder b1;
-  auto w1 = b1.cursor<PointNGs>();
+  auto w1 = b1.cursor<Points>();
 
   for (auto i = 1; i < 10; ++i) {
     w1(0, i * 2., i * 3., i * 4.);
   }
 
   auto t1 = b1.finalize();
-  PointNGs st1{t1};
+  Points st1{t1};
 
-  auto expoints_a = o2::soa::Extend<o2::aod::PointNGs, test::Rsq, test::Sin>(st1);
-  auto extension = ExPointNGsExtension{o2::framework::spawner<o2::aod::Hash<"EXPTSNG/0"_h>>(t1, o2::aod::Hash<"ExPointNGs"_h>::str)};
-  auto expoints = ExPointNGs{{t1, extension.asArrowTable()}, 0};
+  auto expoints_a = o2::soa::Extend<o2::aod::Points, test::Rsq, test::Sin>(st1);
+  auto extension = ExPointsExtension{o2::framework::spawner<o2::aod::Hash<"EXPTSNG/0"_h>>(t1, o2::aod::Hash<"ExPoints"_h>::str)};
+  auto expoints = ExPoints{{t1, extension.asArrowTable()}, 0};
 
   REQUIRE(expoints_a.size() == 9);
   REQUIRE(extension.size() == 9);

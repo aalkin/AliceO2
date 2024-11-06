@@ -33,17 +33,6 @@ DECLARE_SOA_COLUMN(EventProperty, eventProperty, float);
 DECLARE_SOA_DYNAMIC_COLUMN(Sum, sum, [](float x, float y) { return x + y; });
 DECLARE_SOA_EXPRESSION_COLUMN(Sqfoo, sqfoo, float, nsqrt(test::foo));
 } // namespace test
-// DECLARE_SOA_TABLE(Foos, "AOD", "FOO",
-//                   test::Foo);
-// DECLARE_SOA_TABLE(Bars, "AOD", "BAR",
-//                   test::Bar);
-// DECLARE_SOA_TABLE(FooBars, "AOD", "FOOBAR",
-//                   test::Foo, test::Bar,
-//                   test::Sum<test::Foo, test::Bar>);
-// DECLARE_SOA_TABLE(XYZ, "AOD", "XYZ",
-//                   test::X, test::Y, test::Z);
-// DECLARE_SOA_TABLE(Events, "AOD", "EVENTS",
-//                   test::EventProperty);
 
 DECLARE_SOA_TABLE(Foos, "AOD", "FOO",
                   test::Foo);
@@ -79,15 +68,6 @@ DECLARE_SOA_INDEX_COLUMN(B3, b3);
 DECLARE_SOA_INDEX_TABLE(Bs, Roots, "BS", idx::RootId, idx::B1Id, idx::B2Id, idx::B3Id);
 
 } // namespace o2::aod
-
-// struct ATask {
-//   Produces<aod::FooBars> foobars;
-
-//   void process(o2::aod::Track const&)
-//   {
-//     foobars(0.01102005, 0.27092016);
-//   }
-// };
 
 struct ATask {
   Produces<aod::FooBars> foobars;
@@ -129,14 +109,6 @@ struct ETask {
   }
 };
 
-// struct FTask {
-//   expressions::Filter fooFilter = aod::test::foo > 1.;
-//   void process(soa::Filtered<o2::aod::FooBars>::iterator const& foobar)
-//   {
-//     foobar.sum();
-//   }
-// };
-
 struct FTask {
   expressions::Filter fooFilter = aod::test::foo > 1.;
   void process(soa::Filtered<o2::aod::FooBars>::iterator const& foobar)
@@ -144,17 +116,6 @@ struct FTask {
     foobar.sum();
   }
 };
-
-// struct GTask {
-//   void process(o2::soa::Join<o2::aod::Foos, o2::aod::Bars, o2::aod::XYZ> const& foobars)
-//   {
-//     for (auto foobar : foobars) {
-//       foobar.x();
-//       foobar.foo();
-//       foobar.bar();
-//     }
-//   }
-// };
 
 struct GTask {
   void process(o2::soa::Join<o2::aod::Foos, o2::aod::Bars, o2::aod::XYZ> const& foobars)
@@ -167,15 +128,6 @@ struct GTask {
   }
 };
 
-// struct HTask {
-//   void process(o2::soa::Join<o2::aod::Foos, o2::aod::Bars, o2::aod::XYZ>::iterator const& foobar)
-//   {
-//     foobar.x();
-//     foobar.foo();
-//     foobar.bar();
-//   }
-// };
-
 struct HTask {
   void process(o2::soa::Join<o2::aod::Foos, o2::aod::Bars, o2::aod::XYZ>::iterator const& foobar)
   {
@@ -184,18 +136,6 @@ struct HTask {
     foobar.bar();
   }
 };
-
-// struct ITask {
-//   expressions::Filter flt = aod::test::bar > 0.;
-//   void process(o2::aod::Collision const&, o2::soa::Filtered<o2::soa::Join<o2::aod::Foos, o2::aod::Bars, o2::aod::XYZ>> const& foobars)
-//   {
-//     for (auto foobar : foobars) {
-//       foobar.x();
-//       foobar.foo();
-//       foobar.bar();
-//     }
-//   }
-// };
 
 struct ITask {
   expressions::Filter flt = aod::test::bar > 0.;
@@ -249,14 +189,6 @@ TEST_CASE("AdaptorCompilation")
 {
   auto cfgc = makeEmptyConfigContext();
 
-  // REQUIRE(brace_constructible_size<ATask>() == 1);
-  // auto task1 = adaptAnalysisTask<ATask>(*cfgc, TaskName{"test1"});
-  // REQUIRE(task1.inputs.size() == 2);
-  // REQUIRE(task1.outputs.size() == 1);
-  // REQUIRE(task1.inputs[1].binding == std::string("Tracks"));
-  // REQUIRE(task1.inputs[0].binding == std::string("TracksExtension"));
-  // REQUIRE(task1.outputs[0].binding.value == std::string("FooBars"));
-
   REQUIRE(brace_constructible_size<ATask>() == 1);
   auto task1ng = adaptAnalysisTask<ATask>(*cfgc, TaskName{"test1"});
   REQUIRE(task1ng.inputs.size() == 2);
@@ -301,16 +233,9 @@ TEST_CASE("AdaptorCompilation")
   REQUIRE(task5.inputs.size() == 1);
   REQUIRE(task5.inputs[0].binding == "FooBars");
 
-  // auto task6 = adaptAnalysisTask<FTask>(*cfgc, TaskName{"test6"});
-  // REQUIRE(task6.inputs.size() == 1);
-  // REQUIRE(task6.inputs[0].binding == "FooBars");
-
   auto task6ng = adaptAnalysisTask<FTask>(*cfgc, TaskName{"test6"});
   REQUIRE(task6ng.inputs.size() == 1);
   REQUIRE(task6ng.inputs[0].binding == "FooBars");
-
-  // auto task7 = adaptAnalysisTask<GTask>(*cfgc, TaskName{"test7"});
-  // REQUIRE(task7.inputs.size() == 3);
 
   auto task7ng = adaptAnalysisTask<GTask>(*cfgc, TaskName{"test7"});
   REQUIRE(task7ng.inputs.size() == 3);
@@ -318,14 +243,8 @@ TEST_CASE("AdaptorCompilation")
   REQUIRE(task7ng.inputs[1].binding == "Bars");
   REQUIRE(task7ng.inputs[2].binding == "XYZ");
 
-  // auto task8 = adaptAnalysisTask<HTask>(*cfgc, TaskName{"test8"});
-  // REQUIRE(task8.inputs.size() == 3);
-
   auto task8ng = adaptAnalysisTask<HTask>(*cfgc, TaskName{"test8"});
   REQUIRE(task8ng.inputs.size() == 3);
-
-  // auto task9 = adaptAnalysisTask<ITask>(*cfgc, TaskName{"test9"});
-  // REQUIRE(task9.inputs.size() == 4);
 
   auto task9ng = adaptAnalysisTask<ITask>(*cfgc, TaskName{"test9"});
   REQUIRE(task9ng.inputs.size() == 4);
@@ -341,73 +260,7 @@ TEST_CASE("AdaptorCompilation")
   REQUIRE(task12.inputs.size() == 3);
 }
 
-// TEST_CASE("TestPartitionIteration")
-// {
-//   TableBuilder builderA;
-//   auto rowWriterA = builderA.persist<float, float>({"fX", "fY"});
-//   rowWriterA(0, 0.0f, 8.0f);
-//   rowWriterA(0, 1.0f, 9.0f);
-//   rowWriterA(0, 2.0f, 10.0f);
-//   rowWriterA(0, 3.0f, 11.0f);
-//   rowWriterA(0, 4.0f, 12.0f);
-//   rowWriterA(0, 5.0f, 13.0f);
-//   rowWriterA(0, 6.0f, 14.0f);
-//   rowWriterA(0, 7.0f, 15.0f);
-//   auto tableA = builderA.finalize();
-//   REQUIRE(tableA->num_rows() == 8);
-
-//   using TestA = o2::soa::Table<o2::soa::OriginEnc{"AOD"}, o2::soa::Index<>, aod::test::X, aod::test::Y>;
-//   using FilteredTest = o2::soa::Filtered<TestA>;
-//   using PartitionTest = Partition<TestA>;
-//   using PartitionFilteredTest = Partition<o2::soa::Filtered<TestA>>;
-//   using PartitionNestedFilteredTest = Partition<o2::soa::Filtered<o2::soa::Filtered<TestA>>>;
-//   using namespace o2::framework;
-
-//   TestA testA{tableA};
-
-//   PartitionTest p1 = aod::test::x < 4.0f;
-//   p1.bindTable(testA);
-//   REQUIRE(4 == p1.size());
-//   REQUIRE(p1.begin() != p1.end());
-//   auto i = 0;
-//   for (auto& p : p1) {
-//     REQUIRE(i == p.x());
-//     REQUIRE(i + 8 == p.y());
-//     REQUIRE(i == p.index());
-//     i++;
-//   }
-//   REQUIRE(i == 4);
-
-//   expressions::Filter f1 = aod::test::x < 4.0f;
-//   auto selection = expressions::createSelection(testA.asArrowTable(), f1);
-//   FilteredTest filtered{{testA.asArrowTable()}, o2::soa::selectionToVector(selection)};
-//   PartitionFilteredTest p2 = aod::test::y > 9.0f;
-//   p2.bindTable(filtered);
-
-//   REQUIRE(2 == p2.size());
-//   i = 0;
-//   for (auto& p : p2) {
-//     REQUIRE(i + 2 == p.x());
-//     REQUIRE(i + 10 == p.y());
-//     REQUIRE(i + 2 == p.index());
-//     i++;
-//   }
-//   REQUIRE(i == 2);
-
-//   PartitionNestedFilteredTest p3 = aod::test::x < 3.0f;
-//   p3.bindTable(*(p2.mFiltered));
-//   REQUIRE(1 == p3.size());
-//   i = 0;
-//   for (auto& p : p3) {
-//     REQUIRE(i + 2 == p.x());
-//     REQUIRE(i + 10 == p.y());
-//     REQUIRE(i + 2 == p.index());
-//     i++;
-//   }
-//   REQUIRE(i == 1);
-// }
-
-TEST_CASE("TestPartitionIterationNG")
+TEST_CASE("TestPartitionIteration")
 {
   TableBuilder builderA;
   auto rowWriterA = builderA.persist<float, float>({"fX", "fY"});

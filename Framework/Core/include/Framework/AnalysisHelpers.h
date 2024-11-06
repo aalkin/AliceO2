@@ -69,7 +69,7 @@ template <TableRef R>
 constexpr auto tableRef2ConfigParamSpec()
 {
   return o2::framework::ConfigParamSpec{
-    std::string{"iput:"} + o2::aod::Hash<R.label_hash>::str,
+    std::string{"input:"} + o2::aod::Hash<R.label_hash>::str,
     framework::VariantType::String,
     aod::sourceSpec<R>(),
     {"\"\""}};

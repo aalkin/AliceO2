@@ -89,7 +89,7 @@ concept producable = soa::has_metadata<T> || soa::has_metadata<typename T::paren
 template <producable T>
 struct WritingCursor {
  public:
-  using persistent_table_t = decltype([](){ if constexpr (soa::ng_iterator<T>) { return typename T::parent_t{nullptr}; } else { return T{nullptr}; } }());//std::conditional<soa::ng_iterator<T>, typename T::parent_t, T>;
+  using persistent_table_t = decltype([](){ if constexpr (soa::is_iterator<T>) { return typename T::parent_t{nullptr}; } else { return T{nullptr}; } }());//std::conditional<soa::is_iterator<T>, typename T::parent_t, T>;
   using cursor_t = decltype(std::declval<TableBuilder>().cursor<persistent_table_t>());
 
   template <typename... Ts>
@@ -137,7 +137,7 @@ struct WritingCursor {
   template <typename A>
   static decltype(auto) extract(A const& arg)
   {
-    if constexpr (soa::ng_iterator<A>) {
+    if constexpr (soa::is_iterator<A>) {
       return arg.globalIndex();
     } else {
       static_assert(!framework::has_type<A>(typename persistent_table_t::persistent_columns_t{}), "Argument type mismatch");
@@ -189,7 +189,7 @@ struct ProducesGroup {
 };
 
 /// Helper template for table transformations
-template <o2::aod::ng_metadata M, soa::TableRef Ref>
+template <o2::aod::is_metadata M, soa::TableRef Ref>
 struct TableTransform {
   using metadata = M;
   constexpr static auto sources = M::sources;
@@ -226,7 +226,7 @@ struct TableTransform {
 /// This helper struct allows you to declare extended tables which should be
 /// created by the task (as opposed to those pre-defined by data model)
 template <typename T>
-concept spawnable = soa::ng_table<T> && soa::has_metadata<T>;
+concept spawnable = soa::is_table<T> && soa::has_metadata<T>;
 
 template <spawnable T>
 struct Spawns : TableTransform<typename aod::MetadataTrait<o2::aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
@@ -391,7 +391,7 @@ struct IndexBuilder {
 };
 
 /// This helper struct allows you to declare index tables to be created in a task
-template <soa::index_table T>
+template <soa::is_index_table T>
 struct Builds : TableTransform<typename aod::MetadataTrait<aod::Hash<T::ref.desc_hash>>::metadata, T::ref> {
   using metadata = TableTransform<typename aod::MetadataTrait<aod::Hash<T::ref.desc_hash>>::metadata, T::ref>::metadata;
   using IP = std::conditional_t<metadata::exclusive, IndexBuilder<Exclusive>, IndexBuilder<Sparse>>;
@@ -540,13 +540,13 @@ struct Service {
   }
 };
 
-auto getTableFromFilter(soa::ng_filtered_table auto const& table, soa::SelectionVector&& selection)
+auto getTableFromFilter(soa::is_filtered_table auto const& table, soa::SelectionVector&& selection)
 {
   return std::make_unique<o2::soa::Filtered<std::decay_t<decltype(table)>>>(std::vector{table}, std::forward<soa::SelectionVector>(selection));
 }
 
-template <soa::ng_table T>
-  requires(!soa::ng_filtered_table<T>)
+template <soa::is_table T>
+  requires(!soa::is_filtered_table<T>)
 auto getTableFromFilter(const T& table, soa::SelectionVector&& selection)
 {
   return std::make_unique<o2::soa::Filtered<T>>(std::vector{table.asArrowTable()}, std::forward<soa::SelectionVector>(selection));
@@ -670,7 +670,7 @@ struct Partition {
 namespace o2::soa
 {
 /// On-the-fly adding of expression columns
-template <soa::ng_table T, soa::spawnable... Cs>
+template <soa::is_table T, soa::is_spawnable_column... Cs>
 auto Extend(T const& table)
 {
   using output_t = Join<T, soa::Table<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Cs...>>;
@@ -679,7 +679,7 @@ auto Extend(T const& table)
 
 /// Template function to attach dynamic columns on-the-fly (e.g. inside
 /// process() function). Dynamic columns need to be compatible with the table.
-template <soa::ng_table T, soa::dynamic... Cs>
+template <soa::is_table T, soa::is_dynamic_column... Cs>
 auto Attach(T const& table)
 {
   using output_t = Join<T, o2::soa::Table<o2::aod::Hash<"JOIN"_h>, o2::aod::Hash<"JOIN/0"_h>, o2::aod::Hash<"JOIN"_h>, Cs...>>;

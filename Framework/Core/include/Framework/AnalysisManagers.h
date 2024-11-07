@@ -599,7 +599,7 @@ struct SpawnManager {
   static bool requestInputs(std::vector<InputSpec>&, T const&) { return false; }
 };
 
-template <soa::ng_table TABLE>
+template <soa::is_table TABLE>
 struct SpawnManager<Spawns<TABLE>> {
   static bool requestInputs(std::vector<InputSpec>& inputs, Spawns<TABLE>& spawns)
   {

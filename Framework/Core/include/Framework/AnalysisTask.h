@@ -85,8 +85,8 @@ struct AnalysisDataProcessorBuilder {
   template <soa::with_sources T>
   static inline auto getSources()
   {
-    return []<size_t N, std::array<soa::TableRef, N> refs>(){
-      return []<size_t... Is>(std::index_sequence<Is...>){
+    return []<size_t N, std::array<soa::TableRef, N> refs>() {
+      return []<size_t... Is>(std::index_sequence<Is...>) {
         return std::vector{soa::tableRef2ConfigParamSpec<refs[Is]>()...};
       }(std::make_index_sequence<N>());
     }.template operator()<T::sources.size(), T::sources>();
@@ -195,20 +195,20 @@ struct AnalysisDataProcessorBuilder {
   template <soa::is_table T>
   static auto extractFromRecord(InputRecord& record)
   {
-    return T{[&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>){ return std::vector{extractTableFromRecord<refs[Is]>(record)...}; }.template operator()<T::originals.size(), T::originals>(std::make_index_sequence<T::originals.size()>())};
+    return T { [&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) { return std::vector{extractTableFromRecord<refs[Is]>(record)...}; }.template operator()<T::originals.size(), T::originals>(std::make_index_sequence<T::originals.size()>()) };
   }
 
   template <soa::is_iterator T>
   static auto extractFromRecord(InputRecord& record)
   {
-    return typename T::parent_t{[&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>){ return std::vector{extractTableFromRecord<refs[Is]>(record)...}; }.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>())};
+    return typename T::parent_t { [&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) { return std::vector{extractTableFromRecord<refs[Is]>(record)...}; }.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>()) };
   }
 
   template <soa::is_filtered T>
   static auto extractFilteredFromRecord(InputRecord& record, ExpressionInfo& info)
   {
     std::shared_ptr<arrow::Table> table = nullptr;
-    auto joiner = [&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>){ return std::vector{extractTableFromRecord<refs[Is]>(record)...}; };
+    auto joiner = [&record]<size_t N, std::array<soa::TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) { return std::vector{extractTableFromRecord<refs[Is]>(record)...}; };
     if constexpr (soa::is_iterator<T>) {
       table = o2::soa::ArrowHelpers::joinTables(joiner.template operator()<T::parent_t::originals.size(), T::parent_t::originals>(std::make_index_sequence<T::parent_t::originals.size()>()));
     } else {

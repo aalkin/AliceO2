@@ -33,7 +33,9 @@ inline constexpr bool is_specialization_v = is_specialization<T, Ref>::value;
 
 template <template <typename...> typename B, typename S>
 concept specialization = requires {
-  {[]<typename... Ts>(B<Ts...>*) -> B<Ts...> {}(std::declval<S*>())} -> std::same_as<S>;
+  {
+    []<typename... Ts>(B<Ts...>*) -> B<Ts...> {}(std::declval<S*>())
+  } -> std::same_as<S>;
 };
 
 template <typename A, typename B>
@@ -63,7 +65,7 @@ inline constexpr bool always_static_assert_v = always_static_assert<T...>::value
 
 template <template <typename...> typename B, typename D>
 concept base_of_template = requires {
-  []<typename... Ts>(B<Ts...>*){ }(std::declval<D*>());
+  []<typename... Ts>(B<Ts...>*) {}(std::declval<D*>());
 };
 
 template <template <typename...> typename B, typename D>

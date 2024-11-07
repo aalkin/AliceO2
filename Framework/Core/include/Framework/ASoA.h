@@ -46,7 +46,7 @@ void accessingInvalidIndexFor(const char* getter);
 void dereferenceWithWrongType();
 void missingFilterDeclaration(int hash, int ai);
 void notBoundTable(const char* tableName);
-}
+} // namespace o2::soa
 
 namespace o2::soa
 {
@@ -1228,7 +1228,7 @@ static constexpr std::string getLabelForTable()
 }
 
 template <soa::is_table T>
-  requires (!(soa::is_index_table<T> || soa::with_base_table<T>))
+  requires(!(soa::is_index_table<T> || soa::with_base_table<T>))
 static constexpr std::string getLabelFromType()
 {
   return getLabelForTable<T>();
@@ -2129,10 +2129,10 @@ O2HASH("TEST/0");
     constexpr static bool value = true;                                                                   \
   }
 
-#define DECLARE_EQUIVALENT_FOR_INDEX_NG(_Base_, _Equiv_)                                      \
-  template <>                                                                                 \
-  struct EquivalentIndexNG<o2::aod::Hash<_Base_ ""_h>, o2::aod::Hash<_Equiv_ ""_h>> {         \
-    constexpr static bool value = true;                                                       \
+#define DECLARE_EQUIVALENT_FOR_INDEX_NG(_Base_, _Equiv_)                              \
+  template <>                                                                         \
+  struct EquivalentIndexNG<o2::aod::Hash<_Base_ ""_h>, o2::aod::Hash<_Equiv_ ""_h>> { \
+    constexpr static bool value = true;                                               \
   }
 
 #define DECLARE_SOA_COLUMN_FULL(_Name_, _Getter_, _Type_, _Label_)                                                                                                                \
@@ -2599,7 +2599,7 @@ consteval auto getIndexTargets()
     using type = _Type_;                                                                                                                                           \
     using column_t = _Name_##Id;                                                                                                                                   \
     using self_index_t = std::true_type;                                                                                                                           \
-    using compatible_signature = std::conditional<aod::is_aod_hash<_IndexTarget_>, _IndexTarget_, void>;                                                              \
+    using compatible_signature = std::conditional<aod::is_aod_hash<_IndexTarget_>, _IndexTarget_, void>;                                                           \
     _Name_##Id(arrow::ChunkedArray const* column)                                                                                                                  \
       : o2::soa::Column<_Type_, _Name_##Id>(o2::soa::ColumnIterator<type>(column))                                                                                 \
     {                                                                                                                                                              \
@@ -2650,140 +2650,140 @@ consteval auto getIndexTargets()
 #define DECLARE_SOA_SELF_INDEX_COLUMN_FULL(_Name_, _Getter_, _Type_, _Label_) DECLARE_SOA_SELF_INDEX_COLUMN_COMPLETE(_Name_, _Getter_, _Type_, _Label_, void)
 #define DECLARE_SOA_SELF_INDEX_COLUMN(_Name_, _Getter_) DECLARE_SOA_SELF_INDEX_COLUMN_FULL(_Name_, _Getter_, int32_t, #_Name_)
 /// SELF SLICE
-#define DECLARE_SOA_SELF_SLICE_INDEX_COLUMN_COMPLETE(_Name_, _Getter_, _Type_, _Label_, _IndexTarget_) \
-  struct _Name_##IdSlice : o2::soa::Column<_Type_[2], _Name_##IdSlice> {                               \
-    static_assert(std::is_integral_v<_Type_>, "Index type must be integral");                          \
-    static constexpr const char* mLabel = "fIndexSlice" _Label_;                                       \
-    using base = o2::soa::Column<_Type_[2], _Name_##IdSlice>;                                          \
-    using type = _Type_[2];                                                                            \
-    using column_t = _Name_##IdSlice;                                                                  \
-    using self_index_t = std::true_type;                                                               \
-    using compatible_signature = std::conditional<aod::is_aod_hash<_IndexTarget_>, _IndexTarget_, void>;  \
-    _Name_##IdSlice(arrow::ChunkedArray const* column)                                                 \
-      : o2::soa::Column<_Type_[2], _Name_##IdSlice>(o2::soa::ColumnIterator<type>(column))             \
-    {                                                                                                  \
-    }                                                                                                  \
-                                                                                                       \
-    _Name_##IdSlice() = default;                                                                       \
-    _Name_##IdSlice(_Name_##IdSlice const& other) = default;                                           \
-    _Name_##IdSlice& operator=(_Name_##IdSlice const& other) = default;                                \
-    std::array<_Type_, 2> inline getIds() const                                                        \
-    {                                                                                                  \
-      return _Getter_##Ids();                                                                          \
-    }                                                                                                  \
-                                                                                                       \
-    bool has_##_Getter_() const                                                                        \
-    {                                                                                                  \
-      auto a = *mColumnIterator;                                                                       \
-      return a[0] >= 0 && a[1] >= 0;                                                                   \
-    }                                                                                                  \
-                                                                                                       \
-    std::array<_Type_, 2> _Getter_##Ids() const                                                        \
-    {                                                                                                  \
-      auto a = *mColumnIterator;                                                                       \
-      return std::array{a[0], a[1]};                                                                   \
-    }                                                                                                  \
-                                                                                                       \
-    template <typename T>                                                                              \
-    auto _Getter_##_as() const                                                                         \
-    {                                                                                                  \
-      auto t = mBinding.get<T>();                                                                      \
-      if (O2_BUILTIN_UNLIKELY(t == nullptr)) {                                                         \
-        o2::soa::dereferenceWithWrongType();                                                           \
-      }                                                                                                \
-      if (O2_BUILTIN_UNLIKELY(!has_##_Getter_())) {                                                    \
-        return t->emptySlice();                                                                        \
-      }                                                                                                \
-      auto a = *mColumnIterator;                                                                       \
-      auto r = t->rawSlice(a[0], a[1]);                                                                \
-      t->copyIndexBindings(r);                                                                         \
-      r.bindInternalIndicesTo(t);                                                                      \
-      return r;                                                                                        \
-    }                                                                                                  \
-                                                                                                       \
-    bool setCurrentRaw(o2::soa::Binding current)                                                       \
-    {                                                                                                  \
-      this->mBinding = current;                                                                        \
-      return true;                                                                                     \
-    }                                                                                                  \
-    o2::soa::Binding getCurrentRaw() const { return mBinding; }                                        \
-    o2::soa::Binding mBinding;                                                                         \
+#define DECLARE_SOA_SELF_SLICE_INDEX_COLUMN_COMPLETE(_Name_, _Getter_, _Type_, _Label_, _IndexTarget_)   \
+  struct _Name_##IdSlice : o2::soa::Column<_Type_[2], _Name_##IdSlice> {                                 \
+    static_assert(std::is_integral_v<_Type_>, "Index type must be integral");                            \
+    static constexpr const char* mLabel = "fIndexSlice" _Label_;                                         \
+    using base = o2::soa::Column<_Type_[2], _Name_##IdSlice>;                                            \
+    using type = _Type_[2];                                                                              \
+    using column_t = _Name_##IdSlice;                                                                    \
+    using self_index_t = std::true_type;                                                                 \
+    using compatible_signature = std::conditional<aod::is_aod_hash<_IndexTarget_>, _IndexTarget_, void>; \
+    _Name_##IdSlice(arrow::ChunkedArray const* column)                                                   \
+      : o2::soa::Column<_Type_[2], _Name_##IdSlice>(o2::soa::ColumnIterator<type>(column))               \
+    {                                                                                                    \
+    }                                                                                                    \
+                                                                                                         \
+    _Name_##IdSlice() = default;                                                                         \
+    _Name_##IdSlice(_Name_##IdSlice const& other) = default;                                             \
+    _Name_##IdSlice& operator=(_Name_##IdSlice const& other) = default;                                  \
+    std::array<_Type_, 2> inline getIds() const                                                          \
+    {                                                                                                    \
+      return _Getter_##Ids();                                                                            \
+    }                                                                                                    \
+                                                                                                         \
+    bool has_##_Getter_() const                                                                          \
+    {                                                                                                    \
+      auto a = *mColumnIterator;                                                                         \
+      return a[0] >= 0 && a[1] >= 0;                                                                     \
+    }                                                                                                    \
+                                                                                                         \
+    std::array<_Type_, 2> _Getter_##Ids() const                                                          \
+    {                                                                                                    \
+      auto a = *mColumnIterator;                                                                         \
+      return std::array{a[0], a[1]};                                                                     \
+    }                                                                                                    \
+                                                                                                         \
+    template <typename T>                                                                                \
+    auto _Getter_##_as() const                                                                           \
+    {                                                                                                    \
+      auto t = mBinding.get<T>();                                                                        \
+      if (O2_BUILTIN_UNLIKELY(t == nullptr)) {                                                           \
+        o2::soa::dereferenceWithWrongType();                                                             \
+      }                                                                                                  \
+      if (O2_BUILTIN_UNLIKELY(!has_##_Getter_())) {                                                      \
+        return t->emptySlice();                                                                          \
+      }                                                                                                  \
+      auto a = *mColumnIterator;                                                                         \
+      auto r = t->rawSlice(a[0], a[1]);                                                                  \
+      t->copyIndexBindings(r);                                                                           \
+      r.bindInternalIndicesTo(t);                                                                        \
+      return r;                                                                                          \
+    }                                                                                                    \
+                                                                                                         \
+    bool setCurrentRaw(o2::soa::Binding current)                                                         \
+    {                                                                                                    \
+      this->mBinding = current;                                                                          \
+      return true;                                                                                       \
+    }                                                                                                    \
+    o2::soa::Binding getCurrentRaw() const { return mBinding; }                                          \
+    o2::soa::Binding mBinding;                                                                           \
   };
 
 #define DECLARE_SOA_SELF_SLICE_INDEX_COLUMN_FULL(_Name_, _Getter_, _Type_, _Label_) DECLARE_SOA_SELF_SLICE_INDEX_COLUMN_COMPLETE(_Name_, _Getter_, _Type_, _Label_, void)
 #define DECLARE_SOA_SELF_SLICE_INDEX_COLUMN(_Name_, _Getter_) DECLARE_SOA_SELF_SLICE_INDEX_COLUMN_FULL(_Name_, _Getter_, int32_t, "_" #_Name_)
 /// SELF ARRAY
-#define DECLARE_SOA_SELF_ARRAY_INDEX_COLUMN_COMPLETE(_Name_, _Getter_, _Type_, _Label_, _IndexTarget_) \
-  struct _Name_##Ids : o2::soa::Column<std::vector<_Type_>, _Name_##Ids> {                             \
-    static_assert(std::is_integral_v<_Type_>, "Index type must be integral");                          \
-    static constexpr const char* mLabel = "fIndexArray" _Label_;                                       \
-    using base = o2::soa::Column<std::vector<_Type_>, _Name_##Ids>;                                    \
-    using type = std::vector<_Type_>;                                                                  \
-    using column_t = _Name_##Ids;                                                                      \
-    using self_index_t = std::true_type;                                                               \
-    using compatible_signature = std::conditional<aod::is_aod_hash<_IndexTarget_>, _IndexTarget_, void>;  \
-    _Name_##Ids(arrow::ChunkedArray const* column)                                                     \
-      : o2::soa::Column<std::vector<_Type_>, _Name_##Ids>(o2::soa::ColumnIterator<type>(column))       \
-    {                                                                                                  \
-    }                                                                                                  \
-                                                                                                       \
-    _Name_##Ids() = default;                                                                           \
-    _Name_##Ids(_Name_##Ids const& other) = default;                                                   \
-    _Name_##Ids& operator=(_Name_##Ids const& other) = default;                                        \
-    gsl::span<const _Type_> inline getIds() const                                                      \
-    {                                                                                                  \
-      return _Getter_##Ids();                                                                          \
-    }                                                                                                  \
-                                                                                                       \
-    gsl::span<const _Type_> _Getter_##Ids() const                                                      \
-    {                                                                                                  \
-      return *mColumnIterator;                                                                         \
-    }                                                                                                  \
-                                                                                                       \
-    bool has_##_Getter_() const                                                                        \
-    {                                                                                                  \
-      return !(*mColumnIterator).empty();                                                              \
-    }                                                                                                  \
-                                                                                                       \
-    template <typename T>                                                                              \
-    auto _Getter_##_as() const                                                                         \
-    {                                                                                                  \
-      auto t = mBinding.get<T>();                                                                      \
-      if (O2_BUILTIN_UNLIKELY(t == nullptr)) {                                                         \
-        o2::soa::dereferenceWithWrongType();                                                           \
-      }                                                                                                \
-      return getIterators<T>();                                                                        \
-    }                                                                                                  \
-                                                                                                       \
-    template <typename T>                                                                              \
-    auto getIterators() const                                                                          \
-    {                                                                                                  \
-      auto result = std::vector<typename T::unfiltered_iterator>();                                    \
-      for (auto& i : *mColumnIterator) {                                                               \
-        result.push_back(mBinding.get<T>()->rawIteratorAt(i));                                         \
-      }                                                                                                \
-      return result;                                                                                   \
-    }                                                                                                  \
-                                                                                                       \
-    template <typename T>                                                                              \
-    auto _Getter_##_first_as() const                                                                   \
-    {                                                                                                  \
-      return mBinding.get<T>()->rawIteratorAt((*mColumnIterator)[0]);                                  \
-    }                                                                                                  \
-                                                                                                       \
-    template <typename T>                                                                              \
-    auto _Getter_##_last_as() const                                                                    \
-    {                                                                                                  \
-      return mBinding.get<T>()->rawIteratorAt((*mColumnIterator).back());                              \
-    }                                                                                                  \
-                                                                                                       \
-    bool setCurrentRaw(o2::soa::Binding current)                                                       \
-    {                                                                                                  \
-      this->mBinding = current;                                                                        \
-      return true;                                                                                     \
-    }                                                                                                  \
-    o2::soa::Binding getCurrentRaw() const { return mBinding; }                                        \
-    o2::soa::Binding mBinding;                                                                         \
+#define DECLARE_SOA_SELF_ARRAY_INDEX_COLUMN_COMPLETE(_Name_, _Getter_, _Type_, _Label_, _IndexTarget_)   \
+  struct _Name_##Ids : o2::soa::Column<std::vector<_Type_>, _Name_##Ids> {                               \
+    static_assert(std::is_integral_v<_Type_>, "Index type must be integral");                            \
+    static constexpr const char* mLabel = "fIndexArray" _Label_;                                         \
+    using base = o2::soa::Column<std::vector<_Type_>, _Name_##Ids>;                                      \
+    using type = std::vector<_Type_>;                                                                    \
+    using column_t = _Name_##Ids;                                                                        \
+    using self_index_t = std::true_type;                                                                 \
+    using compatible_signature = std::conditional<aod::is_aod_hash<_IndexTarget_>, _IndexTarget_, void>; \
+    _Name_##Ids(arrow::ChunkedArray const* column)                                                       \
+      : o2::soa::Column<std::vector<_Type_>, _Name_##Ids>(o2::soa::ColumnIterator<type>(column))         \
+    {                                                                                                    \
+    }                                                                                                    \
+                                                                                                         \
+    _Name_##Ids() = default;                                                                             \
+    _Name_##Ids(_Name_##Ids const& other) = default;                                                     \
+    _Name_##Ids& operator=(_Name_##Ids const& other) = default;                                          \
+    gsl::span<const _Type_> inline getIds() const                                                        \
+    {                                                                                                    \
+      return _Getter_##Ids();                                                                            \
+    }                                                                                                    \
+                                                                                                         \
+    gsl::span<const _Type_> _Getter_##Ids() const                                                        \
+    {                                                                                                    \
+      return *mColumnIterator;                                                                           \
+    }                                                                                                    \
+                                                                                                         \
+    bool has_##_Getter_() const                                                                          \
+    {                                                                                                    \
+      return !(*mColumnIterator).empty();                                                                \
+    }                                                                                                    \
+                                                                                                         \
+    template <typename T>                                                                                \
+    auto _Getter_##_as() const                                                                           \
+    {                                                                                                    \
+      auto t = mBinding.get<T>();                                                                        \
+      if (O2_BUILTIN_UNLIKELY(t == nullptr)) {                                                           \
+        o2::soa::dereferenceWithWrongType();                                                             \
+      }                                                                                                  \
+      return getIterators<T>();                                                                          \
+    }                                                                                                    \
+                                                                                                         \
+    template <typename T>                                                                                \
+    auto getIterators() const                                                                            \
+    {                                                                                                    \
+      auto result = std::vector<typename T::unfiltered_iterator>();                                      \
+      for (auto& i : *mColumnIterator) {                                                                 \
+        result.push_back(mBinding.get<T>()->rawIteratorAt(i));                                           \
+      }                                                                                                  \
+      return result;                                                                                     \
+    }                                                                                                    \
+                                                                                                         \
+    template <typename T>                                                                                \
+    auto _Getter_##_first_as() const                                                                     \
+    {                                                                                                    \
+      return mBinding.get<T>()->rawIteratorAt((*mColumnIterator)[0]);                                    \
+    }                                                                                                    \
+                                                                                                         \
+    template <typename T>                                                                                \
+    auto _Getter_##_last_as() const                                                                      \
+    {                                                                                                    \
+      return mBinding.get<T>()->rawIteratorAt((*mColumnIterator).back());                                \
+    }                                                                                                    \
+                                                                                                         \
+    bool setCurrentRaw(o2::soa::Binding current)                                                         \
+    {                                                                                                    \
+      this->mBinding = current;                                                                          \
+      return true;                                                                                       \
+    }                                                                                                    \
+    o2::soa::Binding getCurrentRaw() const { return mBinding; }                                          \
+    o2::soa::Binding mBinding;                                                                           \
   };
 
 #define DECLARE_SOA_SELF_ARRAY_INDEX_COLUMN_FULL(_Name_, _Getter_, _Type_, _Label_) DECLARE_SOA_SELF_ARRAY_INDEX_COLUMN_COMPLETE(_Name_, _Getter_, _Type_, _Label_, void)
@@ -2870,31 +2870,31 @@ consteval auto getIndexTargets()
   }
 
 #define DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, ...) \
-    using _Name_##Metadata = TableMetadata<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;            \
+  using _Name_##Metadata = TableMetadata<Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__>;
 
-#define DECLARE_SOA_TABLE_METADATA_TRAIT(_Name_, _Desc_, _Version_)\
-  template <>                                                                                       \
-  struct MetadataTrait<Hash<_Desc_ "/" #_Version_ ""_h>> {                                        \
-    using metadata = _Name_##Metadata;                                                              \
+#define DECLARE_SOA_TABLE_METADATA_TRAIT(_Name_, _Desc_, _Version_) \
+  template <>                                                       \
+  struct MetadataTrait<Hash<_Desc_ "/" #_Version_ ""_h>> {          \
+    using metadata = _Name_##Metadata;                              \
   };
 
-#define DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, _Version_)               \
-  O2HASH(_Desc_ "/" #_Version_);                                                                      \
-  template <typename O>                                                                               \
-  using _Name_##From = o2::soa::Table<Hash<_Label_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;     \
-  using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;                                                   \
-  template <>                                                                                         \
-  struct MetadataTrait<Hash<_Desc_ "/" #_Version_ ""_h>> {                                          \
-    using metadata = _Name_##Metadata;                                                                \
+#define DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, _Version_)         \
+  O2HASH(_Desc_ "/" #_Version_);                                                                \
+  template <typename O>                                                                         \
+  using _Name_##From = o2::soa::Table<Hash<_Label_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>; \
+  using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;                                             \
+  template <>                                                                                   \
+  struct MetadataTrait<Hash<_Desc_ "/" #_Version_ ""_h>> {                                      \
+    using metadata = _Name_##Metadata;                                                          \
   };
 
-#define DECLARE_SOA_STAGE(_Name_, _Origin_, _Desc_, _Version_)              \
-  template <typename O>                                                                               \
-  using _Name_##From = o2::soa::Table<Hash<#_Name_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>;     \
+#define DECLARE_SOA_STAGE(_Name_, _Origin_, _Desc_, _Version_)                                  \
+  template <typename O>                                                                         \
+  using _Name_##From = o2::soa::Table<Hash<#_Name_ ""_h>, Hash<_Desc_ "/" #_Version_ ""_h>, O>; \
   using _Name_ = _Name_##From<Hash<_Origin_ ""_h>>;
 
-#define DECLARE_SOA_TABLE_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, _Version_, ...)        \
-  DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, __VA_ARGS__);                              \
+#define DECLARE_SOA_TABLE_FULL_VERSIONED(_Name_, _Label_, _Origin_, _Desc_, _Version_, ...) \
+  DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, __VA_ARGS__);                       \
   DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, _Label_, _Origin_, _Desc_, _Version_);
 
 #define DECLARE_SOA_TABLE_FULL(_Name_, _Label_, _Origin_, _Desc_, ...) \
@@ -2907,17 +2907,17 @@ consteval auto getIndexTargets()
 
 #define DECLARE_SOA_TABLE_VERSIONED(_Name_, _Origin_, _Desc_, _Version_, ...) \
   O2HASH(#_Name_);                                                            \
-  DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, __VA_ARGS__);          \
+  DECLARE_SOA_TABLE_METADATA(_Name_, _Desc_, _Version_, __VA_ARGS__);         \
   DECLARE_SOA_TABLE_FULL_VERSIONED_(_Name_, #_Name_, _Origin_, _Desc_, _Version_)
 
-#define DECLARE_SOA_TABLE_STAGED_VERSIONED(_BaseName_, _Desc_, _Version_, ...)                      \
-  O2HASH(_Desc_ "/" #_Version_);                                                                    \
-  O2HASH(#_BaseName_);                                                                              \
-  O2HASH("Stored" #_BaseName_);                                                                     \
-  DECLARE_SOA_TABLE_METADATA(_BaseName_, _Desc_, _Version_, __VA_ARGS__);                           \
-  using Stored##_BaseName_##Metadata = _BaseName_##Metadata;                                        \
-  DECLARE_SOA_TABLE_METADATA_TRAIT(_BaseName_, _Desc_, _Version_);                                  \
-  DECLARE_SOA_STAGE(_BaseName_, "AOD", _Desc_, _Version_);                                          \
+#define DECLARE_SOA_TABLE_STAGED_VERSIONED(_BaseName_, _Desc_, _Version_, ...) \
+  O2HASH(_Desc_ "/" #_Version_);                                               \
+  O2HASH(#_BaseName_);                                                         \
+  O2HASH("Stored" #_BaseName_);                                                \
+  DECLARE_SOA_TABLE_METADATA(_BaseName_, _Desc_, _Version_, __VA_ARGS__);      \
+  using Stored##_BaseName_##Metadata = _BaseName_##Metadata;                   \
+  DECLARE_SOA_TABLE_METADATA_TRAIT(_BaseName_, _Desc_, _Version_);             \
+  DECLARE_SOA_STAGE(_BaseName_, "AOD", _Desc_, _Version_);                     \
   DECLARE_SOA_STAGE(Stored##_BaseName_, "AOD1", _Desc_, _Version_);
 
 #define DECLARE_SOA_TABLE_STAGED(_BaseName_, _Desc_, ...) \
@@ -2926,10 +2926,10 @@ consteval auto getIndexTargets()
 #define DECLARE_SOA_EXTENDED_TABLE_FULL(_Name_, _Label_, _OriginalTable_, _Origin_, _Desc_, _Version_, ...)                     \
   O2HASH(_Desc_ "/" #_Version_);                                                                                                \
   template <typename O>                                                                                                         \
-  using _Name_##ExtensionFrom = soa::Table<o2::aod::Hash<_Label_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O>;        \
+  using _Name_##ExtensionFrom = soa::Table<o2::aod::Hash<_Label_ ""_h>, o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, O>;          \
   using _Name_##Extension = _Name_##ExtensionFrom<o2::aod::Hash<_Origin_ ""_h>>;                                                \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                          \
-  struct _Name_##ExtensionMetadataFrom : TableMetadata<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__> {              \
+  struct _Name_##ExtensionMetadataFrom : TableMetadata<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, __VA_ARGS__> {                \
     using base_table_t = _OriginalTable_;                                                                                       \
     using extension_table_t = _Name_##ExtensionFrom<O>;                                                                         \
     using expression_pack_t = framework::pack<__VA_ARGS__>;                                                                     \
@@ -2937,7 +2937,7 @@ consteval auto getIndexTargets()
   };                                                                                                                            \
   using _Name_##ExtensionMetadata = _Name_##ExtensionMetadataFrom<o2::aod::Hash<_Origin_ ""_h>>;                                \
   template <>                                                                                                                   \
-  struct MetadataTrait<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                           \
+  struct MetadataTrait<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                             \
     using metadata = _Name_##ExtensionMetadata;                                                                                 \
   };                                                                                                                            \
   template <typename O>                                                                                                         \
@@ -2956,7 +2956,7 @@ consteval auto getIndexTargets()
   O2HASH(#_Name_);                                                                                                                         \
   O2HASH(_Desc_ "/" #_Version_);                                                                                                           \
   template <typename O = o2::aod::Hash<_Origin_ ""_h>>                                                                                     \
-  struct _Name_##MetadataFrom : o2::aod::TableMetadata<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, soa::Index<>, __VA_ARGS__> {           \
+  struct _Name_##MetadataFrom : o2::aod::TableMetadata<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>, soa::Index<>, __VA_ARGS__> {             \
     static constexpr bool exclusive = _Exclusive_;                                                                                         \
     using Key = _Key_;                                                                                                                     \
     using index_pack_t = framework::pack<__VA_ARGS__>;                                                                                     \
@@ -2972,7 +2972,7 @@ consteval auto getIndexTargets()
   using _Name_ = _Name_##From<o2::aod::Hash<_Origin_ ""_h>>;                                                                               \
                                                                                                                                            \
   template <>                                                                                                                              \
-  struct MetadataTrait<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                                      \
+  struct MetadataTrait<o2::aod::Hash<_Desc_ "/" #_Version_ ""_h>> {                                                                        \
     using metadata = _Name_##Metadata;                                                                                                     \
   };
 

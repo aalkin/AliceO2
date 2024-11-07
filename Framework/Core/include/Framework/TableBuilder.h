@@ -901,7 +901,8 @@ auto spawner(std::vector<std::shared_ptr<arrow::Table>>&& tables, const char* na
   auto projectors = []<typename... C>(framework::pack<C...>) -> std::array<expressions::Projector, sizeof...(C)>
   {
     return {{std::move(C::Projector())...}};
-  }(expression_pack_t{});
+  }
+  (expression_pack_t{});
 
   return spawnerHelper(fullTable, new_schema, framework::pack_size(expression_pack_t{}), projectors.data(), fields, name);
 }
@@ -911,14 +912,15 @@ auto spawner(std::shared_ptr<arrow::Table> const& fullTable, const char* name)
 {
   using expression_pack_t = typename o2::aod::MetadataTrait<D>::metadata::expression_pack_t;
   if (fullTable->num_rows() == 0) {
-    return makeEmptyTable(name,expression_pack_t{});
+    return makeEmptyTable(name, expression_pack_t{});
   }
   static auto fields = o2::soa::createFieldsFromColumns(expression_pack_t{});
   static auto new_schema = std::make_shared<arrow::Schema>(fields);
   auto projectors = []<typename... C>(framework::pack<C...>) -> std::array<expressions::Projector, sizeof...(C)>
   {
     return {{std::move(C::Projector())...}};
-  }(expression_pack_t{});
+  }
+  (expression_pack_t{});
 
   return spawnerHelper(fullTable, new_schema, framework::pack_size(expression_pack_t{}), projectors.data(), fields, name);
 }

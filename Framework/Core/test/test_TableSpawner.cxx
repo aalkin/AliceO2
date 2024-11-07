@@ -26,13 +26,13 @@ namespace test
 DECLARE_SOA_COLUMN(X, x, float);
 DECLARE_SOA_COLUMN(Y, y, float);
 DECLARE_SOA_COLUMN(Z, z, float);
-DECLARE_SOA_EXPRESSION_COLUMN(Rsq, rsq, float, test::x * test::x + test::y * test::y + test::z * test::z);
-DECLARE_SOA_EXPRESSION_COLUMN(Sin, sin, float, test::x / nsqrt (test::x * test::x + test::y * test::y));
-}
+DECLARE_SOA_EXPRESSION_COLUMN(Rsq, rsq, float, test::x* test::x + test::y * test::y + test::z * test::z);
+DECLARE_SOA_EXPRESSION_COLUMN(Sin, sin, float, test::x / nsqrt(test::x * test::x + test::y * test::y));
+} // namespace test
 
 DECLARE_SOA_TABLE(Points, "AOD", "PTSNG", test::X, test::Y, test::Z);
 DECLARE_SOA_EXTENDED_TABLE(ExPoints, Points, "EXPTSNG", 0, test::Rsq, test::Sin);
-}
+} // namespace o2::aod
 
 TEST_CASE("TestTableSpawner")
 {

@@ -226,21 +226,21 @@ inline constexpr bool has_type_conditional_v = has_type_conditional<Condition, T
 template <typename T, typename... Ts>
 consteval size_t has_type_at_v(pack<Ts...>)
 {
-    constexpr size_t size = sizeof...(Ts);
-    constexpr bool found[size] = { std::same_as<T, Ts> ... };
-    for (size_t i = 0; i < size; ++i) {
-      if (found[i]) {
-        return i;
-      }
+  constexpr size_t size = sizeof...(Ts);
+  constexpr bool found[size] = {std::same_as<T, Ts>...};
+  for (size_t i = 0; i < size; ++i) {
+    if (found[i]) {
+      return i;
     }
-    return size + 1;
+  }
+  return size + 1;
 }
 
 template <template <typename, typename> typename Condition, typename T, typename... Ts>
 consteval size_t has_type_at_conditional_v(pack<Ts...>)
 {
   constexpr size_t size = sizeof...(Ts);
-  constexpr bool found[size] = { Condition<T, Ts>::value ... };
+  constexpr bool found[size] = {Condition<T, Ts>::value...};
   for (size_t i = 0; i < size; ++i) {
     if (found[i]) {
       return i;

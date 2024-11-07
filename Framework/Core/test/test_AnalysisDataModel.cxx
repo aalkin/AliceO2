@@ -31,7 +31,7 @@ DECLARE_SOA_COLUMN(D, d, float);
 
 DECLARE_SOA_TABLE(XY, "AOD", "XY", col::X, col::Y);
 DECLARE_SOA_TABLE(ZD, "AOD", "ZD", col::Z, col::D);
-}
+} // namespace o2::aod
 
 TEST_CASE("TestJoinedTablesContains")
 {

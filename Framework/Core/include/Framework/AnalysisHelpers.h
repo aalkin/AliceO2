@@ -89,7 +89,7 @@ concept producable = soa::has_metadata<T> || soa::has_metadata<typename T::paren
 template <producable T>
 struct WritingCursor {
  public:
-  using persistent_table_t = decltype([](){ if constexpr (soa::is_iterator<T>) { return typename T::parent_t{nullptr}; } else { return T{nullptr}; } }());//std::conditional<soa::is_iterator<T>, typename T::parent_t, T>;
+  using persistent_table_t = decltype([]() { if constexpr (soa::is_iterator<T>) { return typename T::parent_t{nullptr}; } else { return T{nullptr}; } }());  // std::conditional<soa::is_iterator<T>, typename T::parent_t, T>;
   using cursor_t = decltype(std::declval<TableBuilder>().cursor<persistent_table_t>());
 
   template <typename... Ts>
@@ -133,7 +133,7 @@ struct WritingCursor {
 
   decltype(FFL(std::declval<cursor_t>())) cursor;
 
- private: 
+ private:
   template <typename A>
   static decltype(auto) extract(A const& arg)
   {

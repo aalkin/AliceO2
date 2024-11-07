@@ -115,7 +115,7 @@ std::shared_ptr<arrow::Table> ArrowHelpers::concatTables(std::vector<std::shared
 
 arrow::ChunkedArray* getIndexFromLabel(arrow::Table* table, const char* label)
 {
-  auto field = std::find_if(table->schema()->fields().begin(), table->schema()->fields().end(), [&](std::shared_ptr<arrow::Field> const& f){
+  auto field = std::find_if(table->schema()->fields().begin(), table->schema()->fields().end(), [&](std::shared_ptr<arrow::Field> const& f) {
     return o2::framework::strToUpper(label) == o2::framework::strToUpper(std::string{f->name()});
   });
   if (field == table->schema()->fields().end()) {
@@ -155,7 +155,7 @@ std::string cutString(std::string&& str)
 
 std::string strToUpper(std::string&& str)
 {
-  std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::toupper(c); });
+  std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::toupper(c); });
   return str;
 }
 } // namespace o2::framework

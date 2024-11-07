@@ -466,7 +466,7 @@ struct ServiceManager<Service<T>> {
   {
     // FIXME: for the moment we only need endOfStream to be
     // stateless. In the future we might want to pass it EndOfStreamContext
-    if constexpr (requires (T t) { t.endOfStream(); }) {
+    if constexpr (requires(T t) { t.endOfStream(); }) {
       service.service->endOfStream();
       return true;
     }

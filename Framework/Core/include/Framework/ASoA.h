@@ -39,7 +39,8 @@
 
 #define DECLARE_SOA_ITERATOR_METADATA()                                       \
   template <typename IT>                                                      \
-  requires(o2::soa::is_iterator<IT>) struct MetadataTrait<IT> {               \
+    requires(o2::soa::is_iterator<IT>)                                        \
+  struct MetadataTrait<IT> {                                                  \
     using metadata = typename MetadataTrait<typename IT::parent_t>::metadata; \
   };
 
@@ -1048,11 +1049,15 @@ struct RowViewCore : public IP, C... {
   void bind()
   {
     using namespace o2::soa;
-    auto f = framework::overloaded  {
-      [this]<typename T>(T*) -> void requires is_persistent_column<T> { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
-      [this]<typename T>(T*) -> void requires is_dynamic_column<T> { bindDynamicColumn<T>(typename T::bindings_t{});},
+    auto f = framework::overloaded{
+      [this]<typename T>(T*) -> void
+        requires is_persistent_column<T>
+                 { T::mColumnIterator.mCurrentPos = &this->mRowIndex; },
+                 [this]<typename T>(T*) -> void
+                   requires is_dynamic_column<T>
+      { bindDynamicColumn<T>(typename T::bindings_t{}); },
       [this]<typename T>(T*) -> void {},
-    };
+      };
     (f(static_cast<C*>(nullptr)), ...);
     if constexpr (has_index_v) {
       this->setIndices(this->getIndices());
@@ -1134,7 +1139,7 @@ template <typename T>
 concept is_index_table = soa::is_specialization_origin_v<T, o2::soa::IndexTable>;
 
 template <soa::is_table T>
-  requires (!soa::is_index_table<T>)
+  requires(!soa::is_index_table<T>)
 static constexpr std::string getLabelFromType()
 {
   if constexpr (soa::is_type_with_originals_v<std::decay_t<T>>) {

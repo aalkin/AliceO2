@@ -87,7 +87,7 @@ struct WritingCursor<soa::Table<ORIGIN, PC...>> {
   template <typename T>
   static decltype(auto) extract(T const& arg)
   {
-    if constexpr (requires (T t) { t.globalIndex(); }) {
+    if constexpr (requires(T t) { t.globalIndex(); }) {
       return arg.globalIndex();
     } else {
       static_assert(!framework::has_type<T>(framework::pack<PC...>{}), "Argument type mismatch");

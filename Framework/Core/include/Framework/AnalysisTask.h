@@ -126,7 +126,8 @@ struct AnalysisDataProcessorBuilder {
   }
 
   template <typename O>
-  static void addOriginal(const char* name, bool value, std::vector<InputSpec>& inputs) requires soa::has_metadata<aod::MetadataTrait<std::decay_t<O>>>
+  static void addOriginal(const char* name, bool value, std::vector<InputSpec>& inputs)
+    requires soa::has_metadata<aod::MetadataTrait<std::decay_t<O>>>
   {
     using metadata = typename aod::MetadataTrait<std::decay_t<O>>::metadata;
     std::vector<ConfigParamSpec> inputMetadata;
@@ -176,7 +177,8 @@ struct AnalysisDataProcessorBuilder {
   }
 
   template <typename T>
-  static auto extractTableFromRecord(InputRecord& record) requires soa::has_metadata<aod::MetadataTrait<T>>
+  static auto extractTableFromRecord(InputRecord& record)
+    requires soa::has_metadata<aod::MetadataTrait<T>>
   {
     auto table = record.get<TableConsumer>(aod::MetadataTrait<T>::metadata::tableLabel())->asArrowTable();
     if (table->num_rows() == 0) {

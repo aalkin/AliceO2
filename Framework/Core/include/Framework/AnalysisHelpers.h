@@ -129,6 +129,7 @@ requires(!std::is_same_v<void, typename aod::MetadataTrait<T>::metadata>) struct
 
 template <template <o2::framework::OriginEnc, typename...> class T, o2::framework::OriginEnc ORIGIN, typename... C>
 struct Produces<T<ORIGIN, C...>> : WritingCursor<typename soa::PackToTable<ORIGIN, typename T<ORIGIN, C...>::table_t::persistent_columns_t>::table> {
+  using persistent_table_t = decltype([]() { if constexpr (soa::is_iterator<T<ORIGIN, C...>>) { return typename T<ORIGIN, C...>::parent_t{nullptr}; } else { return T<ORIGIN, C...>{nullptr}; } }());
 };
 
 /// Use this to group together produces. Useful to separate them logically

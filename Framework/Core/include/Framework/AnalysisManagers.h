@@ -247,17 +247,17 @@ template <typename TABLE>
 struct OutputManager<Produces<TABLE>> {
   static bool appendOutput(std::vector<OutputSpec>& outputs, Produces<TABLE>& /*what*/, uint32_t)
   {
-    outputs.emplace_back(OutputForTable<TABLE>::spec());
+    outputs.emplace_back(OutputForTable<typename Produces<TABLE>::persistent_table_t>::spec());
     return true;
   }
   static bool prepare(ProcessingContext& context, Produces<TABLE>& what)
   {
-    what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTable<TABLE>::ref())));
+    what.resetCursor(std::move(context.outputs().make<TableBuilder>(OutputForTable<typename Produces<TABLE>::persistent_table_t>::ref())));
     return true;
   }
   static bool finalize(ProcessingContext&, Produces<TABLE>& what)
   {
-    what.setLabel(o2::aod::MetadataTrait<TABLE>::metadata::tableLabel());
+    what.setLabel(o2::aod::MetadataTrait<typename Produces<TABLE>::persistent_table_t>::metadata::tableLabel());
     what.release();
     return true;
   }

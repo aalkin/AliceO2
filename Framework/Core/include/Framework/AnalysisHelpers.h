@@ -135,14 +135,17 @@ struct WritingCursor {
 
  private:
   template <typename A>
+    requires requires { &A::globalIndex; }
   static decltype(auto) extract(A const& arg)
   {
-    if constexpr (requires(T t) { t.globalIndex(); }) {
-      return arg.globalIndex();
-    } else {
-      static_assert(!framework::has_type<A>(typename persistent_table_t::persistent_columns_t{}), "Argument type mismatch");
-      return arg;
-    }
+    return arg.globalIndex();
+  }
+
+  template <typename A>
+    requires (framework::has_type<A>(typename persistent_table_t::persistent_columns_t{}))
+  static decltype(auto) extract(A const& arg)
+  {
+    return arg;
   }
 
   /// The table builder which actually performs the

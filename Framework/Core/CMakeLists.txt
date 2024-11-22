@@ -253,8 +253,15 @@ add_executable(o2-test-framework-core
 target_link_libraries(o2-test-framework-core PRIVATE O2::Framework)
 target_link_libraries(o2-test-framework-core PRIVATE O2::Catch2)
 
+add_executable(o2-test-framework-minimal
+	       test/test_ASoA_minimal.cxx
+	      )
+target_link_libraries(o2-test-framework-minimal PRIVATE O2::Framework)
+target_link_libraries(o2-test-framework-minimal PRIVATE O2::Catch2)
+
 get_filename_component(outdir ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../tests ABSOLUTE)
 set_property(TARGET o2-test-framework-core PROPERTY RUNTIME_OUTPUT_DIRECTORY ${outdir})
+set_property(TARGET o2-test-framework-minimal PROPERTY RUNTIME_OUTPUT_DIRECTORY ${outdir})
 
 add_test(NAME framework:core COMMAND o2-test-framework-core --skip-benchmarks)
 

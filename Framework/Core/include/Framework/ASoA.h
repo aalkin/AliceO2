@@ -1708,7 +1708,7 @@ class Table
     TableIteratorBase() = default;
 
     TableIteratorBase(arrow::ChunkedArray* columnData[framework::pack_size(columns_t{})], IP&& policy)
-      : base_iterator<IP>(columnData, std::forward<decltype(policy)>(policy))
+      : base_iterator<IP>(columnData, std::forward<IP>(policy))
     {
     }
 
@@ -1852,17 +1852,17 @@ class Table
   using iterator_template = TableIteratorBase<IP, Parent, T...>;
 
   template <typename IP, typename Parent>
-  static consteval auto full_iter()
+    requires ((sizeof...(Ts) == 0) || (is_column<Ts> && ...))
+  static consteval decltype(auto) full_iter()
   {
-    if constexpr (sizeof...(Ts) == 0) {
-      return iterator_template<IP, Parent>{};
-    } else {
-      if constexpr ((o2::soa::is_column<Ts> && ...)) {
-        return iterator_template<IP, Parent>{};
-      } else {
-        return iterator_template<IP, Parent, Ts...>{};
-      }
-    }
+    return iterator_template<IP, Parent>{};
+  }
+
+  template <typename IP, typename Parent>
+    requires ((sizeof...(Ts) > 0) && (!is_column<Ts> && ...))
+  static consteval decltype(auto) full_iter()
+  {
+    return iterator_template<IP, Parent, Ts...>{};
   }
 
   template <typename IP, typename Parent>

@@ -1018,8 +1018,7 @@ struct TableIterator : IP, C... {
   using policy_t = IP;
   using all_columns = framework::pack<C...>;
   using persistent_columns_t = framework::selected_pack<soa::is_persistent_column_t, C...>;
-  using indexing_columns_t = framework::selected_pack<is_indexing_t, C...>;
-  constexpr inline static bool has_index_v = framework::pack_size(indexing_columns_t{}) > 0;
+  constexpr inline static bool has_index_v = (is_indexing_column<C> || ...);
   using external_index_columns_t = framework::selected_pack<soa::is_external_index_t, C...>;
   using internal_index_columns_t = framework::selected_pack<soa::is_self_index_t, C...>;
   using bindings_pack_t = decltype([]<typename... Cs>(framework::pack<Cs...>) -> framework::pack<typename Cs::binding_t...> {}(external_index_columns_t{})); // decltype(extractBindings(external_index_columns_t{}));
@@ -1055,7 +1054,7 @@ struct TableIterator : IP, C... {
   }
 
   TableIterator(TableIterator<D, O, FilteredIndexPolicy, C...> const& other)
-    requires std::is_same_v<IP, DefaultIndexPolicy>
+    requires std::same_as<IP, DefaultIndexPolicy>
     : IP{static_cast<IP const&>(other)},
       C(static_cast<C const&>(other))...
   {

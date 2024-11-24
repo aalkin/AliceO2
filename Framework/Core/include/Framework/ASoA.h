@@ -1714,7 +1714,7 @@ class Table
 
     template <typename P, typename... Os>
     TableIteratorBase& operator=(TableIteratorBase<IP, P, Os...> other)
-      requires(P::ref::signature == Parent::ref::signature)
+      requires(P::ref::desc_hash == Parent::ref::desc_hash)
     {
       static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
       return *this;
@@ -1729,7 +1729,7 @@ class Table
 
     template <typename P>
     TableIteratorBase& operator=(TableIteratorBase<FilteredIndexPolicy, P, T...> other)
-      requires std::is_same_v<IP, DefaultIndexPolicy>
+      requires std::same_as<IP, DefaultIndexPolicy>
     {
       static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<FilteredIndexPolicy>>(other);
       return *this;
@@ -1737,14 +1737,14 @@ class Table
 
     template <typename P, typename... Os>
     TableIteratorBase(TableIteratorBase<IP, P, Os...> const& other)
-      requires(P::ref::signature == Parent::ref::signature)
+      requires(P::ref::desc_hash == Parent::ref::desc_hash)
     {
       *this = other;
     }
 
     template <typename P, typename... Os>
     TableIteratorBase(TableIteratorBase<IP, P, Os...>&& other) noexcept
-      requires(P::ref::signature == Parent::ref::signature)
+      requires(P::ref::desc_hash == Parent::ref::desc_hash)
     {
       *this = other;
     }

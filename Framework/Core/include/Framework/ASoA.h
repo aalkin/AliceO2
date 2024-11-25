@@ -1011,7 +1011,11 @@ concept can_bind = requires(T&& t) {
   { t.B::mColumnIterator };
 };
 
-template <typename D, typename O, typename IP, typename... C>
+template <typename IP>
+concept is_policy = std::same_as<IP, DefaultIndexPolicy> || std::same_as<IP, FilteredIndexPolicy>;
+
+template <aod::is_aod_hash D, aod::is_origin_hash  O, is_policy IP, soa::is_column... C>
+  requires (sizeof...(C) > 0)
 struct TableIterator : IP, C... {
  public:
   using self_t = TableIterator<D, O, IP, C...>;
@@ -1617,6 +1621,7 @@ arrow::ChunkedArray* getIndexFromLabel(arrow::Table* table, const char* label);
 template <typename D, typename O, typename IP, typename... C>
 consteval auto base_iter(framework::pack<C...>&&) -> TableIterator<D, O, IP, C...>
 {
+  return {};
 }
 
 template <TableRef ref>
@@ -1688,51 +1693,52 @@ class Table
     }
   }());
 
-  using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_persistent_column_t, C...> {}(columns_t{}));
-  using column_types = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::type...> {}(persistent_columns_t{}));
+  using persistent_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_persistent_column_t, C...> { return {}; }(columns_t{}));
+  using column_types = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::type...> { return {}; }(persistent_columns_t{}));
 
-  using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_external_index_t, C...> {}(columns_t{}));
-  using internal_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_self_index_t, C...> {}(columns_t{}));
-  template <typename IP>
+  using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_external_index_t, C...> { return {}; }(columns_t{}));
+  using internal_index_columns_t = decltype([]<typename... C>(framework::pack<C...>&&) -> framework::selected_pack<soa::is_self_index_t, C...> { return {}; }(columns_t{}));
+  template <is_policy IP>
   using base_iterator = decltype(base_iter<D, O, IP>(columns_t{}));
 
-  template <typename IP, typename Parent, typename... T>
+  template <is_policy IP, typename Parent, typename... T>
   struct TableIteratorBase : base_iterator<IP> {
-    using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::selected_pack<soa::is_external_index_t, C...> {}(columns_t{}));
-    using bindings_pack_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::binding_t...> {}(external_index_columns_t{}));
-    static constexpr const std::array<TableRef, sizeof...(T)> originals{T::ref...};
+    using external_index_columns_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::selected_pack<soa::is_external_index_t, C...> { return {}; }(columns_t{}));
+    using bindings_pack_t = decltype([]<typename... C>(framework::pack<C...>) -> framework::pack<typename C::binding_t...> { return {}; }(external_index_columns_t{}));
     using policy_t = IP;
     using parent_t = Parent;
 
     TableIteratorBase() = default;
 
     TableIteratorBase(arrow::ChunkedArray* columnData[framework::pack_size(columns_t{})], IP&& policy)
-      : base_iterator<IP>(columnData, std::forward<IP>(policy))
+      : base_iterator<IP>{columnData, std::forward<IP>(policy)}
     {
     }
 
-    template <typename P, typename... Os>
-    TableIteratorBase& operator=(TableIteratorBase<IP, P, Os...> other)
-      requires(P::ref::desc_hash == Parent::ref::desc_hash)
-    {
-      static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
-      return *this;
-    }
+    using base_iterator<IP>::operator=;
 
-    template <typename P>
-    TableIteratorBase& operator=(TableIteratorBase<IP, P, T...> other)
-    {
-      static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
-      return *this;
-    }
+    //template <typename P, typename... Os>
+    //TableIteratorBase& operator=(TableIteratorBase<IP, P, Os...> other)
+    //  requires(P::ref::desc_hash == Parent::ref::desc_hash)
+    //{
+    //  static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
+    //  return *this;
+    //}
 
-    template <typename P>
-    TableIteratorBase& operator=(TableIteratorBase<FilteredIndexPolicy, P, T...> other)
-      requires std::same_as<IP, DefaultIndexPolicy>
-    {
-      static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<FilteredIndexPolicy>>(other);
-      return *this;
-    }
+    //template <typename P>
+    //TableIteratorBase& operator=(TableIteratorBase<IP, P, T...> other)
+    //{
+    //  static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
+    //  return *this;
+    //}
+
+    //template <typename P>
+    //TableIteratorBase& operator=(TableIteratorBase<FilteredIndexPolicy, P, T...> other)
+    //  requires std::same_as<IP, DefaultIndexPolicy>
+    //{
+    //  static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<FilteredIndexPolicy>>(other);
+    //  return *this;
+    //}
 
     template <typename P, typename... Os>
     TableIteratorBase(TableIteratorBase<IP, P, Os...> const& other)
@@ -1824,7 +1830,7 @@ class Table
       return {getValue<B, CCs>()...};
     }
 
-    using IP::size;
+    using base_iterator<IP>::size;
 
     using base_iterator<IP>::operator++;
 
@@ -1852,16 +1858,16 @@ class Table
 
   template <typename IP, typename Parent>
     requires ((sizeof...(Ts) == 0) || (is_column<Ts> && ...))
-  static consteval decltype(auto) full_iter()
+  static consteval auto full_iter() -> iterator_template<IP, Parent>
   {
-    return iterator_template<IP, Parent>{};
+    return {};
   }
 
   template <typename IP, typename Parent>
     requires ((sizeof...(Ts) > 0) && (!is_column<Ts> && ...))
-  static consteval decltype(auto) full_iter()
+  static consteval auto full_iter() -> iterator_template<IP, Parent, Ts...>
   {
-    return iterator_template<IP, Parent, Ts...>{};
+    return {};
   }
 
   template <typename IP, typename Parent>

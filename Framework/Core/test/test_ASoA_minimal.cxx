@@ -26,8 +26,8 @@ namespace test
 {
 DECLARE_SOA_COLUMN(X, x, float);
 DECLARE_SOA_COLUMN(Y, y, float);
-}
-}
+} // namespace test
+} // namespace o2::aod
 
 TEST_CASE("TestMinimal")
 {

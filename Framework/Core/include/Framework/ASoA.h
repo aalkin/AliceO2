@@ -189,7 +189,7 @@ template <typename C>
 concept is_self_index_column = not_void<typename C::self_index_t> && std::same_as<typename C::self_index_t, std::true_type>;
 
 template <typename C>
-concept is_index_column = !is_self_index_column<C> && (requires {&C::getId;} || requires {&C::getIds;});
+concept is_index_column = !is_self_index_column<C> && (requires { &C::getId; } || requires { &C::getIds; });
 
 template <typename C>
 using is_external_index_t = typename std::conditional_t<is_index_column<C>, std::true_type, std::false_type>;
@@ -783,7 +783,7 @@ struct Index : o2::soa::IndexColumn<Index<START, END>> {
 
 template <typename D>
 concept is_indexing_column = requires {
-  []<int64_t S, int64_t E>(o2::soa::Index<S, E>*){}(std::declval<D*>());
+  []<int64_t S, int64_t E>(o2::soa::Index<S, E>*) {}(std::declval<D*>());
 };
 
 template <typename T>
@@ -1014,8 +1014,8 @@ concept can_bind = requires(T&& t) {
 template <typename IP>
 concept is_policy = std::same_as<IP, DefaultIndexPolicy> || std::same_as<IP, FilteredIndexPolicy>;
 
-template <aod::is_aod_hash D, aod::is_origin_hash  O, is_policy IP, soa::is_column... C>
-  requires (sizeof...(C) > 0)
+template <aod::is_aod_hash D, aod::is_origin_hash O, is_policy IP, soa::is_column... C>
+  requires(sizeof...(C) > 0)
 struct TableIterator : IP, C... {
  public:
   using self_t = TableIterator<D, O, IP, C...>;
@@ -1717,28 +1717,28 @@ class Table
 
     using base_iterator<IP>::operator=;
 
-    //template <typename P, typename... Os>
-    //TableIteratorBase& operator=(TableIteratorBase<IP, P, Os...> other)
-    //  requires(P::ref::desc_hash == Parent::ref::desc_hash)
+    // template <typename P, typename... Os>
+    // TableIteratorBase& operator=(TableIteratorBase<IP, P, Os...> other)
+    //   requires(P::ref::desc_hash == Parent::ref::desc_hash)
     //{
-    //  static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
-    //  return *this;
-    //}
+    //   static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
+    //   return *this;
+    // }
 
-    //template <typename P>
-    //TableIteratorBase& operator=(TableIteratorBase<IP, P, T...> other)
+    // template <typename P>
+    // TableIteratorBase& operator=(TableIteratorBase<IP, P, T...> other)
     //{
-    //  static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
-    //  return *this;
-    //}
+    //   static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<IP>>(other);
+    //   return *this;
+    // }
 
-    //template <typename P>
-    //TableIteratorBase& operator=(TableIteratorBase<FilteredIndexPolicy, P, T...> other)
-    //  requires std::same_as<IP, DefaultIndexPolicy>
+    // template <typename P>
+    // TableIteratorBase& operator=(TableIteratorBase<FilteredIndexPolicy, P, T...> other)
+    //   requires std::same_as<IP, DefaultIndexPolicy>
     //{
-    //  static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<FilteredIndexPolicy>>(other);
-    //  return *this;
-    //}
+    //   static_cast<base_iterator<IP>&>(*this) = static_cast<base_iterator<FilteredIndexPolicy>>(other);
+    //   return *this;
+    // }
 
     template <typename P, typename... Os>
     TableIteratorBase(TableIteratorBase<IP, P, Os...> const& other)
@@ -1857,14 +1857,14 @@ class Table
   using iterator_template = TableIteratorBase<IP, Parent, T...>;
 
   template <typename IP, typename Parent>
-    requires ((sizeof...(Ts) == 0) || (is_column<Ts> && ...))
+    requires((sizeof...(Ts) == 0) || (is_column<Ts> && ...))
   static consteval auto full_iter() -> iterator_template<IP, Parent>
   {
     return {};
   }
 
   template <typename IP, typename Parent>
-    requires ((sizeof...(Ts) > 0) && (!is_column<Ts> && ...))
+    requires((sizeof...(Ts) > 0) && (!is_column<Ts> && ...))
   static consteval auto full_iter() -> iterator_template<IP, Parent, Ts...>
   {
     return {};

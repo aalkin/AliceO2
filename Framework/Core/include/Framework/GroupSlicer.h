@@ -50,7 +50,7 @@ struct GroupSlicer {
     }
 
     template <typename T>
-    requires (o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<T>>())
+      requires(o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<T>>())
     auto splittingFunction(T&& table)
     {
       constexpr auto index = framework::has_type_at_v<std::decay_t<T>>(associated_pack_t{});
@@ -66,7 +66,7 @@ struct GroupSlicer {
           return;
         }
         sliceInfosUnsorted[index] = mSlices->getCacheUnsortedFor(bk);
-        }
+      }
     }
 
     template <typename T>
@@ -75,7 +75,7 @@ struct GroupSlicer {
     }
 
     template <typename T>
-      requires (soa::is_filtered_table<std::decay_t<T>>)
+      requires(soa::is_filtered_table<std::decay_t<T>>)
     auto extractingFunction(T&& table)
     {
       constexpr auto index = framework::has_type_at_v<std::decay_t<T>>(associated_pack_t{});
@@ -159,7 +159,7 @@ struct GroupSlicer {
     }
 
     template <soa::is_smallgroups A1>
-      requires (o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<A1>>() && soa::is_filtered_table<std::decay_t<A1>>)
+      requires(o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<A1>>() && soa::is_filtered_table<std::decay_t<A1>>)
     auto prepareArgument()
     {
       constexpr auto index = framework::has_type_at_v<A1>(associated_pack_t{});
@@ -192,8 +192,8 @@ struct GroupSlicer {
       return typedTable;
     }
 
-    template  <soa::is_filtered_table A1>
-      requires (o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<A1>>() && !soa::is_smallgroups<A1>)
+    template <soa::is_filtered_table A1>
+      requires(o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<A1>>() && !soa::is_smallgroups<A1>)
     auto prepareArgument()
     {
       constexpr auto index = framework::has_type_at_v<A1>(associated_pack_t{});
@@ -232,7 +232,7 @@ struct GroupSlicer {
     }
 
     template <soa::is_table A1>
-      requires (o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<A1>>() && !soa::is_smallgroups<A1> && !soa::is_filtered_table<A1>)
+      requires(o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<A1>>() && !soa::is_smallgroups<A1> && !soa::is_filtered_table<A1>)
     auto prepareArgument()
     {
       constexpr auto index = framework::has_type_at_v<A1>(associated_pack_t{});
@@ -256,7 +256,7 @@ struct GroupSlicer {
     }
 
     template <soa::is_table A1>
-      requires (!o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<A1>>() && !soa::is_smallgroups<A1>)
+      requires(!o2::soa::relatedByIndex<std::decay_t<G>, std::decay_t<A1>>() && !soa::is_smallgroups<A1>)
     auto prepareArgument()
     {
       return std::get<A1>(*mAt);

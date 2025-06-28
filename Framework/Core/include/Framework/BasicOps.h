@@ -81,8 +81,7 @@ static constexpr std::array<std::string_view, BasicOp::Conditional + 1> mapping{
   "nabs",
   "nround",
   "nbitwise_not",
-  "ifnode"
-};
+  "ifnode"};
 
 static constexpr std::array<std::string_view, 9> mathConstants{
   "Almost0",
@@ -93,8 +92,7 @@ static constexpr std::array<std::string_view, 9> mathConstants{
   "TwoPI",
   "PIHalf",
   "PIThird",
-  "PIQuarter"
-};
+  "PIQuarter"};
 
 static constexpr std::array<float, 9> mathConstantsValues{
   o2::constants::math::Almost0,
@@ -105,8 +103,7 @@ static constexpr std::array<float, 9> mathConstantsValues{
   o2::constants::math::TwoPI,
   o2::constants::math::PIHalf,
   o2::constants::math::PIThird,
-  o2::constants::math::PIQuarter
-};
+  o2::constants::math::PIQuarter};
 } // namespace o2::framework
 
 #endif // O2_FRAMEWORK_BASICOPS_H_

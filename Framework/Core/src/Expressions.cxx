@@ -1102,7 +1102,7 @@ std::unique_ptr<Node> Parser::parseBase(Tokenizer& tk)
     if (tk.currentToken != '(') { // binding node or a constant
       std::string binding = id;
       auto posc = std::find(mathConstants.begin(), mathConstants.end(), id);
-      if (posc != mathConstants.end()) { //constant
+      if (posc != mathConstants.end()) { // constant
         return std::make_unique<Node>(LiteralNode{mathConstantsValues[std::distance(mathConstants.begin(), posc)]});
       }
       // binding node
@@ -1161,7 +1161,7 @@ std::unique_ptr<Node> Parser::parseBase(Tokenizer& tk)
   // number
   if (tk.currentToken == Token::FloatNumber) {
     tk.nextToken();
-    switch(tk.FloatValue.index()) {
+    switch (tk.FloatValue.index()) {
       case 0:
         return std::make_unique<Node>(LiteralNode{get<0>(tk.FloatValue)});
       case 1:
@@ -1170,7 +1170,7 @@ std::unique_ptr<Node> Parser::parseBase(Tokenizer& tk)
   }
   if (tk.currentToken == Token::IntegerNumber) {
     tk.nextToken();
-    switch(tk.IntegerValue.index()) {
+    switch (tk.IntegerValue.index()) {
       case 0:
         return std::make_unique<Node>(LiteralNode{get<0>(tk.IntegerValue)});
       case 1:

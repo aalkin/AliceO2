@@ -79,10 +79,10 @@ struct Buildable {
 
 } // namespace
 
-AlgorithmSpec AODReaderHelpers::indexBuilderCallback(ConfigContext const& ctx)
+AlgorithmSpec AODReaderHelpers::indexBuilderCallback(ConfigContext const& /*ctx*/)
 {
-  auto& ac = ctx.services().get<DanglingEdgesContext>();
-  return AlgorithmSpec::InitCallback{[requested = ac.requestedIDXs](InitContext& /*ic*/) {
+  return AlgorithmSpec::InitCallback{[](InitContext& ic) {
+    auto requested = ic.services().get<DanglingEdgesContext>().requestedIDXs;
     std::vector<Buildable> buildables;
     for (auto& i : requested) {
       buildables.emplace_back(i);
@@ -181,10 +181,10 @@ struct Spawnable {
 
 } // namespace
 
-AlgorithmSpec AODReaderHelpers::aodSpawnerCallback(ConfigContext const& ctx)
+AlgorithmSpec AODReaderHelpers::aodSpawnerCallback(ConfigContext const& /*ctx*/)
 {
-  auto& ac = ctx.services().get<DanglingEdgesContext>();
-  return AlgorithmSpec::InitCallback{[requested = ac.spawnerInputs](InitContext& /*ic*/) {
+  return AlgorithmSpec::InitCallback{[](InitContext& ic) {
+    auto requested = ic.services().get<DanglingEdgesContext>().spawnerInputs;
     std::vector<Spawnable> spawnables;
     for (auto& i : requested) {
       spawnables.emplace_back(i);

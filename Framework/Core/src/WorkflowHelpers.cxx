@@ -384,7 +384,7 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
     "internal-dpl-aod-index-builder",
     {},
     {},
-    PluginManager::loadAlgorithmFromPlugin("O2FrameworkOnDemandTablesSupport", "IndexTableBuilder", ctx), // readers::AODReaderHelpers::indexBuilderCallback(ctx),
+    AlgorithmSpec::dummyAlgorithm(), // real algorithm will be set in adjustTopology
     {}};
   AnalysisSupportHelpers::addMissingOutputsToBuilder(dec.requestedIDXs, dec.requestedAODs, dec.requestedDYNs, indexBuilder);
 
@@ -400,7 +400,7 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
     "internal-dpl-aod-spawner",
     {},
     {},
-    PluginManager::loadAlgorithmFromPlugin("O2FrameworkOnDemandTablesSupport", "ExtendedTableSpawner", ctx), // readers::AODReaderHelpers::aodSpawnerCallback(ctx),
+    AlgorithmSpec::dummyAlgorithm(), // real algorithm will be set in adjustTopology
     {}};
   AnalysisSupportHelpers::addMissingOutputsToSpawner({}, dec.spawnerInputs, dec.requestedAODs, aodSpawner);
   AnalysisSupportHelpers::addMissingOutputsToReader(dec.providedAODs, dec.requestedAODs, aodReader);
@@ -431,13 +431,11 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
     auto mctracks2aod = std::find_if(workflow.begin(), workflow.end(), [](auto const& x) { return x.name == "mctracks-to-aod"; });
     if (mctracks2aod == workflow.end()) {
       // add normal reader
-      auto&& algo = PluginManager::loadAlgorithmFromPlugin("O2FrameworkAnalysisSupport", "ROOTFileReader", ctx);
-      aodReader.algorithm = CommonDataProcessors::wrapWithTimesliceConsumption(algo);
       aodReader.outputs.emplace_back(OutputSpec{"TFN", "TFNumber"});
       aodReader.outputs.emplace_back(OutputSpec{"TFF", "TFFilename"});
     } else {
-      // AODs are being injected on-the-fly, add dummy reader
-      auto algo = AlgorithmSpec{
+      // AODs are being injected on-the-fly, add error-handler reader
+      aodReader.algorithm = AlgorithmSpec{
         adaptStateful(
           [outputs = aodReader.outputs](DeviceSpec const&) {
             LOGP(warn, "Workflow with injected AODs has unsatisfied inputs:");
@@ -448,7 +446,6 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
             // to ensure the output type for adaptStateful
             return adaptStateless([](DataAllocator&) {});
           })};
-      aodReader.algorithm = CommonDataProcessors::wrapWithTimesliceConsumption(algo);
     }
     auto concrete = DataSpecUtils::asConcreteDataMatcher(aodReader.inputs[0]);
     timer.outputs.emplace_back(concrete.origin, concrete.description, concrete.subSpec, Lifetime::Enumeration);
@@ -533,9 +530,6 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
 
   // add the Analysys CCDB backend which reads CCDB objects using a provided table
   if (analysisCCDBBackend.outputs.empty() == false) {
-    // add normal reader
-    auto&& algo = PluginManager::loadAlgorithmFromPlugin("O2FrameworkCCDBSupport", "AnalysisCCDBFetcherPlugin", ctx);
-    analysisCCDBBackend.algorithm = algo;
     extraSpecs.push_back(analysisCCDBBackend);
   }
 

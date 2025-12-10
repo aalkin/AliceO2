@@ -156,6 +156,7 @@ int defaultConditionQueryRateMultiplier()
 
 void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext& ctx)
 {
+  int rateLimitingIPCID = std::stoi(ctx.options().get<std::string>("timeframes-rate-limit-ipcid"));
   DataProcessorSpec ccdbBackend{
     .name = "internal-dpl-ccdb-backend",
     .outputs = {},
@@ -230,23 +231,6 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
                 ConfigParamSpec{"step-value-enumeration", VariantType::Int64, 1ll, {"step between one value and the other"}}},
     .requiredServices = CommonServices::defaultServices("O2FrameworkAnalysisSupport:RunSummary")};
 
-  // AOD reader can be rate limited
-  int rateLimitingIPCID = std::stoi(ctx.options().get<std::string>("timeframes-rate-limit-ipcid"));
-  std::string rateLimitingChannelConfigInput;
-  std::string rateLimitingChannelConfigOutput;
-  bool internalRateLimiting = false;
-
-  // In case we have rate-limiting requested, any device without an input will get one on the special
-  // "DPL/RATE" message.
-  if (rateLimitingIPCID >= 0) {
-    rateLimitingChannelConfigInput = fmt::format("name=metric-feedback,type=pull,method=connect,address=ipc://{}metric-feedback-{},transport=shmem,rateLogging=0",
-                                                 ChannelSpecHelpers::defaultIPCFolder(), rateLimitingIPCID);
-    rateLimitingChannelConfigOutput = fmt::format("name=metric-feedback,type=push,method=bind,address=ipc://{}metric-feedback-{},transport=shmem,rateLogging=0",
-                                                  ChannelSpecHelpers::defaultIPCFolder(), rateLimitingIPCID);
-    internalRateLimiting = true;
-    aodReader.options.emplace_back(ConfigParamSpec{"channel-config", VariantType::String, rateLimitingChannelConfigInput, {"how many timeframes can be in flight at the same time"}});
-  }
-
   ctx.services().registerService(ServiceRegistryHelpers::handleForService<DanglingEdgesContext>(new DanglingEdgesContext));
   auto& dec = ctx.services().get<DanglingEdgesContext>();
 
@@ -274,7 +258,7 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
     // A timeframeSink consumes timeframes without creating new
     // timeframe data.
     bool timeframeSink = hasTimeframeInputs && !hasTimeframeOutputs;
-    if (std::stoi(ctx.options().get<std::string>("timeframes-rate-limit-ipcid")) != -1) {
+    if (rateLimitingIPCID != -1) {
       if (timeframeSink && processor.name.find("internal-dpl-injected-dummy-sink") == std::string::npos) {
         O2_SIGNPOST_ID_GENERATE(sid, workflow_helpers);
         uint32_t hash = runtime_hash(processor.name.c_str());
@@ -631,6 +615,10 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
       extraSpecs.push_back(CommonDataProcessors::getScheduledDummySink(ignored));
     } else {
       O2_SIGNPOST_EVENT_EMIT(workflow_helpers, sid, "injectServiceDevices", "Injecting rate limited dummy sink");
+      std::string rateLimitingChannelConfigOutput;
+      if (rateLimitingIPCID != -1) {
+        rateLimitingChannelConfigOutput = fmt::format("name=metric-feedback,type=push,method=bind,address=ipc://{}metric-feedback-{},transport=shmem,rateLogging=0", ChannelSpecHelpers::defaultIPCFolder(), rateLimitingIPCID);
+      }
       extraSpecs.push_back(CommonDataProcessors::getDummySink(ignored, rateLimitingChannelConfigOutput));
     }
   }

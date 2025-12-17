@@ -589,7 +589,7 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
       auto builder = std::find_if(workflow.begin(), workflow.end(), [](DataProcessorSpec const& spec) { return spec.name == "internal-dpl-aod-index-builder"; });
       auto reader = std::find_if(workflow.begin(), workflow.end(), [](DataProcessorSpec const& spec) { return spec.name == "internal-dpl-aod-reader"; });
       auto writer = std::find_if(workflow.begin(), workflow.end(), [](DataProcessorSpec const& spec) { return spec.name == "internal-dpl-aod-writer"; });
-      auto &dec = ctx.services().get<DanglingEdgesContext>();
+      auto& dec = ctx.services().get<DanglingEdgesContext>();
       dec.requestedAODs.clear();
       dec.requestedDYNs.clear();
       dec.providedDYNs.clear();

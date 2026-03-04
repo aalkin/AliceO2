@@ -22,8 +22,9 @@ using namespace o2::framework::expressions;
 
 struct RewriteMcParticles {
   Produces<aod::StoredMcParticles_001From<o2::aod::Hash<"AOD1"_h>>> mcparts;
+  Configurable<float> etaCut{"etaCut", 1.5f, "eta cut"};
 
-  Filter lessThan15 = nabs(aod::mcparticle::eta) < 1.5f;
+  Filter lessThan15 = nabs(aod::mcparticle::eta) < etaCut;
 
   void process(soa::Filtered<aod::McParticles_001> const& mcparticles) // subscribe to full to have Eta
   {

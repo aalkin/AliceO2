@@ -680,8 +680,8 @@ o2::framework::ServiceSpec ArrowSupport::arrowBackendSpec()
           workflow.erase(reader);
         } else {
           // load reader algorithm before deployment
-          auto tfnsource = std::ranges::find_if(workflow, [](DataProcessorSpec const& spec){
-            return std::ranges::any_of(spec.outputs, [](OutputSpec const& output){
+          auto tfnsource = std::ranges::find_if(workflow, [](DataProcessorSpec const& spec) {
+            return std::ranges::any_of(spec.outputs, [](OutputSpec const& output) {
               return DataSpecUtils::match(output, "TFN", "TFNumber", 0);
             });
           });

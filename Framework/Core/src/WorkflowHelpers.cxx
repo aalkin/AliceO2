@@ -411,8 +411,8 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
 
   // add the reader
   if (aodReader.outputs.empty() == false) {
-    auto tfnsource = std::ranges::find_if(workflow, [](DataProcessorSpec const& spec){
-      return std::ranges::any_of(spec.outputs, [](OutputSpec const& output){
+    auto tfnsource = std::ranges::find_if(workflow, [](DataProcessorSpec const& spec) {
+      return std::ranges::any_of(spec.outputs, [](OutputSpec const& output) {
         return DataSpecUtils::match(output, "TFN", "TFNumber", 0);
       });
     });

@@ -704,6 +704,11 @@ void WorkflowHelpers::injectAODWriter(WorkflowSpec& workflow, ConfigContext cons
       return DataSpecUtils::partialMatch(spec, o2::header::DataOrigin("TFN"));
     });
     dec.isDangling[std::distance(dec.outputsInputs.begin(), it)] = false;
+
+    it = std::find_if(dec.outputsInputs.begin(), dec.outputsInputs.end(), [](InputSpec const& spec) -> bool {
+      return DataSpecUtils::partialMatch(spec, o2::header::DataOrigin("TFF"));
+    });
+    dec.isDangling[std::distance(dec.outputsInputs.begin(), it)] = false;
   }
 }
 

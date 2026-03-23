@@ -127,13 +127,11 @@ TEST_CASE("TestInputOutputSpecMetadata")
     DataProcessorSpec{
       .name = "S1",
       .outputs = {OutputSpec{OutputLabel{"o1"}, o2::header::DataOrigin{"TST"}, "OUTPUT1", 0, Lifetime::Timeframe, {{"param1", VariantType::Bool, true, ConfigParamSpec::HelpString{"\"\""}}, {"param2", VariantType::Bool, true, ConfigParamSpec::HelpString{"\"\""}}}},
-                  OutputSpec{OutputLabel{"o2"}, o2::header::DataOrigin{"TST"}, "OUTPUT2"}}
-    }
-  };
+                  OutputSpec{OutputLabel{"o2"}, o2::header::DataOrigin{"TST"}, "OUTPUT2"}}}};
 
   std::vector<DataProcessorInfo> dataProcessorInfoOut{
-                                                      {.name = "S1", .executable = "test_Framework_test_SerializationWorkflow"},
-                                                      };
+    {.name = "S1", .executable = "test_Framework_test_SerializationWorkflow"},
+  };
 
   CommandInfo commandInfoOut{"o2-dpl-workflow -b"};
 

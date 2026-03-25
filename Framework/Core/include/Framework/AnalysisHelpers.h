@@ -386,7 +386,7 @@ constexpr auto tableRef2OutputSpec()
   using md = typename o2::aod::MetadataTrait<o2::aod::Hash<R.desc_hash>>::metadata;
   if constexpr (soa::with_ccdb_urls<md>) {
     metadata.emplace_back("ccdb:", framework::VariantType::Bool, true, framework::ConfigParamSpec::HelpString{"\"\""});
-  } else if constexpr(soa::with_expression_pack<md>) {
+  } else if constexpr (soa::with_expression_pack<md>) {
     metadata.emplace_back("projectors", framework::VariantType::Bool, true, framework::ConfigParamSpec::HelpString{"\"\""});
   } else if constexpr (soa::with_index_pack<md>) {
     metadata.emplace_back("index-records", framework::VariantType::Bool, true, framework::ConfigParamSpec::HelpString{"\"\""});

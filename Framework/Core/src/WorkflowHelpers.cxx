@@ -377,7 +377,7 @@ void WorkflowHelpers::injectServiceDevices(WorkflowSpec& workflow, ConfigContext
         dec.providedDYNs.emplace_back(output);
       } else if (hasCCDBURLs) {
         dec.providedTIMs.emplace_back(output);
-      } else if(hasIndexRecords) {
+      } else if (hasIndexRecords) {
         dec.providedIDXs.emplace_back(output);
       } else if (DataSpecUtils::partialMatch(output, AODOrigins)) {
         dec.providedAODs.emplace_back(output);

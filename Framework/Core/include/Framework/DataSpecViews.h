@@ -18,14 +18,14 @@ namespace o2::framework::checks
 {
 static auto has_params_with_name(std::string&& name)
 {
-  return [name](ConfigParamSpec const& p){return p.name.compare(name) == 0;};
+  return [name](ConfigParamSpec const& p) { return p.name.compare(name) == 0; };
 }
 
 static auto has_params_with_name_starting(std::string&& name)
 {
-  return [name](ConfigParamSpec const& p){return p.name.starts_with(name);};
+  return [name](ConfigParamSpec const& p) { return p.name.starts_with(name); };
 }
-}
+} // namespace o2::framework::checks
 
 namespace o2::framework::views
 {

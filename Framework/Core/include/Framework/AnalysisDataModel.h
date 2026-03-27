@@ -517,10 +517,10 @@ DECLARE_SOA_TABLE_FULL(StoredTracksIU, "Tracks_IU", "AOD", "TRACK_IU", //! On di
                        o2::soa::Marker<2>);
 
 DECLARE_SOA_EXTENDED_TABLE_NG(TracksIU, StoredTracksIU, "EXTRACK_IU", 0, //! Track parameters at inner most update (e.g. ITS) as it comes from the tracking
-                           aod::track::Pt,
-                           aod::track::P,
-                           aod::track::Eta,
-                           aod::track::Phi);
+                              aod::track::Pt,
+                              aod::track::P,
+                              aod::track::Eta,
+                              aod::track::Phi);
 
 DECLARE_SOA_TABLE_FULL(StoredTracksCov, "TracksCov", "AOD", "TRACKCOV", //! On disk version of the TracksCov table at collision vertex
                        track::SigmaY, track::SigmaZ, track::SigmaSnp, track::SigmaTgl, track::Sigma1Pt,

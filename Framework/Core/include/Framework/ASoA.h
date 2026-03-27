@@ -1326,7 +1326,7 @@ concept with_sources = requires {
 };
 
 template <typename T>
-concept with_sources_generator = requires (T t) {
+concept with_sources_generator = requires(T t) {
   t.template generateSources<o2::aod::Hash<"AOD"_h>>();
 };
 

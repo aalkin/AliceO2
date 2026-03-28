@@ -26,7 +26,7 @@ typedef boost::mpl::list<o2::dcs::DataPointIdentifier, o2::dcs::DataPointValue, 
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(DataPointCompositeObjectTypeTraits, T, testTypes)
 {
-  BOOST_CHECK_EQUAL(std::is_trivially_copyable<T>::value, true);
+  BOOST_CHECK_EQUAL(o2::framework::is_forced_trivially_copyable<T>::value, true);
   BOOST_CHECK_EQUAL(std::is_polymorphic<T>::value, false);
   BOOST_CHECK_EQUAL(std::is_pointer<T>::value, false);
   BOOST_CHECK_EQUAL(o2::framework::is_forced_non_messageable<T>::value, false);

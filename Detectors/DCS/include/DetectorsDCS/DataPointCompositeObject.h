@@ -312,11 +312,13 @@ struct is_messageable<o2::dcs::DataPointCompositeObject> : std::true_type {
 } // namespace o2
 
 /// Defining DataPointCompositeObject explicitly as copiable
-namespace std
-{
+namespace o2::framework {
+template <typename T>
+struct is_forced_trivially_copyable;
+
 template <>
-struct is_trivially_copyable<o2::dcs::DataPointCompositeObject> : std::true_type {
+struct is_forced_trivially_copyable<o2::dcs::DataPointCompositeObject> : std::true_type {
 };
-} // namespace std
+} // namespace o2::framework
 
 #endif /* O2_DCS_DATAPOINT_COMPOSITE_OBJECT_H */

@@ -243,11 +243,15 @@ struct hash<o2::dcs::DataPointIdentifier> {
     return std::hash<uint64_t>{}(dpid.hash_code());
   }
 };
+} // namespace std
+namespace o2::framework {
+template <typename T>
+struct is_forced_trivially_copyable;
 
 template <>
-struct is_trivially_copyable<o2::dcs::DataPointIdentifier> : std::true_type {
+struct is_forced_trivially_copyable<o2::dcs::DataPointIdentifier> : std::true_type {
 };
 
-} // namespace std
+} // namespace o2::framework
 
 #endif /* O2_DCS_DATAPOINT_IDENTIFIER_H */

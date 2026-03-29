@@ -244,7 +244,8 @@ struct hash<o2::dcs::DataPointIdentifier> {
   }
 };
 } // namespace std
-namespace o2::framework {
+namespace o2::framework
+{
 template <typename T>
 struct is_forced_trivially_copyable;
 

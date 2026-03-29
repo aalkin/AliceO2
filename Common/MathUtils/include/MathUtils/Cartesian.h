@@ -284,7 +284,8 @@ GPUdi() SMatrix<T, D1, D1, MatRepSym<T, D1>> Similarity(const SMatrix<T, D1, D2,
 #if (!defined(GPUCA_STANDALONE) || !defined(DGPUCA_NO_ROOT)) && !defined(GPUCA_GPUCODE) && !defined(GPUCOMMONRTYPES_H_ACTIVE)
 std::ostream& operator<<(std::ostream& os, const o2::math_utils::Rotation2Df_t& t);
 std::ostream& operator<<(std::ostream& os, const o2::math_utils::Rotation2Dd_t& t);
-namespace o2::framework {
+namespace o2::framework
+{
 template <typename T>
 struct is_forced_trivially_copyable;
 

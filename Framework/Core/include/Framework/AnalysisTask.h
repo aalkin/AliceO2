@@ -557,8 +557,8 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
 
   // request base tables for spawnable extended tables and indices to be built
   // this checks for duplications
-  homogeneous_apply_refs_sized<numElements>([&inputs](auto& element) {
-    return analysis_task_parsers::requestInputs(inputs, element);
+  homogeneous_apply_refs_sized<numElements>([&inputs, &newOrigin](auto& element) {
+    return analysis_task_parsers::requestInputs(inputs, element, newOrigin);
   },
                                             *task.get());
 
@@ -567,8 +567,13 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
     LOG(warn) << "Task " << name_str << " has no inputs";
   }
 
+  // update OutputSpecs in output declarations
+  homogeneous_apply_refs_sized<numElements>([&newOrigin](auto& element){ return analysis_task_parsers::updateOutputSpec(element, newOrigin); }, *task.get());
+
+  // append outputs
   homogeneous_apply_refs_sized<numElements>([&outputs, &hash](auto& element) { return analysis_task_parsers::appendOutput(outputs, element, hash); }, *task.get());
 
+  // request services
   auto requiredServices = CommonServices::defaultServices();
   auto arrowServices = CommonServices::arrowServices();
   requiredServices.insert(requiredServices.end(), arrowServices.begin(), arrowServices.end());

@@ -774,23 +774,32 @@ o2::framework::ServiceSpec ArrowSupport::arrowTableSlicingCacheSpec()
     .preProcessing = [](ProcessingContext& pc, void* service_ptr) {
       auto* service = static_cast<ArrowTableSlicingCache*>(service_ptr);
       auto& caches = service->bindingsKeys;
-      for (auto i = 0u; i < caches.size(); ++i) {
-        if (caches[i].enabled && pc.inputs().getPos(caches[i].binding.c_str()) >= 0) {
-          auto status = service->updateCacheEntry(i, pc.inputs().get<TableConsumer>(caches[i].matcher)->asArrowTable());
-          if (!status.ok()) {
-            throw runtime_error_f("Failed to update slice cache for %s/%s", caches[i].binding.c_str(), caches[i].key.c_str());
-          }
-        }
-      }
+
+      int counter = 0;
+      (void) (caches |
+             std::views::transform([&counter](auto const& entry){ return std::make_pair(counter++, entry); }) |
+             std::views::filter([&pc](auto const& pair){ return pair.second.enabled && pc.inputs().getPos(pair.second.matcher) >= 0; }) |
+             std::views::transform([&service, &pc](auto const& pair){
+               auto status = service->updateCacheEntry(pair.first, pc.inputs().get<TableConsumer>(pair.second.matcher)->asArrowTable());
+               if (!status.ok()) {
+                 throw runtime_error_f("Failed to update slice cache for %s/%s: %s", pair.second.binding.c_str(), pair.second.key.c_str(), status.ToString().c_str());
+               }
+               return status;
+             }));
+
+      counter = 0;
       auto& unsortedCaches = service->bindingsKeysUnsorted;
-      for (auto i = 0u; i < unsortedCaches.size(); ++i) {
-        if (unsortedCaches[i].enabled && pc.inputs().getPos(unsortedCaches[i].binding.c_str()) >= 0) {
-          auto status = service->updateCacheEntryUnsorted(i, pc.inputs().get<TableConsumer>(unsortedCaches[i].matcher)->asArrowTable());
-          if (!status.ok()) {
-            throw runtime_error_f("failed to update slice cache (unsorted) for %s/%s", unsortedCaches[i].binding.c_str(), unsortedCaches[i].key.c_str());
-          }
-        }
-      } },
+      (void) (unsortedCaches |
+             std::views::transform([&counter](auto const& entry){ return std::make_pair(counter++, entry); }) |
+             std::views::filter([&pc](auto const& pair){ return pair.second.enabled && pc.inputs().getPos(pair.second.matcher) >= 0; }) |
+             std::views::transform([&service, &pc](auto const& pair){
+               auto status = service->updateCacheEntryUnsorted(pair.first, pc.inputs().get<TableConsumer>(pair.second.matcher)->asArrowTable());
+               if (!status.ok()) {
+                 throw runtime_error_f("Failed to update slice cache (unsorted) for %s/%s: %s", pair.second.binding.c_str(), pair.second.key.c_str(), status.ToString().c_str());
+               }
+               return status;
+             }));
+     },
     .kind = ServiceKind::Stream};
 }
 

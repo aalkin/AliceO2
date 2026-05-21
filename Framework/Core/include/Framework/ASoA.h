@@ -1414,11 +1414,11 @@ static constexpr auto hasColumnForKey(framework::pack<C...>, std::string_view ke
 {
   auto caseInsensitiveCompare = [](const std::string_view& str1, const std::string_view& str2) {
     return (str1.size() == str2.size()) && std::ranges::equal(
-      str1, str2,
-      [](char c1, char c2) {
-        return std::tolower(static_cast<unsigned char>(c1)) ==
-               std::tolower(static_cast<unsigned char>(c2));
-      });
+                                             str1, str2,
+                                             [](char c1, char c2) {
+                                               return std::tolower(static_cast<unsigned char>(c1)) ==
+                                                      std::tolower(static_cast<unsigned char>(c2));
+                                             });
   };
   return (caseInsensitiveCompare(C::inherited_t::mLabel, key) || ...);
 }

@@ -42,6 +42,7 @@
 
 // Do not change this for a full inclusion of fair::mq::Device.
 #include <fairmq/FwdDecls.h>
+#include <shmem/Message.h>
 
 namespace arrow
 {
@@ -496,6 +497,8 @@ class DataAllocator
 
   struct CacheId {
     int64_t value;
+    int64_t handle;
+    int64_t segment;
   };
 
   enum struct CacheStrategy : int {
@@ -507,7 +510,7 @@ class DataAllocator
   CacheId adoptContainer(const Output& /*spec*/, ContainerT& /*container*/, CacheStrategy /* cache  = false */, o2::header::SerializationMethod /* method = header::gSerializationMethodNone*/)
   {
     static_assert(always_static_assert_v<ContainerT>, "Container cannot be moved. Please make sure it is backed by a o2::pmr::FairMQMemoryResource");
-    return {0};
+    return {0, 0, 0};
   }
 
   /// Adopt a PMR container. Notice that the container must be moveable and
@@ -595,12 +598,15 @@ DataAllocator::CacheId DataAllocator::adoptContainer(const Output& spec, Contain
                                                                payloadMessage->GetSize() //
   );
 
-  CacheId cacheId{0}; //
+  CacheId cacheId{0, 0, 0}; //
   if (cache == CacheStrategy::Always) {
     // The message will be shallow cloned in the cache. Since the
     // clone is indistinguishable from the original, we can keep sending
     // the original.
     cacheId.value = context.addToCache(payloadMessage);
+    auto meta = dynamic_cast<fair::mq::shmem::Message*>(payloadMessage.get())->GetMeta();
+    cacheId.handle = meta.fHandle;
+    cacheId.segment = meta.fSegmentId;
   }
 
   context.add<MessageContext::TrivialObject>(std::move(headerMessage), std::move(payloadMessage), routeIndex);

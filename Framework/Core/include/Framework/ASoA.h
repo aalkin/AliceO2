@@ -24,6 +24,7 @@
 #include "Framework/ArrowTableSlicingCache.h" // IWYU pragma: export
 #include "Framework/SliceCache.h"             // IWYU pragma: export
 #include "Framework/VariantHelpers.h"         // IWYU pragma: export
+#include <fairmq/Version.h>
 #include <arrow/array/array_binary.h>
 #include <arrow/table.h>              // IWYU pragma: export
 #include <arrow/array.h>              // IWYU pragma: export
@@ -36,9 +37,16 @@
 #include <cstring>
 #include <gsl/span> // IWYU pragma: export
 
+namespace fair::mq::shmem {
+struct MetaHeader;
+}
+
 namespace o2::framework
 {
 using ListVector = std::vector<std::vector<int64_t>>;
+#if (FAIRMQ_VERSION_DEC >= 111000)
+using PointerReconstructor = std::function<std::byte*(fair::mq::shmem::MetaHeader&&)>;
+#endif
 
 std::string cutString(std::string&& str);
 std::string strToUpper(std::string&& str);
@@ -1081,6 +1089,9 @@ concept can_bind = requires(T&& t) {
 template <typename... C>
 concept has_index = (is_indexing_column<C> || ...);
 
+template <typename C>
+concept needs_ptr_rec = C::needs_ptr_rec;
+
 template <typename D, typename O, typename IP, typename... C>
 struct TableIterator : IP, C... {
  public:
@@ -1248,6 +1259,21 @@ struct TableIterator : IP, C... {
   {
     doSetCurrentInternal(internal_index_columns_t{}, table);
   }
+#if (FAIRMQ_VERSION_DEC >= 111000)
+  void setPointerReconstructor(framework::PointerReconstructor const& pointerReconstructor)
+  {
+    [&pointerReconstructor, this]<typename... Cs>(framework::pack<Cs...>) {
+      ([&pointerReconstructor, this]<typename CC>() {
+        if constexpr (needs_ptr_rec<CC>) {
+          if (pointerReconstructor) {
+            CC::ptrRec = &pointerReconstructor;
+          }
+        }
+      }.template operator()<Cs>(),
+       ...);
+    }(all_columns{});
+  }
+#endif
 
  private:
   /// Helper to move at the end of columns which actually have an iterator.
@@ -2285,7 +2311,12 @@ class Table
   {
     return self_t{mTable->Slice(0, 0), 0};
   }
-
+#if (FAIRMQ_VERSION_DEC >= 111000)
+  void setPointerReconstructor(framework::PointerReconstructor const& pointerReconstructor)
+  {
+    mBegin.setPointerReconstructor(pointerReconstructor);
+  }
+#endif
  private:
   template <typename T>
   arrow::ChunkedArray* lookupColumn()
@@ -2464,6 +2495,56 @@ consteval static std::string_view namespace_prefix()
   };                                                                                                                                                                              \
   [[maybe_unused]] static constexpr o2::framework::expressions::BindingNode _Getter_ { _Label_, _Name_::hash, o2::framework::expressions::selectArrowType<_Type_>() }
 
+#if (FAIRMQ_VERSION_DEC >= 111000)
+#define DECLARE_SOA_CCDB_COLUMN_FULL(_Name_, _Label_, _Getter_, _ConcreteType_, _CCDBQuery_)                      \
+  struct _Name_ : o2::soa::Column<int64_t[3], _Name_> {                                                           \
+    static constexpr const char* mLabel = _Label_;                                                                \
+    static constexpr const char* query = _CCDBQuery_;                                                             \
+    static constexpr const uint32_t hash = crc32(namespace_prefix<_Name_>(), std::string_view{#_Getter_});        \
+    static constexpr bool needs_ptr_rec = true;                                                                   \
+    std::function<std::byte*(fair::mq::shmem::MetaHeader&&)> const* ptrRec = nullptr;                             \
+    using base = o2::soa::Column<int64_t[3], _Name_>;                                                             \
+    using type = int64_t[3];                                                                                      \
+    using column_t = _Name_;                                                                                      \
+    _Name_(arrow::ChunkedArray const* column)                                                                     \
+      : o2::soa::Column<int64_t[3], _Name_>(o2::soa::ColumnIterator<int64_t[3]>(column))                          \
+    {                                                                                                             \
+    }                                                                                                             \
+                                                                                                                  \
+    _Name_() = default;                                                                                           \
+    _Name_(_Name_ const& other) = default;                                                                        \
+    _Name_& operator=(_Name_ const& other) = default;                                                             \
+                                                                                                                  \
+    decltype(auto) _Getter_() const                                                                               \
+    {                                                                                                             \
+      auto& [handle, segment, size] = *mColumnIterator;                                                           \
+    auto span = std::span<std::byte>{(*ptrRec)(fair::mq::shmem::MetaHeader{                                       \
+                                              static_cast<size_t>(size),                                          \
+                                              0, handle, 0, 0,                                                    \
+                                              static_cast<uint16_t>(segment), true}), static_cast<size_t>(size)}; \
+      if constexpr (std::same_as<_ConcreteType_, std::span<std::byte>>) {                                         \
+        return span;                                                                                              \
+      } else {                                                                                                    \
+        static std::byte* payload = nullptr;                                                                      \
+        static _ConcreteType_* deserialised = nullptr;                                                            \
+        static TClass* c = TClass::GetClass(#_ConcreteType_);                                                     \
+        if (payload != (std::byte*)span.data()) {                                                                 \
+          payload = (std::byte*)span.data();                                                                      \
+          delete deserialised;                                                                                    \
+          TBufferFile f(TBufferFile::EMode::kRead, span.size(), (char*)span.data(), kFALSE);                      \
+          deserialised = (_ConcreteType_*)soa::extractCCDBPayload((char*)payload, span.size(), c, "ccdb_object"); \
+        }                                                                                                         \
+        return *deserialised;                                                                                     \
+      }                                                                                                           \
+    }                                                                                                             \
+                                                                                                                  \
+    decltype(auto)                                                                                                \
+      get() const                                                                                                 \
+    {                                                                                                             \
+      return _Getter_();                                                                                          \
+    }                                                                                                             \
+  };
+#else
 #define DECLARE_SOA_CCDB_COLUMN_FULL(_Name_, _Label_, _Getter_, _ConcreteType_, _CCDBQuery_)                      \
   struct _Name_ : o2::soa::Column<std::span<std::byte>, _Name_> {                                                 \
     static constexpr const char* mLabel = _Label_;                                                                \
@@ -2506,6 +2587,7 @@ consteval static std::string_view namespace_prefix()
       return _Getter_();                                                                                          \
     }                                                                                                             \
   };
+#endif
 
 #define DECLARE_SOA_CCDB_COLUMN(_Name_, _Getter_, _ConcreteType_, _CCDBQuery_) \
   DECLARE_SOA_CCDB_COLUMN_FULL(_Name_, "f" #_Name_, _Getter_, _ConcreteType_, _CCDBQuery_)
@@ -3849,7 +3931,12 @@ class FilteredBase : public T
   {
     return mCached;
   }
-
+#if (FAIRMQ_VERSION_DEC >= 111000)
+  void setPointerReconstructor(framework::PointerReconstructor const& pointerReconstructor)
+  {
+    mFilteredBegin.setPointerReconstructor(pointerReconstructor);
+  }
+#endif
  private:
   void resetRanges()
   {

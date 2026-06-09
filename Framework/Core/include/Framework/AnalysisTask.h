@@ -26,6 +26,8 @@
 #include "Framework/TypeIdHelpers.h"
 #include "Framework/ArrowTableSlicingCache.h"
 #include "Framework/AnalysisDataModel.h"
+#include "Framework/DanglingEdgesContext.h"
+#include <fairmq/Version.h>
 
 #include <arrow/compute/kernel.h>
 #include <arrow/table.h>
@@ -302,11 +304,19 @@ struct AnalysisDataProcessorBuilder {
   }
 
   template <typename Task, is_table_iterator_or_enumeration Grouping, std::ranges::input_range R, soa::is_table... Associated>
+#if (FAIRMQ_VERSION_DEC >= 111000)
+  static void invokeProcess(Task& task, InputRecord& inputs, R matchers, PointerReconstructor const& pointerReconstructor, void (Task::*processingFunction)(Grouping, Associated...), std::vector<ExpressionInfo>& infos, ArrowTableSlicingCache& slices, header::DataOrigin newOrigin = header::DataOrigin{"AOD"})
+#else
   static void invokeProcess(Task& task, InputRecord& inputs, R matchers, void (Task::*processingFunction)(Grouping, Associated...), std::vector<ExpressionInfo>& infos, ArrowTableSlicingCache& slices, header::DataOrigin newOrigin = header::DataOrigin{"AOD"})
+#endif
   {
     using G = std::decay_t<Grouping>;
     auto groupingTable = AnalysisDataProcessorBuilder::bindGroupingTable(inputs, matchers, processingFunction, infos);
-
+#if (FAIRMQ_VERSION_DEC >= 111000)
+    if constexpr (!is_enumeration<G>) {
+      groupingTable.setPointerReconstructor(pointerReconstructor);
+    }
+#endif
     constexpr const int numElements = nested_brace_constructible_size<false, std::decay_t<Task>>() / 10;
 
     // set filtered tables for partitions with grouping
@@ -347,6 +357,12 @@ struct AnalysisDataProcessorBuilder {
            ...);
         },
         associatedTables);
+#if (FAIRMQ_VERSION_DEC >= 111000)
+      std::apply([&pointerReconstructor](auto&... table) {
+        (table.setPointerReconstructor(pointerReconstructor), ...);
+      },
+                 associatedTables);
+#endif
 
       auto binder = [&task, &groupingTable, &associatedTables](auto& x) mutable {
         x.bindExternalIndices(&groupingTable, &std::get<std::decay_t<Associated>>(associatedTables)...);
@@ -377,6 +393,12 @@ struct AnalysisDataProcessorBuilder {
         auto slicer = GroupSlicer(groupingTable, associatedTables, slices, newOrigin);
         for (auto& slice : slicer) {
           auto associatedSlices = slice.associatedTables();
+#if (FAIRMQ_VERSION_DEC >= 111000)
+          std::apply([&pointerReconstructor](auto&... table) {
+            (table.setPointerReconstructor(pointerReconstructor), ...);
+          },
+                     associatedSlices);
+#endif
           overwriteInternalIndices(associatedSlices, associatedTables);
           std::apply(
             [&binder](auto&... x) mutable {
@@ -643,8 +665,19 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
     ic.services().get<ArrowTableSlicingCacheDef>().setCaches(std::move(bindingsKeys));
     ic.services().get<ArrowTableSlicingCacheDef>().setCachesUnsorted(std::move(bindingsKeysUnsorted));
     ic.services().get<ArrowTableSlicingCacheDef>().setOrigin(newOrigin);
+#if (FAIRMQ_VERSION_DEC >= 111000)
+    PointerReconstructor pointerReconstructor(nullptr);
+    bool hasCCDBTables = !ic.services().get<DanglingEdgesContext>().requestedTIMs.empty();
 
-    return [task, expressionInfos, inputInfos, newOrigin](ProcessingContext& pc) mutable {
+    return [task, expressionInfos, inputInfos, newOrigin, hasCCDBTables, pointerReconstructor](ProcessingContext& pc) mutable {
+      if (hasCCDBTables && (!pointerReconstructor)) {
+        auto& proxy = pc.services().get<FairMQDeviceProxy>();
+        auto& spec = pc.services().get<DanglingEdgesContext>().requestedTIMs.front();
+        pointerReconstructor = proxy.getShmPointerReconstructor(spec, 0);
+      }
+#else
+    return [task, expressionInfos, inputInfos, newOrigin, hasCCDBTables](ProcessingContext& pc) mutable {
+#endif
       // load the ccdb object from their cache
       homogeneous_apply_refs_sized<numElements>([&pc](auto& element) { return analysis_task_parsers::newDataframeCondition(pc.inputs(), element); }, *task.get());
       // reset partitions once per dataframe
@@ -669,16 +702,28 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
       if constexpr (requires { &T::process; }) {
         auto loc = std::ranges::find_if(inputInfos, [](auto const& info) { return info.hash == o2::framework::TypeIdHelpers::uniqueId<decltype(&T::process)>(); });
         auto matchers = loc == inputInfos.end() ? std::vector<std::pair<int, ConcreteDataMatcher>>{} : loc->matchers;
+#if (FAIRMQ_VERSION_DEC >= 111000)
+        AnalysisDataProcessorBuilder::invokeProcess(*(task.get()), pc.inputs(), matchers, pointerReconstructor, &T::process, expressionInfos, slices, newOrigin);
+#else
         AnalysisDataProcessorBuilder::invokeProcess(*(task.get()), pc.inputs(), matchers, &T::process, expressionInfos, slices, newOrigin);
+#endif
       }
       // execute optional process()
       homogeneous_apply_refs_sized<numElements>(
+#if (FAIRMQ_VERSION_DEC >= 111000)
+        [&pc, &expressionInfos, &task, &slices, &inputInfos, &newOrigin, &pointerReconstructor](auto& x) {
+#else
         [&pc, &expressionInfos, &task, &slices, &inputInfos, &newOrigin](auto& x) {
+#endif
           if constexpr (is_process_configurable<decltype(x)>) {
             if (x.value == true) {
               auto loc = std::ranges::find_if(inputInfos, [](auto const& info) { return info.hash == o2::framework::TypeIdHelpers::uniqueId<decltype(x.process)>(); });
               auto matchers = loc == inputInfos.end() ? std::vector<std::pair<int, ConcreteDataMatcher>>{} : loc->matchers;
+#if (FAIRMQ_VERSION_DEC >= 111000)
+              AnalysisDataProcessorBuilder::invokeProcess(*task.get(), pc.inputs(), matchers, pointerReconstructor, x.process, expressionInfos, slices, newOrigin);
+#else
               AnalysisDataProcessorBuilder::invokeProcess(*task.get(), pc.inputs(), matchers, x.process, expressionInfos, slices, newOrigin);
+#endif
               return true;
             }
             return false;

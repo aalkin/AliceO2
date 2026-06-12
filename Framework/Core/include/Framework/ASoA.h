@@ -37,7 +37,8 @@
 #include <cstring>
 #include <gsl/span> // IWYU pragma: export
 
-namespace fair::mq::shmem {
+namespace fair::mq::shmem
+{
 struct MetaHeader;
 }
 
@@ -2518,10 +2519,11 @@ consteval static std::string_view namespace_prefix()
     decltype(auto) _Getter_() const                                                                               \
     {                                                                                                             \
       auto& [handle, segment, size] = *mColumnIterator;                                                           \
-    auto span = std::span<std::byte>{(*ptrRec)(fair::mq::shmem::MetaHeader{                                       \
-                                              static_cast<size_t>(size),                                          \
-                                              0, handle, 0, 0,                                                    \
-                                              static_cast<uint16_t>(segment), true}), static_cast<size_t>(size)}; \
+      auto span = std::span<std::byte>{(*ptrRec)(fair::mq::shmem::MetaHeader{                                     \
+                                         static_cast<size_t>(size),                                               \
+                                         0, handle, 0, 0,                                                         \
+                                         static_cast<uint16_t>(segment), true}),                                  \
+                                       static_cast<size_t>(size)};                                                \
       if constexpr (std::same_as<_ConcreteType_, std::span<std::byte>>) {                                         \
         return span;                                                                                              \
       } else {                                                                                                    \

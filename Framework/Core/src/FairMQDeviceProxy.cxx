@@ -380,7 +380,7 @@ PointerReconstructor FairMQDeviceProxy::getShmPointerReconstructor(InputSpec con
     }
   }
   if (c.value != ChannelIndex::INVALID) {
-    return {[transport = getInputChannel(c)->Transport()](fair::mq::shmem::MetaHeader&& meta){ return reinterpret_cast<std::byte*>(fair::mq::shmem::GetDataAddressFromHandle(*transport, meta)); }};
+    return {[transport = getInputChannel(c)->Transport()](fair::mq::shmem::MetaHeader&& meta) { return reinterpret_cast<std::byte*>(fair::mq::shmem::GetDataAddressFromHandle(*transport, meta)); }};
   }
   return {};
 }

@@ -65,7 +65,7 @@ class FairMQDeviceProxy
   [[nodiscard]] ChannelIndex getForwardChannelIndexByName(std::string const& channelName) const;
   /// Retrieve the channel index from a given OutputSpec and the associated timeslice
   [[nodiscard]] ChannelIndex getOutputChannelIndex(OutputSpec const& spec, size_t timeslice) const;
-  #if (FAIRMQ_VERSION_DEC >= 111000)
+#if (FAIRMQ_VERSION_DEC >= 111000)
   /// Retrieve the pointer-reconstruction function for the shm manager for a given input spec
   [[nodiscard]] PointerReconstructor getShmPointerReconstructor(InputSpec const& spec, size_t timeslice);
 #endif

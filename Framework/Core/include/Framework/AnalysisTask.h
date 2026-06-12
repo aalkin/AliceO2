@@ -602,7 +602,8 @@ DataProcessorSpec adaptAnalysisTask(ConfigContext const& ctx, Args&&... args)
   // replace origins in Preslice declarations
   homogeneous_apply_refs_sized<numElements>([&newOrigin](auto& element) { return analysis_task_parsers::replaceOrigin(element, newOrigin); }, *task.get());
 
-  auto algo = AlgorithmSpec::InitCallback{
+  auto algo = AlgorithmSpec::InitCallback
+  {
     [task = task, expressionInfos, inputInfos, newOrigin, newOriginStr](InitContext& ic) mutable {
       Cache bindingsKeys;
       Cache bindingsKeysUnsorted;

@@ -3721,7 +3721,7 @@ class FilteredBase : public T
     SelectionVector newSelection;
     newSelection.resize(static_cast<int64_t>(end - start + 1));
     std::iota(newSelection.begin(), newSelection.end(), start);
-    return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
+    return self_t{{this->asArrowTable()}, std::move(newSelection), this->offset()};
   }
 
   auto emptySlice() const
@@ -3993,7 +3993,7 @@ class Filtered : public FilteredBase<T>
     SelectionVector newSelection;
     newSelection.resize(static_cast<int64_t>(end - start + 1));
     std::iota(newSelection.begin(), newSelection.end(), start);
-    return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
+    return self_t{{this->asArrowTable()}, std::move(newSelection), this->offset()};
   }
 
   auto emptySlice() const
@@ -4168,7 +4168,7 @@ class Filtered<Filtered<T>> : public FilteredBase<typename T::table_t>
     SelectionVector newSelection;
     newSelection.resize(static_cast<int64_t>(end - start + 1));
     std::iota(newSelection.begin(), newSelection.end(), start);
-    return self_t{{this->asArrowTable()}, std::move(newSelection), 0};
+    return self_t{{this->asArrowTable()}, std::move(newSelection), this->offset()};
   }
 
   auto emptySlice() const

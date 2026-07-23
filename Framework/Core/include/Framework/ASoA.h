@@ -1724,7 +1724,7 @@ class Table
   using table_t = self_t;
 
   static constexpr const auto originals = computeOriginals<ref, Ts...>();
-  static constexpr const auto originalLabels = []<size_t N, std::array<TableRef, N> refs, size_t... Is> (std::index_sequence<Is...>) consteval {
+  static constexpr const auto originalLabels = []<size_t N, std::array<TableRef, N> refs, size_t... Is>(std::index_sequence<Is...>) consteval {
     return std::array<const char*, N>{o2::aod::label<refs[Is]>()...};
   }.template operator()<originals.size(), originals>(std::make_index_sequence<originals.size()>());
   static constexpr const uint32_t binding_origin = originals[0].origin_hash;
@@ -2373,97 +2373,97 @@ consteval static std::string_view namespace_prefix()
   [[maybe_unused]] static constexpr o2::framework::expressions::BindingNode _Getter_ { _Label_, _Name_::hash, o2::framework::expressions::selectArrowType<_Type_>() }
 
 #if (FAIRMQ_VERSION_DEC >= 111000)
-#define DECLARE_SOA_CCDB_COLUMN_FULL(_Name_, _Label_, _Getter_, _ConcreteType_, _CCDBQuery_)                                  \
-  struct _Name_ : o2::soa::Column<int64_t[3], _Name_> {                                                                       \
-    static constexpr const char* mLabel = _Label_;                                                                            \
-    static constexpr const char* query = _CCDBQuery_;                                                                         \
-    static constexpr const uint32_t hash = compile_time_hash(namespace_prefix<_Name_>(), std::string_view{#_Getter_});        \
-    static constexpr bool needs_ptr_rec = true;                                                                               \
-    std::function<std::byte*(fair::mq::shmem::MetaHeader&&)> const* ptrRec = nullptr;                                         \
-    using base = o2::soa::Column<int64_t[3], _Name_>;                                                                         \
-    using type = int64_t[3];                                                                                                  \
-    using column_t = _Name_;                                                                                                  \
-    _Name_(arrow::ChunkedArray const* column)                                                                                 \
-      : o2::soa::Column<int64_t[3], _Name_>(o2::soa::ColumnIterator<int64_t[3]>(column))                                      \
-    {                                                                                                                         \
-    }                                                                                                                         \
-                                                                                                                              \
-    _Name_() = default;                                                                                                       \
-    _Name_(_Name_ const& other) = default;                                                                                    \
-    _Name_& operator=(_Name_ const& other) = default;                                                                         \
-                                                                                                                              \
-    decltype(auto) _Getter_() const                                                                                           \
-    {                                                                                                                         \
-      auto& [handle, segment, size] = *mColumnIterator;                                                                       \
-      auto span = std::span<std::byte>{(*ptrRec)(fair::mq::shmem::MetaHeader{                                                 \
-                                         static_cast<size_t>(size),                                                           \
-                                         0, handle, 0, 0,                                                                     \
-                                         static_cast<uint16_t>(segment), true}),                                              \
-                                       static_cast<size_t>(size)};                                                            \
-      if constexpr (std::same_as<_ConcreteType_, std::span<std::byte>>) {                                                     \
-        return span;                                                                                                          \
-      } else {                                                                                                                \
-        static std::byte* payload = nullptr;                                                                                  \
-        static _ConcreteType_* deserialised = nullptr;                                                                        \
-        static TClass* c = TClass::GetClass(#_ConcreteType_);                                                                 \
-        if (payload != (std::byte*)span.data()) {                                                                             \
-          payload = (std::byte*)span.data();                                                                                  \
-          delete deserialised;                                                                                                \
-          TBufferFile f(TBufferFile::EMode::kRead, span.size(), (char*)span.data(), kFALSE);                                  \
-          deserialised = (_ConcreteType_*)soa::extractCCDBPayload((char*)payload, span.size(), c, "ccdb_object");             \
-        }                                                                                                                     \
-        return *deserialised;                                                                                                 \
-      }                                                                                                                       \
-    }                                                                                                                         \
-                                                                                                                              \
-    decltype(auto)                                                                                                            \
-      get() const                                                                                                             \
-    {                                                                                                                         \
-      return _Getter_();                                                                                                      \
-    }                                                                                                                         \
+#define DECLARE_SOA_CCDB_COLUMN_FULL(_Name_, _Label_, _Getter_, _ConcreteType_, _CCDBQuery_)                           \
+  struct _Name_ : o2::soa::Column<int64_t[3], _Name_> {                                                                \
+    static constexpr const char* mLabel = _Label_;                                                                     \
+    static constexpr const char* query = _CCDBQuery_;                                                                  \
+    static constexpr const uint32_t hash = compile_time_hash(namespace_prefix<_Name_>(), std::string_view{#_Getter_}); \
+    static constexpr bool needs_ptr_rec = true;                                                                        \
+    std::function<std::byte*(fair::mq::shmem::MetaHeader&&)> const* ptrRec = nullptr;                                  \
+    using base = o2::soa::Column<int64_t[3], _Name_>;                                                                  \
+    using type = int64_t[3];                                                                                           \
+    using column_t = _Name_;                                                                                           \
+    _Name_(arrow::ChunkedArray const* column)                                                                          \
+      : o2::soa::Column<int64_t[3], _Name_>(o2::soa::ColumnIterator<int64_t[3]>(column))                               \
+    {                                                                                                                  \
+    }                                                                                                                  \
+                                                                                                                       \
+    _Name_() = default;                                                                                                \
+    _Name_(_Name_ const& other) = default;                                                                             \
+    _Name_& operator=(_Name_ const& other) = default;                                                                  \
+                                                                                                                       \
+    decltype(auto) _Getter_() const                                                                                    \
+    {                                                                                                                  \
+      auto& [handle, segment, size] = *mColumnIterator;                                                                \
+      auto span = std::span<std::byte>{(*ptrRec)(fair::mq::shmem::MetaHeader{                                          \
+                                         static_cast<size_t>(size),                                                    \
+                                         0, handle, 0, 0,                                                              \
+                                         static_cast<uint16_t>(segment), true}),                                       \
+                                       static_cast<size_t>(size)};                                                     \
+      if constexpr (std::same_as<_ConcreteType_, std::span<std::byte>>) {                                              \
+        return span;                                                                                                   \
+      } else {                                                                                                         \
+        static std::byte* payload = nullptr;                                                                           \
+        static _ConcreteType_* deserialised = nullptr;                                                                 \
+        static TClass* c = TClass::GetClass(#_ConcreteType_);                                                          \
+        if (payload != (std::byte*)span.data()) {                                                                      \
+          payload = (std::byte*)span.data();                                                                           \
+          delete deserialised;                                                                                         \
+          TBufferFile f(TBufferFile::EMode::kRead, span.size(), (char*)span.data(), kFALSE);                           \
+          deserialised = (_ConcreteType_*)soa::extractCCDBPayload((char*)payload, span.size(), c, "ccdb_object");      \
+        }                                                                                                              \
+        return *deserialised;                                                                                          \
+      }                                                                                                                \
+    }                                                                                                                  \
+                                                                                                                       \
+    decltype(auto)                                                                                                     \
+      get() const                                                                                                      \
+    {                                                                                                                  \
+      return _Getter_();                                                                                               \
+    }                                                                                                                  \
   };
 #else
-#define DECLARE_SOA_CCDB_COLUMN_FULL(_Name_, _Label_, _Getter_, _ConcreteType_, _CCDBQuery_)                                  \
-  struct _Name_ : o2::soa::Column<std::span<std::byte>, _Name_> {                                                             \
-    static constexpr const char* mLabel = _Label_;                                                                            \
-    static constexpr const char* query = _CCDBQuery_;                                                                         \
-    static constexpr const uint32_t hash = compile_time_hash(namespace_prefix<_Name_>(), std::string_view{#_Getter_});        \
-    using base = o2::soa::Column<std::span<std::byte>, _Name_>;                                                               \
-    using type = std::span<std::byte>;                                                                                        \
-    using column_t = _Name_;                                                                                                  \
-    _Name_(arrow::ChunkedArray const* column)                                                                                 \
-      : o2::soa::Column<std::span<std::byte>, _Name_>(o2::soa::ColumnIterator<std::span<std::byte>>(column))                  \
-    {                                                                                                                         \
-    }                                                                                                                         \
-                                                                                                                              \
-    _Name_() = default;                                                                                                       \
-    _Name_(_Name_ const& other) = default;                                                                                    \
-    _Name_& operator=(_Name_ const& other) = default;                                                                         \
-                                                                                                                              \
-    decltype(auto) _Getter_() const                                                                                           \
-    {                                                                                                                         \
-      if constexpr (std::same_as<_ConcreteType_, std::span<std::byte>>) {                                                     \
-        return *mColumnIterator;                                                                                              \
-      } else {                                                                                                                \
-        static std::byte* payload = nullptr;                                                                                  \
-        static _ConcreteType_* deserialised = nullptr;                                                                        \
-        static TClass* c = TClass::GetClass(#_ConcreteType_);                                                                 \
-        auto span = *mColumnIterator;                                                                                         \
-        if (payload != (std::byte*)span.data()) {                                                                             \
-          payload = (std::byte*)span.data();                                                                                  \
-          delete deserialised;                                                                                                \
-          TBufferFile f(TBufferFile::EMode::kRead, span.size(), (char*)span.data(), kFALSE);                                  \
-          deserialised = (_ConcreteType_*)soa::extractCCDBPayload((char*)payload, span.size(), c, "ccdb_object");             \
-        }                                                                                                                     \
-        return *deserialised;                                                                                                 \
-      }                                                                                                                       \
-    }                                                                                                                         \
-                                                                                                                              \
-    decltype(auto)                                                                                                            \
-      get() const                                                                                                             \
-    {                                                                                                                         \
-      return _Getter_();                                                                                                      \
-    }                                                                                                                         \
+#define DECLARE_SOA_CCDB_COLUMN_FULL(_Name_, _Label_, _Getter_, _ConcreteType_, _CCDBQuery_)                           \
+  struct _Name_ : o2::soa::Column<std::span<std::byte>, _Name_> {                                                      \
+    static constexpr const char* mLabel = _Label_;                                                                     \
+    static constexpr const char* query = _CCDBQuery_;                                                                  \
+    static constexpr const uint32_t hash = compile_time_hash(namespace_prefix<_Name_>(), std::string_view{#_Getter_}); \
+    using base = o2::soa::Column<std::span<std::byte>, _Name_>;                                                        \
+    using type = std::span<std::byte>;                                                                                 \
+    using column_t = _Name_;                                                                                           \
+    _Name_(arrow::ChunkedArray const* column)                                                                          \
+      : o2::soa::Column<std::span<std::byte>, _Name_>(o2::soa::ColumnIterator<std::span<std::byte>>(column))           \
+    {                                                                                                                  \
+    }                                                                                                                  \
+                                                                                                                       \
+    _Name_() = default;                                                                                                \
+    _Name_(_Name_ const& other) = default;                                                                             \
+    _Name_& operator=(_Name_ const& other) = default;                                                                  \
+                                                                                                                       \
+    decltype(auto) _Getter_() const                                                                                    \
+    {                                                                                                                  \
+      if constexpr (std::same_as<_ConcreteType_, std::span<std::byte>>) {                                              \
+        return *mColumnIterator;                                                                                       \
+      } else {                                                                                                         \
+        static std::byte* payload = nullptr;                                                                           \
+        static _ConcreteType_* deserialised = nullptr;                                                                 \
+        static TClass* c = TClass::GetClass(#_ConcreteType_);                                                          \
+        auto span = *mColumnIterator;                                                                                  \
+        if (payload != (std::byte*)span.data()) {                                                                      \
+          payload = (std::byte*)span.data();                                                                           \
+          delete deserialised;                                                                                         \
+          TBufferFile f(TBufferFile::EMode::kRead, span.size(), (char*)span.data(), kFALSE);                           \
+          deserialised = (_ConcreteType_*)soa::extractCCDBPayload((char*)payload, span.size(), c, "ccdb_object");      \
+        }                                                                                                              \
+        return *deserialised;                                                                                          \
+      }                                                                                                                \
+    }                                                                                                                  \
+                                                                                                                       \
+    decltype(auto)                                                                                                     \
+      get() const                                                                                                      \
+    {                                                                                                                  \
+      return _Getter_();                                                                                               \
+    }                                                                                                                  \
   };
 #endif
 
